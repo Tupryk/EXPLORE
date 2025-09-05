@@ -1,0 +1,9 @@
+RRT:
+  max_nodes: 10
+  min_cost: 5e-2
+  stepsize: .1
+  verbose: 1
+  check_collisions: True
+  target_prob: 1.
+  sample_count: 1000
+  output_dir: ${hydra:runtime.output_dir}

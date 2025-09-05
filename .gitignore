@@ -1,0 +1,7 @@
+__pycache__
+data/
+checkpoints/
+z.*
+outcmaes/
+*.png
+*.pkl
