@@ -1,7 +1,3 @@
-rl_method: "PPO"
-verbose: 1
-total_timesteps: 2
-output_dir: ${hydra:runtime.output_dir}
 env:
   start_config_idx: 80
   target_config_idx: 32
@@ -12,3 +8,6 @@ env:
   use_vel: False
   guiding: True
   dataset: "trees"
+
+checkpoint_dir: "checkpoints/trained_rl_policy.zip"
+output_dir: ${hydra:runtime.output_dir}

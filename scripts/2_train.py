@@ -5,7 +5,7 @@ from explore.train.trainer import Trainer
 from explore.utils.logger import get_logger
 
 
-@hydra.main(config_path="../configs", config_name="guided_RL")
+@hydra.main(version_base="1.3", config_path="../configs", config_name="guided_RL")
 def main(cfg: DictConfig):
     logger = get_logger(cfg)
     trainer = Trainer(cfg, logger)

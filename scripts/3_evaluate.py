@@ -1,60 +1,35 @@
-import torch
-from omegaconf import DictConfig
+import os
 import hydra
-from utils.logger import get_logger
-from models.my_model import MyModel
-from datasets.my_dataset import MyDataset
-from torch.utils.data import DataLoader
-from sklearn.metrics import accuracy_score
+import imageio
+from omegaconf import DictConfig
+from stable_baselines3 import PPO
 
-obs, _ = env.reset()
-    env.render()
+from explore.utils.logger import get_logger
+from explore.env.FingerBallsEnv import FingerBallsEnv
+
+
+@hydra.main(version_base="1.3", config_path="../configs", config_name="eval_policy")
+def main(cfg: DictConfig):
+    logger = get_logger(cfg)
+    logger.info("Starting evaluation...")
+
+    env = FingerBallsEnv(cfg.env)
+    model = PPO.load(cfg.checkpoint_dir, env=env)
+
+    obs, _ = env.reset()
+    img = env.render()
+    imgs = [img]
     done = False
 
     while not done:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
-        env.render()
+        img = env.render()
+        imgs.append(img)
 
-
-@hydra.main(version_base="1.3", config_path="../configs", config_name="config")
-def main(cfg: DictConfig):
-    logger = get_logger(cfg)
-    logger.info("Starting evaluation...")
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"Using device: {device}")
-
-    # Load model
-    model = MyModel(cfg.model).to(device)
-    model.load_state_dict(torch.load(cfg.eval.checkpoint_path, map_location=device))
-    model.eval()
-
-    # Load test data
-    test_dataset = MyDataset(cfg.data.test_path)
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=cfg.eval.batch_size,
-        shuffle=False,
-        num_workers=cfg.training.num_workers
-    )
-
-    # Run evaluation
-    all_preds = []
-    all_labels = []
-
-    with torch.no_grad():
-        for inputs, labels in test_loader:
-            inputs = inputs.to(device)
-            outputs = model(inputs)
-            preds = torch.argmax(outputs, dim=1).cpu()
-            all_preds.extend(preds.tolist())
-            all_labels.extend(labels.tolist())
-
-    # Compute metrics
-    accuracy = accuracy_score(all_labels, all_preds)
-    logger.info(f"Test Accuracy: {accuracy:.4f}")
+    result_path = os.path.join(cfg.output_dir, "result.gif")
+    imageio.mimsave(result_path, imgs, fps=10)
 
 
 if __name__ == "__main__":
