@@ -6,7 +6,7 @@ import gymnasium as gym
 from gymnasium import spaces
 from omegaconf import DictConfig
 
-from explore.env.MujocoSim import MjSim
+from explore.env.mujoco_sim import MjSim
 from explore.datasets.rnd_configs import RndConfigs
 
 

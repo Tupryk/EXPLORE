@@ -3,7 +3,7 @@ import torch
 from omegaconf import DictConfig
 from stable_baselines3 import PPO
 
-from explore.env.FingerBallsEnv import FingerBallsEnv
+from explore.env.finger_balls_env import FingerBallsEnv
 
 
 class Trainer:

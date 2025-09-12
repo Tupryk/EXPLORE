@@ -1,11 +1,34 @@
-import torch
 import random
 import numpy as np
-import robotic as ry
-import torch.nn as nn
+from scipy.interpolate import make_interp_spline
 
-from explore.env.MujocoSim import MjSim
-from explore.datasets.rnd_configs import RndConfigs
+
+class ND_BSpline:
+    def __init__(self, start_time: float, start_pos: np.ndarray, degree: int=2):
+        self.start_time = start_time
+        self.start_pos = start_pos
+        self.degree = degree
+        
+    def compute(self, points: np.ndarray, times: np.ndarray, end_time: float):
+        points = np.array([self.start_pos, *points])
+        times = np.array([self.start_time, *times])
+        times += self.start_time
+        times[0] -= self.start_time
+        self.splines = [make_interp_spline(times, points[:, dim], k=self.degree) for dim in range(points.shape[1])]
+        
+    def eval(self, t: float):
+        point = np.array([s(t) for s in self.splines])
+        return point
+        
+
+def compute_cost_new(state0: tuple,
+                     state1: tuple) -> float:
+
+    cost  = np.linalg.norm(state0[1][:3]  - state1[1][:3])
+    cost += np.linalg.norm(state0[1][3:6] - state1[1][3:6])
+    cost += np.linalg.norm(state0[1][6:9] - state1[1][6:9])
+
+    return cost
 
 
 def compute_cost(state0: tuple,
@@ -28,18 +51,6 @@ def compute_cost(state0: tuple,
         cost += err
 
     return cost
-
-
-def compute_contacts(C0: ry.Config, contactees: list[str], contacted: list[str]) -> np.ndarray:
-    contacts = np.zeros( len(contactees) * len(contacted) - len(contactees) )
-    idx = 0
-    for ees in contactees:
-        for ed in contacted:
-            if ees != ed:
-                if 0. >= C0.eval(ry.FS.negDistance, [ees, ed])[0][0]:
-                    contacts[idx] = 1
-                idx += 1
-    return contacts*.1
 
 
 def randint_excluding(low: int, high: int, exclude: int):
@@ -82,62 +93,3 @@ def sample_cluster_balanced(node_idx: list[int], labels: list[int]) -> tuple[int
     sampled_idx = random.choice(idxs)
 
     return node_idx[sampled_idx], cluster_idx
-
-
-def play_model_mlp(model: nn.Module,
-                   start_config_idx: int,
-                   target_config_idx: int=-1,
-                   steps: int=20) -> float:
-    
-    Ds = RndConfigs("data/twoFingers.g", "data/rnd_twoFingers.h5")
-    Ds.set_config(start_config_idx)
-
-    sim = MjSim(open('data/twoFingers.xml', 'r').read(), Ds.C, view=False)
-    tau = .1
-    time_offset = .0
-    horizon = 4
-    history = 1
-    relevant_frames = ["obj", "l_fing", "r_fing"]
-    relevant_frames_idxs = [Ds.C.getFrameNames().index(rf) for rf in relevant_frames]
-
-    if target_config_idx != -1:
-        De = RndConfigs("data/twoFingers.g", "data/rnd_twoFingers.h5")
-        De.set_config(target_config_idx)
-        sim_ = MjSim(open('data/twoFingers.xml', 'r').read(), De.C, view=False)
-        goal_state = sim_.getState()[0][relevant_frames_idxs, :3].flatten()
-        goal_state = torch.tensor(goal_state).float().unsqueeze(0).to("cuda")
-
-    state = sim.getState()[0][relevant_frames_idxs, :3].flatten()
-    model_in = [state for _ in range(history+1)]
-    model_in = torch.tensor(model_in).reshape(1, -1).float().to("cuda")
-
-    for i in range(0, steps, horizon):
-
-        if target_config_idx != -1:
-            model_out = model(torch.cat((goal_state, model_in.reshape(history+1, -1)), dim=0).reshape(1, -1))
-        else:
-            model_out = model(model_in)
-
-        q_targets = model_out.cpu().detach().numpy().reshape(horizon, -1)
-
-        for j, q in enumerate(q_targets):
-            sim.resetSplineRef(time_offset)
-            sim.setSplineRef(q.reshape(1,-1), [.1], append=False)
-        
-            sim.step([], tau, ry.ControlMode.spline, .5)
-            time_offset += tau
-            Ds.C.view(True)
-
-            print(f"Finished step number {i+j}")
-
-        state = sim.getState()[0][relevant_frames_idxs, :3].flatten()
-        model_in = model_in[:, :len(state)*(history)]
-        state = torch.tensor(state).float().to("cuda")
-        model_in = torch.cat((model_in.squeeze(0), state)).unsqueeze(0)
-
-    error = 0.
-    if target_config_idx != -1:
-        # TODO: Calculate error
-        pass
-
-    return error

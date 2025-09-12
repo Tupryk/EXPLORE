@@ -5,7 +5,7 @@ from omegaconf import DictConfig
 from stable_baselines3 import PPO
 
 from explore.utils.logger import get_logger
-from explore.env.FingerBallsEnv import FingerBallsEnv
+from explore.env.finger_balls_env import FingerBallsEnv
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="eval_policy")

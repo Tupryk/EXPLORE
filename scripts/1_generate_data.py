@@ -9,10 +9,10 @@ from explore.datasets.rnd_configs import RndConfigs
             config_path="../configs",
             config_name="trajectory_generation")
 def main(cfg: DictConfig):
+    
+    D = RndConfigs("configs/rnd_twoFingers.h5")
 
-    D = RndConfigs("configs/twoFingers.g", "configs/rnd_twoFingers.h5")
-
-    S = Search(D.C, D.positions, cfg.RRT)
+    S = Search(D.positions, cfg.RRT)
 
     S.run(display=0.)
 
