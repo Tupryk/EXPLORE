@@ -5,8 +5,8 @@ from tqdm import trange
 from omegaconf import DictConfig
 from sklearn.neighbors import NearestNeighbors
 
-from explore.datasets.adj_map import AdjMap
 from explore.env.mujoco_sim import MjSim
+from explore.datasets.adj_map import AdjMap
 from explore.utils.utils import compute_cost_new, randint_excluding
 
 
@@ -53,6 +53,10 @@ class Search:
         self.relevant_frames_weights = [1., 1., 1.]
         self.relevant_frames_idxs = [0, 1, 2]  # TODO
         self.verbose = cfg.verbose
+        self.sample_uniform = cfg.sample_uniform
+        
+        self.start_idx = cfg.start_idx
+        self.end_idx = cfg.end_idx
 
         self.nbrs = NearestNeighbors(n_neighbors=1, metric="euclidean")
         
@@ -66,7 +70,8 @@ class Search:
             state = self.sim.getState()
             self.target_states.append(state)
 
-        self.adj_map = AdjMap(self.min_cost, output_dir=self.output_dir)
+        adj_verb = 1 if self.verbose > 2 else 0
+        self.adj_map = AdjMap(self.min_cost, output_dir=self.output_dir, verbose=adj_verb)
 
     def simulate_action(self,
                         q_target: np.ndarray,
@@ -124,9 +129,8 @@ class Search:
         self.adj_map.save(prefix=f"{self.run_name}start_")
 
         for _ in pbar:
-
-            # start_idx = np.random.randint(0, 100)
-            start_idx = 1
+            
+            start_idx = np.random.randint(0, 100) if self.start_idx == -1 else self.start_idx
         
             # Fit kNN with current node states
             if len(self.trees[start_idx]) != 1:
@@ -134,14 +138,19 @@ class Search:
             self.nbrs.fit(self.trees_kNNs[start_idx])  # Could possibly be made faster if each new node would not require rebuilding the kNN tree
 
             # Sample random sim state
-            exploring = not (np.random.uniform() < self.target_prob)
+            exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
             target_config_idx = -1
-            if exploring:
-                # Sample target sometimes
-                sim_sample = np.random.uniform(low=-1., high=1., size=9)
+            if exploring or self.end_idx == -1:
+                if self.sample_uniform:
+                    # Sample target sometimes
+                    sim_sample = np.random.uniform(low=-1., high=1., size=9)
+                else:
+                    target_config_idx = randint_excluding(0, 100, start_idx)  # TODO: exclude end_idx
+                    t = self.target_states[target_config_idx]
+                    sim_sample = t[1][:9]
             else:
-                target_config_idx = randint_excluding(0, 100, start_idx)
-                t = self.target_states[target_config_idx]
+                target_config_idx = self.end_idx
+                t = self.target_states[self.end_idx]
                 sim_sample = t[1][:9]
             
             # Pick closest node
@@ -194,7 +203,11 @@ class Search:
                 
                 mask = ~np.eye(self.adj_map.costs.shape[0], dtype=bool)
                 masked = self.adj_map.costs[mask]
-                pbar.set_postfix(avg_cost=masked.mean(), min_cost=masked.min())
+                if self.end_idx == -1:
+                    pbar.set_postfix(avg_cost=masked.mean(), min_cost=masked.min())
+                else:
+                    pbar.set_postfix(avg_cost=masked.mean(), min_cost=masked.min(),
+                                     target_cost=self.adj_map.costs[self.start_idx][self.end_idx])
 
         self.adj_map.save(prefix=f"{self.run_name}end_")
 

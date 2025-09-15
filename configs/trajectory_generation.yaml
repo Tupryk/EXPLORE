@@ -1,8 +1,11 @@
 RRT:
-  max_nodes: 1000000
+  max_nodes: 25000
   min_cost: 5e-2
   stepsize: .1
   verbose: 1
-  target_prob: 1.
-  sample_count: 1000
+  target_prob: .2
+  sample_uniform: False
+  start_idx: -1
+  end_idx: -1
+  sample_count: 100
   output_dir: ${hydra:runtime.output_dir}

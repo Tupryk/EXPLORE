@@ -9,7 +9,7 @@ from explore.utils.utils import ND_BSpline
 
 class MjSim:
 
-    def __init__(self, xml: str, tau_sim: float=0.01, view: bool=True, verbose: int=0):
+    def __init__(self, xml: str, tau_sim: float=0.01, view: bool=False, verbose: int=0):
         self.tau_sim = tau_sim
         self.model = mujoco.MjModel.from_xml_string(xml)
         self.data = mujoco.MjData(self.model)
@@ -20,6 +20,18 @@ class MjSim:
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
         else:
             self.viewer = None
+            
+        frames = []
+
+        for geom_id in range(self.model.ngeom):
+            body_id = self.model.geom_bodyid[geom_id]
+            frames.append(body_id)
+
+        self.possible_contacts = []
+        while len(frames):
+            for i in range(1, len(frames)):
+                self.possible_contacts.append((frames[0], frames[i]))
+            del frames[0]
             
         self.resetSplineRef(0.)
 
@@ -92,3 +104,25 @@ class MjSim:
             self.ctrl.append(points[0])
         else:
             raise NotImplementedError("Appending not implemented")
+        
+    def getContacts(self) -> np.ndarray:
+        contacts = []
+        for i in range(self.data.ncon):
+            contact = self.data.contact[i]
+
+            geom1 = contact.geom1
+            geom2 = contact.geom2
+
+            body1 = self.model.geom_bodyid[geom1]
+            body2 = self.model.geom_bodyid[geom2]
+
+            contacts.append((body1, body2))
+        
+        contacts_vec = np.zeros(len(self.possible_contacts))
+        for c in contacts:
+            if c in self.possible_contacts:
+                contacts_vec[self.possible_contacts.index(c)] = 1
+            else:
+                contacts_vec[self.possible_contacts.index((c[1], c[0]))] = 1
+        
+        return contacts_vec

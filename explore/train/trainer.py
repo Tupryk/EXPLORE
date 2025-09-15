@@ -1,13 +1,15 @@
 import os
 import torch
+import logging
 from omegaconf import DictConfig
 from stable_baselines3 import PPO
 
 from explore.env.finger_balls_env import FingerBallsEnv
 
 
-class Trainer:
-    def __init__(self, cfg: DictConfig, logger):
+class RL_Trainer:
+    
+    def __init__(self, cfg: DictConfig, logger: logging.Logger):
         self.cfg = cfg
         self.logger = logger
         
@@ -33,3 +35,12 @@ class Trainer:
         self.logger.info("Starting training...")
         self.model.learn(total_timesteps=self.total_timesteps)
         self.model.save(self.save_as)
+        
+class VAE_Trainer:
+    
+    def __init__(self, cfg: DictConfig, logger: logging.Logger):
+        self.cfg = cfg
+        self.logger = logger
+    
+    def train(self):
+        pass

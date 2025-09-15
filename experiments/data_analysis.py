@@ -1,3 +1,4 @@
+import os
 import time
 import pickle
 import numpy as np
@@ -10,13 +11,16 @@ from explore.datasets.rnd_configs import RndConfigs
 
 ERROR_THRESH = 5e-2
 tree_count = 100
-dataset = "trees"
+dataset = "data/15-32-50/trees"
+# dataset = "data/15-42-54/trees"
+# dataset = "data/16-32-38/trees"
 
 
 trees: list[list[dict]] = []
 
 for i in range(tree_count):
-    with open(f"data/{dataset}/tree_{i}.pkl", "rb") as f:
+    data_path = os.path.join(dataset, f"tree_{i}.pkl")
+    with open(data_path, "rb") as f:
         tree: list[dict] = pickle.load(f)
         trees.append(tree)
 
@@ -36,12 +40,17 @@ for i in tqdm(range(tree_count)):
     top_nodes.append(tree_top_nodes)
     min_costs.append(tree_min_costs)
 
-adj_map = AdjMap(notebook=True)
+adj_map = AdjMap()
 for i in range(tree_count):
     for j in range(tree_count):
         adj_map.set_value(i, j, min_costs[i][j])
 adj_map.update_data()
 adj_map.show()
+start_idx = 1
+end_idx = 0
+costs = [min_costs[start_idx][i] for i in range(tree_count)]
+print(f"Mean costs for start config {start_idx}: {sum(costs)/tree_count}")
+print(f"Cost for target {end_idx} with start {start_idx}: {costs[end_idx]}")
 
 colors = [-1 for _ in range(tree_count)]
 
@@ -53,7 +62,7 @@ for i in range(tree_count):
         max_color_idx += 1
         
         for j in range(tree_count):
-            if min_costs[i][j] <= 5e-2:
+            if i != j and min_costs[i][j] <= ERROR_THRESH:
                 if colors[j] != -1:
                     c = colors[j]
                     for k in range(tree_count):
@@ -121,10 +130,17 @@ for i, path in enumerate(top_paths):
 percs = [float(np.round(c/len(top_paths[i])*100)) for i, c in enumerate(target_counts)]
 percs.sort()
 percs.reverse()
-print("Percetage of reached config used as target: ", percs)
+
+possible_paths = tree_count**2 - tree_count
+print("Found Trajectories Count: ", len(top_paths), " of ", possible_paths)
+print("When considering full graph: ", sum([v**2 for v in group_sizes]) - tree_count, " of ", possible_paths)
+
+if not len(top_paths):
+    print("No trajectories found!")
+    exit()
+
+print("Percentage of reached config used as target: ", percs)
 print("Avg. use of reached config as target: ", sum(percs)/len(percs))
-print("Found Trajectories Count: ", len(top_paths), " of ", tree_count**2)
-print("When considering full graph: ", sum([v**2 for v in group_sizes]), " of ", tree_count**2)
 
 while True:
     path_idx = np.random.randint(0, len(top_paths))
@@ -135,12 +151,18 @@ start_idx = top_paths_start[path_idx]
 end_idx = top_paths_goal[path_idx]
 print("Start idx: ", start_idx)
 print("End idx: ", end_idx)
-
 path_lens = [len(p) for p in top_paths]
+
+# print("Path lens: [", end="")
+# for i in range(len(top_paths)):
+#     end = "]\n" if i == len(top_paths)-1 else ", "
+#     print(f"{path_lens[i]} ({top_paths_start[i]}, {top_paths_goal[i]})", end=end)
+
 path_lens.sort()
 path_lens.reverse()
-print("Path lengths: ", path_lens)
+print("Path length: ", sum(path_lens)/len(path_lens))
 print("Sampled Path Length: ", len(path))
+
 
 sim = MjSim(open("configs/twoFingers.xml", 'r').read(), tau_sim=0.01, view=True)
 
