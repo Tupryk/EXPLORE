@@ -8,7 +8,6 @@ data = np.loadtxt(txt_file, dtype=np.float64)
 
 new_data = []
 for i, vec in enumerate(data):
-    if i >= 100: break
     new_vec = np.zeros(25)
     new_vec[:7] = vec[:7]
     new_vec[9:16] = vec[7:14]

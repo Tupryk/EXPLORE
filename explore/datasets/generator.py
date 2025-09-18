@@ -85,15 +85,24 @@ class Search:
     def run(self, display: float=1.) -> tuple[list[MultiSearchNode], float]:
         
         self.reset_trees()
+        
+        trees_name = f"{self.run_name}trees"
+        folder_path = os.path.join(self.output_dir, trees_name)
+        os.makedirs(folder_path, exist_ok=True)
 
         if self.verbose > 0:
             pbar = trange(self.max_nodes, desc="Physics RRT Search", unit="epoch")
         else:
             pbar = range(self.max_nodes)
             
-        for _ in pbar:
+        nodes_per_tree = self.max_nodes // self.configs.shape[0]
+        
+        for i in pbar:
             
-            start_idx = np.random.randint(0, self.configs.shape[0]) if self.start_idx == -1 else self.start_idx
+            if self.start_idx == -1:
+                start_idx = i // nodes_per_tree
+            else:
+                start_idx = self.start_idx
         
             # Fit kNN with current node states
             self.nbrs.fit(self.trees_kNNs[start_idx])  # Could possibly be made faster if each new node would not require rebuilding the kNN tree
@@ -151,25 +160,28 @@ class Search:
             
             self.trees[start_idx].append(best_node)
             self.trees_kNNs[start_idx] = np.vstack((self.trees_kNNs[start_idx], best_state[1].reshape(1, -1)))
-
-        trees_name = f"{self.run_name}trees"
-        folder_path = os.path.join(self.output_dir, trees_name)
-        os.makedirs(folder_path, exist_ok=True)
-
-        for i, tree in enumerate(self.trees):
-            new_tree = []
-            for node in tree:
-                new_node = {
-                    "parent": node.parent,
-                    "action": node.action,
-                    "state": node.state,
-                    "time": node.time,
-                    "path": node.path,
-                    "explore_node": node.explore_node,
-                    "target_config_idx": node.target_config_idx
-                }
-                new_tree.append(new_node)
-        
-            data_path = os.path.join(folder_path, f"tree_{i}.pkl")
-            with open(data_path, "wb") as f:
-                pickle.dump(new_tree, f)
+            
+            if i % nodes_per_tree == nodes_per_tree-1:
+                if self.verbose > 3:
+                    print(f"Storing tree {start_idx} at i {i}")
+                
+                dict_tree = []
+                for node in self.trees[start_idx]:
+                    new_node = {
+                        "parent": node.parent,
+                        "action": node.action,
+                        "state": node.state,
+                        "time": node.time,
+                        "path": node.path,
+                        "explore_node": node.explore_node,
+                        "target_config_idx": node.target_config_idx
+                    }
+                    dict_tree.append(new_node)
+                    
+                data_path = os.path.join(folder_path, f"tree_{i}.pkl")
+                with open(data_path, "wb") as f:
+                    pickle.dump(dict_tree, f)
+                
+                # Free memory
+                self.reset_trees()
+                
