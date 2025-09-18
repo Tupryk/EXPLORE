@@ -10,5 +10,5 @@ RRT:
   sample_count: 100
   output_dir: ${hydra:runtime.output_dir}
 
-configs_path: "data/pandasTable_ball.h5"
+configs_path: "configs/pandasTable_ball.h5"
 mujoco_xml: "configs/franka_emika_panda/scene.xml"

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from explore.env.mujoco_sim import MjSim
 
 
-file = h5py.File("data/pandasTable_ball.h5", 'r')
+file = h5py.File("configs/pandasTable_ball.h5", 'r')
 stable_configs = file["positions"]
 
 fig = plt.figure()

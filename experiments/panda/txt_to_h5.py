@@ -2,7 +2,7 @@ import h5py
 import numpy as np
 
 txt_file = "data/joint_states.txt"
-h5_file = "data/pandasTable_ball.h5"
+h5_file = "configs/pandasTable_ball.h5"
 
 data = np.loadtxt(txt_file, dtype=np.float64)
 
