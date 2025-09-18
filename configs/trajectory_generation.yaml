@@ -1,11 +1,14 @@
 RRT:
-  max_nodes: 25000
+  max_nodes: 50000
   min_cost: 5e-2
-  stepsize: .1
-  verbose: 1
+  stepsize: .3
+  verbose: 3
   target_prob: .2
   sample_uniform: False
   start_idx: -1
   end_idx: -1
   sample_count: 100
   output_dir: ${hydra:runtime.output_dir}
+
+configs_path: "data/pandasTable_ball.h5"
+mujoco_xml: "configs/franka_emika_panda/scene.xml"

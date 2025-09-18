@@ -6,8 +6,7 @@ from omegaconf import DictConfig
 from sklearn.neighbors import NearestNeighbors
 
 from explore.env.mujoco_sim import MjSim
-from explore.datasets.adj_map import AdjMap
-from explore.utils.utils import compute_cost_new, randint_excluding
+from explore.utils.utils import randint_excluding
 
 
 class MultiSearchNode:
@@ -16,7 +15,6 @@ class MultiSearchNode:
                  action: np.ndarray,
                  state: tuple,
                  time: float,
-                 costs: list,
                  path: list=None,
                  explore_node: bool=False,
                  target_config_idx: int=-1):
@@ -26,20 +24,18 @@ class MultiSearchNode:
         self.time = time
         self.path = path  # Motion
         self.explore_node = explore_node
-        self.costs = costs
         self.target_config_idx = target_config_idx
 
 class Search:
     tau_action = 0.1
     tau_sim = 0.01
 
-    def __init__(self, configs: np.ndarray, cfg: DictConfig):
+    def __init__(self, mujoco_xml: str, configs: np.ndarray, cfg: DictConfig):
         
         self.run_name = ""
         self.configs = configs
 
-        self.sim = MjSim(open("configs/twoFingers.xml", 'r').read(),
-                         self.tau_sim, view=False, verbose=0)
+        self.sim = MjSim(mujoco_xml, self.tau_sim, view=False, verbose=0)
 
         self.max_nodes = cfg.max_nodes
         self.stepsize = cfg.stepsize
@@ -49,9 +45,6 @@ class Search:
         self.output_dir = cfg.output_dir
 
         self.sample_count = cfg.sample_count
-        self.relevant_frame_names = ["obj", "l_fing", "r_fing"]
-        self.relevant_frames_weights = [1., 1., 1.]
-        self.relevant_frames_idxs = [0, 1, 2]  # TODO
         self.verbose = cfg.verbose
         self.sample_uniform = cfg.sample_uniform
         
@@ -60,19 +53,6 @@ class Search:
 
         self.nbrs = NearestNeighbors(n_neighbors=1, metric="euclidean")
         
-        self.target_states = []
-
-        for i in range(100):
-            joint_state = self.configs[i,3:]
-            frame_state = np.zeros((1, 7))
-            frame_state[0, :3] = self.configs[i,:3]
-            self.sim.pushConfig(joint_state, frame_state)
-            state = self.sim.getState()
-            self.target_states.append(state)
-
-        adj_verb = 1 if self.verbose > 2 else 0
-        self.adj_map = AdjMap(self.min_cost, output_dir=self.output_dir, verbose=adj_verb)
-
     def simulate_action(self,
                         q_target: np.ndarray,
                         time_offset: float,
@@ -82,40 +62,25 @@ class Search:
         self.sim.setSplineRef(q_target.reshape(1, -1), [self.tau_action], append=False)
         
         self.sim.step(self.tau_action, display)
-    
-    def getNodeRelevantState(self, tree_idx: int, idx: int) -> np.ndarray:
-        node_state = self.trees[tree_idx][idx].state[1][:9]
-        return node_state
 
     def reset_trees(self):
 
         self.trees: list[list[MultiSearchNode]] = []
         self.trees_kNNs: list[np.ndarray] = []
-        for i in range(100):
-
-            joint_state = self.configs[i,3:]
-            frame_state = np.zeros((1, 7))
-            frame_state[0, :3] = self.configs[i,:3]
-            self.sim.pushConfig(joint_state, frame_state)
+        for i in range(self.configs.shape[0]):
+            
+            self.sim.pushConfig(self.configs[i])
             state = self.sim.getState()
         
-            costs = self.compute_costs(state)
-            root = MultiSearchNode(-1, None, state, 0., costs)
+            root = MultiSearchNode(-1, None, state, 0.)
             self.trees.append([root])
 
-            kNN_state_list = np.array([self.getNodeRelevantState(i, 0)])
+            kNN_state_list = np.array([state[1]])
             self.trees_kNNs.append(kNN_state_list)
 
     def sample_q_target(self, current_q: np.ndarray):
         q_target = current_q + self.stepsize * np.random.randn(current_q.size)
         return q_target
-
-    def compute_costs(self, state: tuple) -> list:
-        costs = []
-        for target in self.target_states:
-            cost = compute_cost_new(state, target)
-            costs.append(cost)
-        return costs
 
     def run(self, display: float=1.) -> tuple[list[MultiSearchNode], float]:
         
@@ -126,15 +91,11 @@ class Search:
         else:
             pbar = range(self.max_nodes)
             
-        self.adj_map.save(prefix=f"{self.run_name}start_")
-
         for _ in pbar:
             
-            start_idx = np.random.randint(0, 100) if self.start_idx == -1 else self.start_idx
+            start_idx = np.random.randint(0, self.configs.shape[0]) if self.start_idx == -1 else self.start_idx
         
             # Fit kNN with current node states
-            if len(self.trees[start_idx]) != 1:
-                self.trees_kNNs[start_idx] = np.vstack([self.trees_kNNs[start_idx], self.getNodeRelevantState(start_idx, -1)])
             self.nbrs.fit(self.trees_kNNs[start_idx])  # Could possibly be made faster if each new node would not require rebuilding the kNN tree
 
             # Sample random sim state
@@ -143,15 +104,13 @@ class Search:
             if exploring or self.end_idx == -1:
                 if self.sample_uniform:
                     # Sample target sometimes
-                    sim_sample = np.random.uniform(low=-1., high=1., size=9)
+                    sim_sample = np.random.uniform(low=-1., high=1., size=self.configs.shape[1])
                 else:
-                    target_config_idx = randint_excluding(0, 100, start_idx)  # TODO: exclude end_idx
-                    t = self.target_states[target_config_idx]
-                    sim_sample = t[1][:9]
+                    target_config_idx = randint_excluding(0, self.configs.shape[0], start_idx)  # TODO: exclude end_idx
+                    sim_sample = self.configs[target_config_idx]
             else:
                 target_config_idx = self.end_idx
-                t = self.target_states[self.end_idx]
-                sim_sample = t[1][:9]
+                sim_sample = self.configs[self.end_idx]
             
             # Pick closest node
             _, node_idx = self.nbrs.kneighbors(sim_sample.reshape(1, -1))
@@ -175,7 +134,7 @@ class Search:
                 self.simulate_action(q_target, node_start_time, display)  # This is extremely slow!
 
                 state = self.sim.getState()
-                eval_state = state[1][:9]
+                eval_state = state[1]
 
                 cost2target = np.linalg.norm(sim_sample - eval_state)
 
@@ -184,32 +143,14 @@ class Search:
                     best_q = q_target
                     best_node_cost = cost2target
             
-            costs = self.compute_costs(best_state)
-            
             best_node = MultiSearchNode(
                 node_idx, best_q, best_state,
                 node_start_time + self.tau_action,
-                costs, explore_node=exploring,
+                explore_node=exploring,
                 target_config_idx=target_config_idx)
             
             self.trees[start_idx].append(best_node)
-
-            # Report
-            if self.verbose > 1:
-                for i in range(100):
-                    if self.trees[start_idx][-1].costs[i] < self.adj_map.costs[start_idx, i]:
-                        self.adj_map.set_value(start_idx, i, self.trees[start_idx][-1].costs[i])
-                self.adj_map.update_data()
-                
-                mask = ~np.eye(self.adj_map.costs.shape[0], dtype=bool)
-                masked = self.adj_map.costs[mask]
-                if self.end_idx == -1:
-                    pbar.set_postfix(avg_cost=masked.mean(), min_cost=masked.min())
-                else:
-                    pbar.set_postfix(avg_cost=masked.mean(), min_cost=masked.min(),
-                                     target_cost=self.adj_map.costs[self.start_idx][self.end_idx])
-
-        self.adj_map.save(prefix=f"{self.run_name}end_")
+            self.trees_kNNs[start_idx] = np.vstack((self.trees_kNNs[start_idx], best_state[1].reshape(1, -1)))
 
         trees_name = f"{self.run_name}trees"
         folder_path = os.path.join(self.output_dir, trees_name)
@@ -225,7 +166,6 @@ class Search:
                     "time": node.time,
                     "path": node.path,
                     "explore_node": node.explore_node,
-                    "costs": node.costs,
                     "target_config_idx": node.target_config_idx
                 }
                 new_tree.append(new_node)

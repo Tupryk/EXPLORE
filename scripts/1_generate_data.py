@@ -1,8 +1,8 @@
+import h5py
 import hydra
 from omegaconf import DictConfig
 
 from explore.datasets.generator import Search
-from explore.datasets.rnd_configs import RndConfigs
 
 
 @hydra.main(version_base="1.3",
@@ -10,9 +10,10 @@ from explore.datasets.rnd_configs import RndConfigs
             config_name="trajectory_generation")
 def main(cfg: DictConfig):
     
-    D = RndConfigs("configs/rnd_twoFingers.h5")
+    file = h5py.File(cfg.configs_path, 'r')
+    stable_configs = file["positions"]
 
-    S = Search(D.positions, cfg.RRT)
+    S = Search(cfg.mujoco_xml, stable_configs, cfg.RRT)
 
     S.run(display=0.)
 

@@ -4,5 +4,3 @@ checkpoints/
 outputs/
 z.*
 outcmaes/
-*.png
-*.pkl

@@ -3,19 +3,18 @@ import time
 import pickle
 import numpy as np
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 
+from explore.utils.vis import AdjMap
 from explore.env.mujoco_sim import MjSim
-from explore.datasets.adj_map import AdjMap
-from explore.datasets.rnd_configs import RndConfigs
 
-ERROR_THRESH = 5e-2
-tree_count = 100
-dataset = "data/15-32-50/trees"
-# dataset = "data/15-42-54/trees"
-# dataset = "data/16-32-38/trees"
+ERROR_THRESH = 2
+mujoco_xml = "configs/twoFingers.xml"
+dataset = "data/Pandas/21-24-53/trees"
+mujoco_xml = "configs/franka_emika_panda/scene.xml"
 
 
+tree_count = len(os.listdir(dataset))
+print(f"Tree Count: {tree_count}")
 trees: list[list[dict]] = []
 
 for i in range(tree_count):
@@ -33,23 +32,23 @@ for i in tqdm(range(tree_count)):
     
     for n, node in enumerate(trees[i]):
         for j in range(tree_count):
-            if node["costs"][j] < tree_min_costs[j]:
-                tree_min_costs[j] = node["costs"][j]
+            e = trees[j][0]["state"][1] - node["state"][1]
+            node_cost = e.T @ e
+            if node_cost < tree_min_costs[j]:
+                tree_min_costs[j] = node_cost
                 tree_top_nodes[j] = n
     
     top_nodes.append(tree_top_nodes)
     min_costs.append(tree_min_costs)
 
-adj_map = AdjMap()
-for i in range(tree_count):
-    for j in range(tree_count):
-        adj_map.set_value(i, j, min_costs[i][j])
-adj_map.update_data()
-adj_map.show()
+min_costs = np.array(min_costs)
+
+# AdjMap(min_costs, ERROR_THRESH, min_costs.max())
+
 start_idx = 1
 end_idx = 0
 costs = [min_costs[start_idx][i] for i in range(tree_count)]
-print(f"Mean costs for start config {start_idx}: {sum(costs)/tree_count}")
+print(f"Mean costs for start config {start_idx}: {sum(costs)/tree_count}, (Min: {min(costs)}, Max {max(costs)})")
 print(f"Cost for target {end_idx} with start {start_idx}: {costs[end_idx]}")
 
 colors = [-1 for _ in range(tree_count)]
@@ -88,7 +87,7 @@ print("Group Sizes: ", group_sizes)
 top_paths_data = []
 for i in range(tree_count):
     for j in range(tree_count):
-        if min_costs[i][j] < ERROR_THRESH:
+        if min_costs[i][j] < ERROR_THRESH and i != j:
             top_paths_data.append(
                 ((i, j), top_nodes[i][j])
             )
@@ -142,10 +141,8 @@ if not len(top_paths):
 print("Percentage of reached config used as target: ", percs)
 print("Avg. use of reached config as target: ", sum(percs)/len(percs))
 
-while True:
-    path_idx = np.random.randint(0, len(top_paths))
-    path = top_paths[path_idx]
-    if len(path) != 1: break
+path_idx = np.random.randint(0, len(top_paths))
+path = top_paths[path_idx]
 
 start_idx = top_paths_start[path_idx]
 end_idx = top_paths_goal[path_idx]
@@ -164,14 +161,10 @@ print("Path length: ", sum(path_lens)/len(path_lens))
 print("Sampled Path Length: ", len(path))
 
 
-sim = MjSim(open("configs/twoFingers.xml", 'r').read(), tau_sim=0.01, view=True)
+sim = MjSim(mujoco_xml, tau_sim=0.01, view=True)
 
 def view_config(idx: int, sim: MjSim):
-    D = RndConfigs("configs/rnd_twoFingers.h5")
-    joint_state = D.positions[idx,3:]
-    frame_state = np.zeros((1, 7))
-    frame_state[0, :3] = D.positions[idx,:3]
-    sim.pushConfig(joint_state, frame_state)
+    sim.pushConfig(trees[idx][0]["state"][1])
     time.sleep(5)
 
 view_config(start_idx, sim)

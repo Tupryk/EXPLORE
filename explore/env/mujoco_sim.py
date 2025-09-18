@@ -9,17 +9,24 @@ from explore.utils.utils import ND_BSpline
 
 class MjSim:
 
-    def __init__(self, xml: str, tau_sim: float=0.01, view: bool=False, verbose: int=0):
+    def __init__(self, xml_path: str, tau_sim: float=0.01, view: bool=False, verbose: int=0):
+        
         self.tau_sim = tau_sim
-        self.model = mujoco.MjModel.from_xml_string(xml)
+        self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.data = mujoco.MjData(self.model)
         self.model.opt.timestep = self.tau_sim
         self.verbose = verbose
 
         if view:
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
+            # while self.viewer.is_running():
+            #     time.sleep(0.05)
         else:
             self.viewer = None
+            
+        if self.verbose:
+            print(f"Loaded config '{xml_path}' with position values:")
+            print(self.data.qpos)
             
         frames = []
 
@@ -34,8 +41,8 @@ class MjSim:
             del frames[0]
             
         self.resetSplineRef(0.)
-
-    def pushConfig(self, joint_state: np.ndarray, frame_poses: np.ndarray):
+        
+    def pushConfig_old(self, joint_state: np.ndarray, frame_poses: np.ndarray):
         qn = joint_state.shape[0]
         self.data.qpos[:qn] = joint_state
         self.data.qvel[:qn] = np.zeros(qn)
@@ -49,12 +56,22 @@ class MjSim:
         if self.viewer is not None:
             self.viewer.sync()
 
+    def pushConfig(self, joint_state: np.ndarray):
+        self.data.qpos = joint_state
+        self.data.qvel = np.zeros_like(self.data.qvel)
+
+        mujoco.mj_forward(self.model, self.data)
+
+        if self.viewer is not None:
+            self.viewer.sync()
+
     def run(self, steps: int, view: float=1.):
         
         for k in range(steps):
             # ref_pos = self.ctrl.eval(self.ctrl_time)
             perc = (k+1)/steps
             ref_pos = (1 - perc) * self.ctrl[0] + (perc) * self.ctrl[1]
+            # print(ref_pos)
             self.data.ctrl = ref_pos
             mujoco.mj_step(self.model, self.data)
             self.ctrl_time += self.tau_sim
@@ -69,6 +86,14 @@ class MjSim:
 
     def step(self, tau: float, view: float):
         self.run(math.ceil(tau/self.tau_sim), view)
+    
+    def step_sim(self, view: bool=False):
+        mujoco.mj_step(self.model, self.data)
+        
+        if view:
+            if self.viewer is not None:
+                self.viewer.sync()
+            time.sleep(self.tau_sim)
 
     def getState(self):
         state = (
@@ -98,7 +123,7 @@ class MjSim:
         self.ctrl_time = ctrl_time
 
     def setSplineRef(self, points: np.ndarray,
-                     times: np.ndarray, append: bool):
+                     times: np.ndarray, append: bool=False):
         if not append:
             # self.ctrl.compute(points, times, self.ctrl_time)
             self.ctrl.append(points[0])
