@@ -84,14 +84,23 @@ print(groups)
 print("Group Count: ", len(groups))
 print("Group Sizes: ", group_sizes)
 
+
+look_at_specific_start_idx = 6
+look_at_specific_end_idx = 1
 top_paths_data = []
 for i in range(tree_count):
     for j in range(tree_count):
-        if min_costs[i][j] < ERROR_THRESH and i != j:
+        if look_at_specific_start_idx == -1 and i != look_at_specific_start_idx:
+            continue
+        if look_at_specific_end_idx == -1 and j != look_at_specific_end_idx:
+            continue
+        if (
+            (look_at_specific_end_idx != -1 and look_at_specific_end_idx != -1) or
+            (min_costs[i][j] < ERROR_THRESH and i != j)
+            ):
             top_paths_data.append(
                 ((i, j), top_nodes[i][j])
             )
-
 top_paths = []
 top_paths_start = []
 top_paths_goal = []

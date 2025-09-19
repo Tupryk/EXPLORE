@@ -6,8 +6,8 @@ RRT:
   target_prob: .2
   sample_uniform: False
   threading: True
-  start_idx: -1
-  end_idx: -1
+  start_idx: 6
+  end_idx: 1
   sample_count: 1000
   output_dir: ${hydra:runtime.output_dir}
 

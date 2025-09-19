@@ -22,7 +22,8 @@ sim = MjSim("configs/franka_emika_panda/scene.xml", 0.01, view=True, verbose=1)
 
 sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
 
-for i in sampled_configs:
-    print(stable_configs[i])
-    sim.pushConfig(stable_configs[i])
+# for i in sampled_configs:
+for i, sc in enumerate(stable_configs):
+    print(i)
+    sim.pushConfig(sc)
     time.sleep(1)
