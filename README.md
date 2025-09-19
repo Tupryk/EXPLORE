@@ -7,5 +7,5 @@ pip install -e .
 ```
 
 ```
-python3 scripts/1_generate_data.py
+python scripts/1_generate_data.py
 ```

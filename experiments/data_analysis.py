@@ -157,7 +157,7 @@ path_lens = [len(p) for p in top_paths]
 
 path_lens.sort()
 path_lens.reverse()
-print("Path length: ", sum(path_lens)/len(path_lens))
+print("Avg. Path length: ", sum(path_lens)/len(path_lens))
 print("Sampled Path Length: ", len(path))
 
 

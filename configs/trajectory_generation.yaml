@@ -2,12 +2,13 @@ RRT:
   max_nodes: 10000
   min_cost: 5e-2
   stepsize: .3
-  verbose: 3
+  verbose: 1
   target_prob: .2
   sample_uniform: False
+  threading: True
   start_idx: -1
   end_idx: -1
-  sample_count: 100
+  sample_count: 1000
   output_dir: ${hydra:runtime.output_dir}
 
 configs_path: "configs/pandasTable_ball.h5"

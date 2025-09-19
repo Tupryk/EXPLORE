@@ -5,3 +5,4 @@ checkpoints/
 outputs/
 z.*
 outcmaes/
+MUJOCO_LOG.TXT

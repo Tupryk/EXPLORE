@@ -1,26 +1,34 @@
+import time
 import mujoco
 import numpy as np
 from explore.env.mujoco_sim import MjSim
 
-sim = MjSim("configs/franka_emika_panda/scene.xml", 0.01, view=True, verbose=0)
+sim = MjSim("configs/franka_emika_panda/scene.xml", 0.001, view=True, verbose=0)
+
+ctrl_joint_ids = [
+    sim.model.jnt_qposadr[sim.model.actuator_trnid[i][0]]
+    for i in range(sim.model.nu)
+]
+ctrl_joint_ids = [int(sim.model.actuator_trnid[i][0]) for i in range(sim.model.nu)]
+print(ctrl_joint_ids)
+motor_qpos = [float(sim.data.qpos[sim.model.jnt_qposadr[jid]]) for jid in ctrl_joint_ids]
+print(motor_qpos)
 
 joint_dim = sim.data.ctrl.shape
 print(joint_dim)
 
-tau_action = 1
+tau_action = 10
 
 ctrl_time = 0.0
 q_target = np.array([
     0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 255,
     0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 255
 ])
-sim.resetSplineRef(ctrl_time)
-sim.setSplineRef(q_target.reshape(1, -1), [tau_action])
+config = np.array([
+    0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 0.04, 0.04,
+    0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 0.04, 0.04,
+    0, 0, 0.7, 1, 0, 0, 0
+])
+sim.pushConfig(config)
+time.sleep(5)
 sim.step(tau_action, view=tau_action)
-# print(sim.data.ctrl)
-ctrl_time += tau_action
-
-for i in range(1000):
-    # print(sim.data.qpos[16:18])
-    # print(sim.data.qpos.shape)
-    sim.step_sim(True)

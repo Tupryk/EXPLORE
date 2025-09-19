@@ -15,7 +15,7 @@ def main(cfg: DictConfig):
 
     S = Search(cfg.mujoco_xml, stable_configs, cfg.RRT)
 
-    S.run(display=0.)
+    S.run()
 
 
 if __name__ == "__main__":

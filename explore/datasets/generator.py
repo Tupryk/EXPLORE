@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import trange
 from omegaconf import DictConfig
 from sklearn.neighbors import NearestNeighbors
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from explore.env.mujoco_sim import MjSim
 from explore.utils.utils import randint_excluding
@@ -35,8 +36,6 @@ class Search:
         self.run_name = ""
         self.configs = configs
 
-        self.sim = MjSim(mujoco_xml, self.tau_sim, view=False, verbose=0)
-
         self.max_nodes = cfg.max_nodes
         self.stepsize = cfg.stepsize
         self.target_prob = cfg.target_prob
@@ -47,21 +46,21 @@ class Search:
         self.sample_count = cfg.sample_count
         self.verbose = cfg.verbose
         self.sample_uniform = cfg.sample_uniform
+        self.threading = cfg.threading
         
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
-
+        
         self.nbrs = NearestNeighbors(n_neighbors=1, metric="euclidean")
         
-    def simulate_action(self,
-                        q_target: np.ndarray,
-                        time_offset: float,
-                        display: float=.1):
+        sim_count = 10 if self.threading else 1
+        self.sim = [MjSim(mujoco_xml, self.tau_sim, view=False, verbose=0) for _ in range(sim_count)]
+        assert self.sample_count % len(self.sim) == 0
         
-        self.sim.resetSplineRef(time_offset)
-        self.sim.setSplineRef(q_target.reshape(1, -1), [self.tau_action], append=False)
+        self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
         
-        self.sim.step(self.tau_action, display)
+        if self.verbose:
+            print(f"Starting search across {self.configs.shape[0]} configs!")
 
     def reset_trees(self):
 
@@ -69,20 +68,31 @@ class Search:
         self.trees_kNNs: list[np.ndarray] = []
         for i in range(self.configs.shape[0]):
             
-            self.sim.pushConfig(self.configs[i])
-            state = self.sim.getState()
+            self.sim[0].pushConfig(self.configs[i])
+            state = self.sim[0].getState()
         
             root = MultiSearchNode(-1, None, state, 0.)
             self.trees.append([root])
 
             kNN_state_list = np.array([state[1]])
             self.trees_kNNs.append(kNN_state_list)
+    
+    def sim_sampler(self, process_idx: int, start_state: np.ndarray,
+                    sim_sample: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
+        
+        ctrl_target = np.random.uniform(self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])
+        
+        self.sim[process_idx].setState(*start_state)
+        
+        self.sim[process_idx].step(self.tau_action, ctrl_target)
+        state = self.sim[process_idx].getState()
+        
+        e = sim_sample - state[1]
+        cost2target = e.T @ e
+        
+        return cost2target, state, ctrl_target
 
-    def sample_q_target(self, current_q: np.ndarray):
-        q_target = current_q + self.stepsize * np.random.randn(current_q.size)
-        return q_target
-
-    def run(self, display: float=1.) -> tuple[list[MultiSearchNode], float]:
+    def run(self) -> tuple[list[MultiSearchNode], float]:
         
         self.reset_trees()
         
@@ -115,43 +125,41 @@ class Search:
                     # Sample target sometimes
                     sim_sample = np.random.uniform(low=-1., high=1., size=self.configs.shape[1])
                 else:
-                    target_config_idx = randint_excluding(0, self.configs.shape[0], start_idx)  # TODO: exclude end_idx
+                    target_config_idx = randint_excluding(0, self.configs.shape[0], start_idx)  # TODO: exclude end_idx if end_idx != -1
                     sim_sample = self.configs[target_config_idx]
             else:
                 target_config_idx = self.end_idx
-                sim_sample = self.configs[self.end_idx]
+                sim_sample = self.configs[target_config_idx]
             
             # Pick closest node
             _, node_idx = self.nbrs.kneighbors(sim_sample.reshape(1, -1))
             node_idx = int(node_idx[0][0])
             node = self.trees[start_idx][node_idx]
 
-            # Sample random actions in closes node and pick the one closest to the sampled state
-            best_node_cost = float("inf")
-
             node_start_time = node.time
             start_state = node.state
-            self.sim.setState(*start_state)
-            current_q = start_state[1][:self.sim.data.ctrl.size]
 
-            for _ in range(self.sample_count):
-                self.sim.setState(*start_state)
-
-                q_target = self.sample_q_target(current_q)  # This is extremely slow!
-
-                # Simulate for control_tau time
-                self.simulate_action(q_target, node_start_time, display)  # This is extremely slow!
-
-                state = self.sim.getState()
-                eval_state = state[1]
-
-                cost2target = np.linalg.norm(sim_sample - eval_state)
-
-                if cost2target < best_node_cost:
-                    best_state = self.sim.getState()
-                    best_q = q_target
-                    best_node_cost = cost2target
+            results = []
             
+            
+            sample_batch_count = self.sample_count//len(self.sim)
+            
+            if self.threading:
+                for _ in range(sample_batch_count):
+                    with ThreadPoolExecutor(max_workers=5) as executor:
+                        futures = [
+                            executor.submit(self.sim_sampler, process_idx, start_state, sim_sample)
+                            for process_idx in range(len(self.sim))
+                        ]
+                        for future in as_completed(futures):
+                            results.append(future.result())
+            else:
+                for i in range(self.sample_count):
+                    sample = self.sim_sampler(0, start_state, sim_sample)
+                    results.append(sample)
+                    
+            best_node_cost, best_state, best_q = min(results, key=lambda x: x[0])
+                
             best_node = MultiSearchNode(
                 node_idx, best_q, best_state,
                 node_start_time + self.tau_action,
