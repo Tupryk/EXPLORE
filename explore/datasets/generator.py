@@ -1,4 +1,5 @@
 import os
+import cma
 import pickle
 import numpy as np
 from tqdm import trange
@@ -47,6 +48,7 @@ class Search:
         self.verbose = cfg.verbose
         self.sample_uniform = cfg.sample_uniform
         self.threading = cfg.threading
+        self.sampling_strategy = cfg.sampling_strategy
         
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
@@ -57,7 +59,15 @@ class Search:
         self.sim = [MjSim(mujoco_xml, self.tau_sim, view=False, verbose=0) for _ in range(sim_count)]
         assert self.sample_count % len(self.sim) == 0
         
+        self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
         self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
+        
+        if self.sampling_strategy == "rs":
+            self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
+        elif self.sampling_strategy == "cma":
+            self.action_sampler = lambda o, t: self.cma_sample_ctrls(o, t)
+        else:
+            raise Exception(f"Sampling strategy '{self.sampling_strategy}' not implemented yet!")
         
         if self.verbose:
             print(f"Starting search across {self.configs.shape[0]} configs!")
@@ -76,21 +86,79 @@ class Search:
 
             kNN_state_list = np.array([state[1]])
             self.trees_kNNs.append(kNN_state_list)
+            
+    def random_sample_ctrls(self, origin: np.ndarray, target: np.ndarray
+                            ) -> tuple[float, np.ndarray, np.ndarray]:
+        
+        low = self.ctrl_ranges[:, 0]
+        high = self.ctrl_ranges[:, 1]
+        sampled_ctrls = np.random.uniform(low, high, size=(self.sample_count, self.ctrl_dim))
+        
+        results = self.eval_multiple_ctrls(sampled_ctrls, origin, target)
+                
+        best_node_cost, best_state, best_q = min(results, key=lambda x: x[0])
+        return best_node_cost, best_state, best_q
     
-    def sim_sampler(self, process_idx: int, start_state: np.ndarray,
-                    sim_sample: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
+    def cma_sample_ctrls(self, origin: np.ndarray, target: np.ndarray
+                         ) -> tuple[float, np.ndarray, np.ndarray]:
         
-        ctrl_target = np.random.uniform(self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])
+        pop_size = 20
+        initial_guess = np.random.randn(self.ctrl_dim)
+        es = cma.CMAEvolutionStrategy(initial_guess, 0.5, {
+            "popsize": pop_size,
+            "maxfevals": self.sample_count,
+            "verbose": -1
+        })
+
+        while not es.stop():
+            candidates = es.ask()
+
+            results = self.eval_multiple_ctrls(candidates, origin, target)
+            fitness_values = [r[0] for r in results]
+
+            es.tell(candidates, fitness_values)
+            
+            if self.verbose > 3:
+                es.disp()
         
-        self.sim[process_idx].setState(*start_state)
+        _, best_state, _ = self.eval_ctrl(es.result.xbest, origin, target)
+        return es.result.fbest, best_state, es.result.xbest
+    
+    def eval_multiple_ctrls(self, ctrls: np.ndarray, origin: np.ndarray,
+                            target: np.ndarray) -> np.ndarray:
+        results = []
+        sim_count = len(self.sim)
         
-        self.sim[process_idx].step(self.tau_action, ctrl_target)
-        state = self.sim[process_idx].getState()
+        if self.threading:
+            sample_batch_count = len(ctrls) // sim_count
+            for i in range(sample_batch_count):
+                # Five Workers and ten simulators seem to be optimal
+                with ThreadPoolExecutor(max_workers=5) as executor:
+                    futures = [
+                        executor.submit(self.eval_ctrl, ctrls[i*sim_count+sim_idx], origin, target, sim_idx)
+                        for sim_idx in range(sim_count)
+                    ]
+                    for future in as_completed(futures):
+                        results.append(future.result())
+        else:
+            for ctrl in ctrls:
+                res = self.eval_ctrl(ctrl, origin, target)
+                results.append(res)
         
-        e = sim_sample - state[1]
+        return results
+    
+    def eval_ctrl(self, ctrl: np.ndarray, origin: np.ndarray,
+                  target: np.ndarray, sim_idx: int=0) -> tuple[float, np.ndarray, np.ndarray]:
+        
+        self.sim[sim_idx].setState(*origin)
+        
+        self.sim[sim_idx].step(self.tau_action, ctrl)
+        state = self.sim[sim_idx].getState()
+        
+        e = target - state[1]
         cost2target = e.T @ e
         
-        return cost2target, state, ctrl_target
+        return cost2target, state, ctrl
 
     def run(self) -> tuple[list[MultiSearchNode], float]:
         
@@ -120,9 +188,9 @@ class Search:
             # Sample random sim state
             exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
             target_config_idx = -1
+            
             if exploring or self.end_idx == -1:
                 if self.sample_uniform:
-                    # Sample target sometimes
                     sim_sample = np.random.uniform(low=-1., high=1., size=self.configs.shape[1])
                 else:
                     target_config_idx = randint_excluding(0, self.configs.shape[0], start_idx)  # TODO: exclude end_idx if end_idx != -1
@@ -139,26 +207,7 @@ class Search:
             node_start_time = node.time
             start_state = node.state
 
-            results = []
-            
-            
-            sample_batch_count = self.sample_count//len(self.sim)
-            
-            if self.threading:
-                for _ in range(sample_batch_count):
-                    with ThreadPoolExecutor(max_workers=5) as executor:
-                        futures = [
-                            executor.submit(self.sim_sampler, process_idx, start_state, sim_sample)
-                            for process_idx in range(len(self.sim))
-                        ]
-                        for future in as_completed(futures):
-                            results.append(future.result())
-            else:
-                for i in range(self.sample_count):
-                    sample = self.sim_sampler(0, start_state, sim_sample)
-                    results.append(sample)
-                    
-            best_node_cost, best_state, best_q = min(results, key=lambda x: x[0])
+            best_node_cost, best_state, best_q = self.action_sampler(start_state, sim_sample)
                 
             best_node = MultiSearchNode(
                 node_idx, best_q, best_state,

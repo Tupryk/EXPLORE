@@ -9,6 +9,7 @@ RRT:
   start_idx: 6
   end_idx: 1
   sample_count: 1000
+  sampling_strategy: "cma"
   output_dir: ${hydra:runtime.output_dir}
 
 configs_path: "configs/pandasTable_ball.h5"
