@@ -54,9 +54,14 @@ def compute_cost(state0: tuple,
 
 
 def randint_excluding(low: int, high: int, exclude: int):
-    x = np.random.randint(low, high - 1)
-    return x if x < exclude else x + 1
-
+    # Only for positive values
+    if exclude >= 0:
+        x = np.random.randint(low, high - 1)
+        return x if x < exclude else x + 1
+    else:
+        x = np.random.randint(low, high)
+        return x
+        
 
 def k_means(vectors: list[list[float]], k: int, cost_func, max_iter: int=100) -> list[int]:
     
