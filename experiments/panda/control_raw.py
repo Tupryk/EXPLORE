@@ -18,7 +18,7 @@ data.ctrl = np.array([
     0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 255
 ])
 print(data.qpos)
-viewer = mujoco.viewer.launch_passive(model, data)
+# viewer = mujoco.viewer.launch_passive(model, data)
 print(model.nu)
 print(model.actuator_trnid)
 ctrl_joint_ids = [int(model.actuator_trnid[i][0]) for i in range(model.nu)]
@@ -28,8 +28,39 @@ print(motor_qpos)
 ctrl_ranges = model.actuator_ctrlrange
 print("ctrl_ranges: ", ctrl_ranges)
 
-for i in range(10000):
-    if i > 3000:
-        mujoco.mj_step(model, data)
-        viewer.sync()
-    time.sleep(tau_sim)
+
+import mujoco
+
+for i in range(model.nu):
+    trntype = model.actuator_trntype[i]
+    if trntype == mujoco.mjtTrn.mjTRN_JOINT:
+        joint_id = model.actuator_trnid[i][0]
+        joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
+        print(f"Actuator {i} controls joint {joint_name}")
+
+    elif trntype == mujoco.mjtTrn.mjTRN_TENDON:
+        tendon_id = model.actuator_trnid[i][0]
+        tendon_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_TENDON, tendon_id)
+        print(f"Actuator {i} controls tendon {tendon_name}")
+
+        # now get joints inside this tendon
+        adr = model.tendon_adr[tendon_id]
+        num = model.tendon_num[tendon_id]
+        for k in range(adr, adr + num):
+            if model.wrap_type[k] == mujoco.mjtWrap.mjWRAP_JOINT:
+                j_id = model.wrap_objid[k]
+                j_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, j_id)
+                coef = model.wrap_prm[k]
+                print(f"    includes joint {j_name} with coef={coef}")
+
+    else:
+        print(f"Actuator {i} has unsupported type {trntype}")
+
+
+
+
+# for i in range(10000):
+#     if i > 3000:
+#         mujoco.mj_step(model, data)
+#         viewer.sync()
+#     time.sleep(tau_sim)

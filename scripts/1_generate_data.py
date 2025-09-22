@@ -11,9 +11,8 @@ from explore.datasets.generator import Search
 def main(cfg: DictConfig):
     
     file = h5py.File(cfg.configs_path, 'r')
-    stable_configs = file["positions"]
 
-    S = Search(cfg.mujoco_xml, stable_configs, cfg.RRT)
+    S = Search(cfg.mujoco_xml, file["qpos"], file["ctrl"], cfg.RRT)
 
     S.run()
 

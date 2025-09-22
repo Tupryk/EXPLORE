@@ -1,15 +1,15 @@
 import os
-import time
 import pickle
 import numpy as np
 from tqdm import tqdm
 
-from explore.utils.vis import AdjMap
 from explore.env.mujoco_sim import MjSim
+from explore.utils.vis import AdjMap, play_path
 
-ERROR_THRESH = 2
+
+ERROR_THRESH = 1
 mujoco_xml = "configs/twoFingers.xml"
-dataset = "data/Pandas/21-24-53/trees"
+dataset = "data/Pandas/17-34-44/trees"
 mujoco_xml = "configs/franka_emika_panda/scene.xml"
 
 
@@ -43,7 +43,7 @@ for i in tqdm(range(tree_count)):
 
 min_costs = np.array(min_costs)
 
-# AdjMap(min_costs, ERROR_THRESH, min_costs.max())
+AdjMap(min_costs, ERROR_THRESH, min_costs.max())
 
 start_idx = 1
 end_idx = 0
@@ -90,10 +90,11 @@ look_at_specific_end_idx = 1
 top_paths_data = []
 for i in range(tree_count):
     for j in range(tree_count):
-        if look_at_specific_start_idx == -1 and i != look_at_specific_start_idx:
+        if look_at_specific_start_idx != -1 and i != look_at_specific_start_idx:
             continue
-        if look_at_specific_end_idx == -1 and j != look_at_specific_end_idx:
+        if look_at_specific_end_idx != -1 and j != look_at_specific_end_idx:
             continue
+
         if (
             (look_at_specific_end_idx != -1 and look_at_specific_end_idx != -1) or
             (min_costs[i][j] < ERROR_THRESH and i != j)
@@ -169,21 +170,7 @@ path_lens.reverse()
 print("Avg. Path length: ", sum(path_lens)/len(path_lens))
 print("Sampled Path Length: ", len(path))
 
-
+start_state = trees[start_idx][0]["state"][1]
+target_state = trees[end_idx][0]["state"][1]
 sim = MjSim(mujoco_xml, tau_sim=0.01, view=True)
-
-def view_config(idx: int, sim: MjSim):
-    sim.pushConfig(trees[idx][0]["state"][1])
-    time.sleep(5)
-
-view_config(start_idx, sim)
-view_config(end_idx, sim)
-
-tau_action = .1
-sim.setState(*path[0]["state"])
-path.pop(0)
-for node in path:
-    q_target = node["action"]
-    sim.resetSplineRef(node["time"])
-    sim.setSplineRef(q_target.reshape(1, -1), [tau_action], append=False)    
-    sim.step(tau_action, view=10)
+play_path(start_state, target_state, path, sim)

@@ -38,9 +38,11 @@ class MjSim:
                 self.possible_contacts.append((frames[0], frames[i]))
             del frames[0]
 
-    def pushConfig(self, joint_state: np.ndarray):
+    def pushConfig(self, joint_state: np.ndarray, ctrl_state: np.ndarray=None):
         self.data.qpos = joint_state
         self.data.qvel = np.zeros_like(self.data.qvel)
+        if not (ctrl_state is None):
+            self.data.ctrl = ctrl_state
 
         mujoco.mj_forward(self.model, self.data)
 

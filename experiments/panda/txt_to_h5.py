@@ -9,55 +9,65 @@ h5_file = "configs/pandasTable_ball.h5"
 
 data = np.loadtxt(txt_file, dtype=np.float64)
 
-new_data = []
+new_data_pos = []
+new_data_ctrl = []
 for i, vec in enumerate(data):
-    new_vec = np.zeros(25)
+    state_vec = np.zeros(25)
     
-    new_vec[:8] = vec[:8]
-    new_vec[8] = vec[7]
-    new_vec[9:17] = vec[8:16]
-    new_vec[17] = vec[15]
+    state_vec[:8] = vec[:8]
+    state_vec[8] = vec[7]
+    state_vec[9:17] = vec[8:16]
+    state_vec[17] = vec[15]
     
-    new_vec[18:21] = vec[16:]
-    new_vec[21] = 1
+    state_vec[18:21] = vec[16:]
+    state_vec[21] = 1
     
-    new_data.append(new_vec)
+    ctrl_vec = np.zeros(16)
+    ctrl_vec[:8] = state_vec[:8]
+    ctrl_vec[8:16] = state_vec[9:17]
+    ctrl_vec[7] *= 255/0.04
+    ctrl_vec[15] *= 255/0.04
+    
+    new_data_pos.append(state_vec)
+    new_data_ctrl.append(ctrl_vec)
 
-data = np.array(new_data)
+data_pos = np.array(new_data_pos)
+data_ctrl = np.array(new_data_ctrl)
 
 SAME_THRESH = 0.1
 i = 0
-while i < data.shape[0]:
+while i < data_pos.shape[0]:
     keep = []
-    for j in range(data.shape[0]):
+    for j in range(data_pos.shape[0]):
         if i == j: keep.append(i)
         
-        e = data[i] - data[j]
+        e = data_pos[i] - data_pos[j]
         if e.T @ e > SAME_THRESH:
             keep.append(j)
 
-    data = data[keep]
+    data_pos = data_pos[keep]
+    data_ctrl = data_ctrl[keep]
     i += 1
 
-costs = np.zeros((data.shape[0], data.shape[0]))
-for i in range(data.shape[0]):
-    for j in range(data.shape[0]):
+costs = np.zeros((data_pos.shape[0], data_pos.shape[0]))
+for i in range(data_pos.shape[0]):
+    for j in range(data_pos.shape[0]):
         
         if i == j: continue
         
-        e = data[i] - data[j]
+        e = data_pos[i] - data_pos[j]
         costs[i, j] = e.T @ e
 
 masked = costs.copy()
 np.fill_diagonal(masked, np.inf)
-print(f"Data size: {data.shape[0]}")
+print(f"Config Count: {data_pos.shape[0]}")
 print("Min cost: ", masked.min())
 print("Max cost: ", costs.max())
 
 with h5py.File(h5_file, "w") as f:
-    f.create_dataset("positions", data=data)
+    f.create_dataset("qpos", data=data_pos)
+    f.create_dataset("ctrl", data=data_ctrl)
 
-print(f"Data saved to {h5_file} under key 'positions'.")
+print(f"Success: Data saved to {h5_file}.")
 
-AdjMap(costs, SAME_THRESH, costs.max())
-
+# AdjMap(costs, SAME_THRESH, costs.max())

@@ -1,5 +1,6 @@
 import os
 import cma
+import time
 import pickle
 import numpy as np
 from tqdm import trange
@@ -32,10 +33,12 @@ class Search:
     tau_action = 0.1
     tau_sim = 0.01
 
-    def __init__(self, mujoco_xml: str, configs: np.ndarray, cfg: DictConfig):
+    def __init__(self, mujoco_xml: str, configs: np.ndarray,
+                 configs_ctrl: np.ndarray, cfg: DictConfig):
         
         self.run_name = ""
         self.configs = configs
+        self.configs_ctrl = configs_ctrl
 
         self.max_nodes = cfg.max_nodes
         self.stepsize = cfg.stepsize
@@ -78,7 +81,7 @@ class Search:
         self.trees_kNNs: list[np.ndarray] = []
         for i in range(self.configs.shape[0]):
             
-            self.sim[0].pushConfig(self.configs[i])
+            self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
             state = self.sim[0].getState()
         
             root = MultiSearchNode(-1, None, state, 0.)
@@ -86,13 +89,18 @@ class Search:
 
             kNN_state_list = np.array([state[1]])
             self.trees_kNNs.append(kNN_state_list)
+    
+    def gauss_sample_ctrl(self, mean: np.ndarray, sample_count: int=1,
+                          std_perc: float=0.25) -> np.ndarray:
+        std_devs = np.abs(self.ctrl_ranges[:, 0] - self.ctrl_ranges[:, 1]) * std_perc
+        noise = np.random.randn(sample_count * self.ctrl_dim).reshape(sample_count, -1)
+        sample = noise * std_devs + mean
+        return sample
             
-    def random_sample_ctrls(self, origin: np.ndarray, target: np.ndarray
+    def random_sample_ctrls(self, origin: tuple, target: tuple
                             ) -> tuple[float, np.ndarray, np.ndarray]:
         
-        low = self.ctrl_ranges[:, 0]
-        high = self.ctrl_ranges[:, 1]
-        sampled_ctrls = np.random.uniform(low, high, size=(self.sample_count, self.ctrl_dim))
+        sampled_ctrls = self.gauss_sample_ctrl(origin[3], self.sample_count)
         
         results = self.eval_multiple_ctrls(sampled_ctrls, origin, target)
                 
@@ -104,6 +112,7 @@ class Search:
         
         pop_size = 20
         initial_guess = np.random.randn(self.ctrl_dim)
+        initial_guess = origin[3]
         es = cma.CMAEvolutionStrategy(initial_guess, 0.5, {
             "popsize": pop_size,
             "maxfevals": self.sample_count,
@@ -124,8 +133,8 @@ class Search:
         _, best_state, _ = self.eval_ctrl(es.result.xbest, origin, target)
         return es.result.fbest, best_state, es.result.xbest
     
-    def eval_multiple_ctrls(self, ctrls: np.ndarray, origin: np.ndarray,
-                            target: np.ndarray) -> np.ndarray:
+    def eval_multiple_ctrls(self, ctrls: np.ndarray, origin: tuple,
+                            target: tuple) -> np.ndarray:
         results = []
         sim_count = len(self.sim)
         
@@ -147,8 +156,8 @@ class Search:
         
         return results
     
-    def eval_ctrl(self, ctrl: np.ndarray, origin: np.ndarray,
-                  target: np.ndarray, sim_idx: int=0) -> tuple[float, np.ndarray, np.ndarray]:
+    def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
+                  target: tuple, sim_idx: int=0) -> tuple[float, np.ndarray, np.ndarray]:
         
         self.sim[sim_idx].setState(*origin)
         
@@ -159,6 +168,24 @@ class Search:
         cost2target = e.T @ e
         
         return cost2target, state, ctrl
+    
+    def store_tree(self, idx: int, folder_path: str):
+        dict_tree = []
+        for node in self.trees[idx]:
+            new_node = {
+                "parent": node.parent,
+                "action": node.action,
+                "state": node.state,
+                "time": node.time,
+                "path": node.path,
+                "explore_node": node.explore_node,
+                "target_config_idx": node.target_config_idx
+            }
+            dict_tree.append(new_node)
+            
+        data_path = os.path.join(folder_path, f"tree_{idx}.pkl")
+        with open(data_path, "wb") as f:
+            pickle.dump(dict_tree, f)
 
     def run(self) -> tuple[list[MultiSearchNode], float]:
         
@@ -167,6 +194,8 @@ class Search:
         trees_name = f"{self.run_name}trees"
         folder_path = os.path.join(self.output_dir, trees_name)
         os.makedirs(folder_path, exist_ok=True)
+        
+        [self.store_tree(i, folder_path) for i, _ in enumerate(self.trees)]
 
         if self.verbose > 0:
             pbar = trange(self.max_nodes, desc="Physics RRT Search", unit="epoch")
@@ -174,6 +203,8 @@ class Search:
             pbar = range(self.max_nodes)
             
         nodes_per_tree = self.max_nodes // self.configs.shape[0]
+        
+        start_time = time.time()
         
         for i in pbar:
             
@@ -218,27 +249,23 @@ class Search:
             self.trees[start_idx].append(best_node)
             self.trees_kNNs[start_idx] = np.vstack((self.trees_kNNs[start_idx], best_state[1].reshape(1, -1)))
             
-            if i % nodes_per_tree == nodes_per_tree-1:
+            if (((self.start_idx == -1) and (i % nodes_per_tree == nodes_per_tree-1)) or
+                ((self.start_idx != -1) and (i == self.max_nodes-1))):
                 if self.verbose > 3:
                     print(f"Storing tree {start_idx} at i {i}")
                 
-                dict_tree = []
-                for node in self.trees[start_idx]:
-                    new_node = {
-                        "parent": node.parent,
-                        "action": node.action,
-                        "state": node.state,
-                        "time": node.time,
-                        "path": node.path,
-                        "explore_node": node.explore_node,
-                        "target_config_idx": node.target_config_idx
-                    }
-                    dict_tree.append(new_node)
-                    
-                data_path = os.path.join(folder_path, f"tree_{i}.pkl")
-                with open(data_path, "wb") as f:
-                    pickle.dump(dict_tree, f)
+                self.store_tree(start_idx, folder_path)
                 
                 # Free memory
                 self.reset_trees()
-                
+        
+        end_time = time.time()
+        total_time = end_time - start_time
+        
+        if self.verbose > 1:
+            print(f"Total time taken: {total_time:.2f} seconds")
+
+        time_data_path = os.path.join(self.output_dir, f"time_taken.txt")
+        with open(time_data_path, "w") as f:
+            f.write(f"{total_time}")
+                    
