@@ -5,7 +5,7 @@ import pickle
 import numpy as np
 from tqdm import trange
 from omegaconf import DictConfig
-from sklearn.neighbors import NearestNeighbors
+from scipy.spatial import cKDTree
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from explore.env.mujoco_sim import MjSim
@@ -55,8 +55,6 @@ class Search:
         
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
-        
-        self.nbrs = NearestNeighbors(n_neighbors=1, metric="euclidean")
         
         sim_count = 10 if self.threading else 1
         self.sim = [MjSim(mujoco_xml, self.tau_sim, view=False, verbose=0) for _ in range(sim_count)]
@@ -214,7 +212,7 @@ class Search:
                 start_idx = self.start_idx
         
             # Fit kNN with current node states
-            self.nbrs.fit(self.trees_kNNs[start_idx])  # Could possibly be made faster if each new node would not require rebuilding the kNN tree
+            kdtree = cKDTree(self.trees_kNNs[start_idx])
 
             # Sample random sim state
             exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
@@ -231,8 +229,7 @@ class Search:
                 sim_sample = self.configs[target_config_idx]
             
             # Pick closest node
-            _, node_idx = self.nbrs.kneighbors(sim_sample.reshape(1, -1))
-            node_idx = int(node_idx[0][0])
+            _, node_idx = kdtree.query(sim_sample, k=1)
             node = self.trees[start_idx][node_idx]
 
             node_start_time = node.time
@@ -268,4 +265,3 @@ class Search:
         time_data_path = os.path.join(self.output_dir, f"time_taken.txt")
         with open(time_data_path, "w") as f:
             f.write(f"{total_time}")
-                    
