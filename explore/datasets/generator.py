@@ -2,10 +2,10 @@ import os
 import cma
 import time
 import pickle
+import hnswlib
 import numpy as np
 from tqdm import trange
 from omegaconf import DictConfig
-from scipy.spatial import cKDTree
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from explore.env.mujoco_sim import MjSim
@@ -40,7 +40,7 @@ class Search:
         self.configs = configs
         self.configs_ctrl = configs_ctrl
 
-        self.max_nodes = cfg.max_nodes
+        self.max_nodes = int(cfg.max_nodes)
         self.stepsize = cfg.stepsize
         self.target_prob = cfg.target_prob
 
@@ -58,7 +58,7 @@ class Search:
         
         sim_count = 10 if self.threading else 1
         self.sim = [MjSim(mujoco_xml, self.tau_sim, view=False, verbose=0) for _ in range(sim_count)]
-        assert self.sample_count % len(self.sim) == 0
+        assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
         
         self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
         self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
@@ -76,7 +76,8 @@ class Search:
     def reset_trees(self):
 
         self.trees: list[list[MultiSearchNode]] = []
-        self.trees_kNNs: list[np.ndarray] = []
+        self.trees_kNNs: list[hnswlib.Index] = []
+        self.trees_kNNs_sizes: list[int] = []
         for i in range(self.configs.shape[0]):
             
             self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
@@ -85,8 +86,16 @@ class Search:
             root = MultiSearchNode(-1, None, state, 0.)
             self.trees.append([root])
 
-            kNN_state_list = np.array([state[1]])
-            self.trees_kNNs.append(kNN_state_list)
+            kNN_tree = hnswlib.Index(space='l2', dim=state[1].shape[0])
+            if self.start_idx == -1:
+                max_tree_size = int(np.ceil(self.max_nodes / self.configs) + 1)
+            else:
+                max_tree_size = int(self.max_nodes + self.configs.shape[0])
+            kNN_tree.init_index(max_elements=max_tree_size, ef_construction=200, M=16)
+            kNN_tree.add_items(state[1].astype(np.float32), ids=[0])
+
+            self.trees_kNNs.append(kNN_tree)
+            self.trees_kNNs_sizes.append(1)
     
     def gauss_sample_ctrl(self, mean: np.ndarray, sample_count: int=1,
                           std_perc: float=0.25) -> np.ndarray:
@@ -155,7 +164,7 @@ class Search:
         return results
     
     def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
-                  target: tuple, sim_idx: int=0) -> tuple[float, np.ndarray, np.ndarray]:
+                  target: np.ndarray, sim_idx: int=0) -> tuple[float, np.ndarray, np.ndarray]:
         
         self.sim[sim_idx].setState(*origin)
         
@@ -210,9 +219,6 @@ class Search:
                 start_idx = i // nodes_per_tree
             else:
                 start_idx = self.start_idx
-        
-            # Fit kNN with current node states
-            kdtree = cKDTree(self.trees_kNNs[start_idx])
 
             # Sample random sim state
             exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
@@ -229,8 +235,9 @@ class Search:
                 sim_sample = self.configs[target_config_idx]
             
             # Pick closest node
-            _, node_idx = kdtree.query(sim_sample, k=1)
-            node = self.trees[start_idx][node_idx]
+            node_idx, _ = self.trees_kNNs[start_idx].knn_query(sim_sample, k=1)
+            node_idx = node_idx[0][0]
+            node: MultiSearchNode = self.trees[start_idx][node_idx]
 
             node_start_time = node.time
             start_state = node.state
@@ -238,13 +245,14 @@ class Search:
             best_node_cost, best_state, best_q = self.action_sampler(start_state, sim_sample)
                 
             best_node = MultiSearchNode(
-                node_idx, best_q, best_state,
+                node_idx, best_q.copy(), best_state,  # The copy here is to reduce memory usage: some weird numpy thing about views in arrays or smth...
                 node_start_time + self.tau_action,
                 explore_node=exploring,
                 target_config_idx=target_config_idx)
             
             self.trees[start_idx].append(best_node)
-            self.trees_kNNs[start_idx] = np.vstack((self.trees_kNNs[start_idx], best_state[1].reshape(1, -1)))
+            self.trees_kNNs[start_idx].add_items(best_state[1].astype(np.float32), ids=[self.trees_kNNs_sizes[start_idx]])
+            self.trees_kNNs_sizes[start_idx] += 1
             
             if (((self.start_idx == -1) and (i % nodes_per_tree == nodes_per_tree-1)) or
                 ((self.start_idx != -1) and (i == self.max_nodes-1))):
@@ -255,6 +263,13 @@ class Search:
                 
                 # Free memory
                 self.reset_trees()
+
+            if (i+1) % 1000 == 0:
+                import psutil
+
+                process = psutil.Process(os.getpid())
+                print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
+                print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
         
         end_time = time.time()
         total_time = end_time - start_time
@@ -265,3 +280,4 @@ class Search:
         time_data_path = os.path.join(self.output_dir, f"time_taken.txt")
         with open(time_data_path, "w") as f:
             f.write(f"{total_time}")
+
