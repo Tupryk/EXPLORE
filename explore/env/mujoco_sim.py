@@ -39,10 +39,10 @@ class MjSim:
             del frames[0]
 
     def pushConfig(self, joint_state: np.ndarray, ctrl_state: np.ndarray=None):
-        self.data.qpos = joint_state
-        self.data.qvel = np.zeros_like(self.data.qvel)
+        self.data.qpos[:] = joint_state
+        self.data.qvel[:] = np.zeros_like(self.data.qvel)
         if not (ctrl_state is None):
-            self.data.ctrl = ctrl_state
+            self.data.ctrl[:] = ctrl_state
 
         mujoco.mj_forward(self.model, self.data)
 
@@ -55,7 +55,7 @@ class MjSim:
         steps = math.ceil(tau_action/self.tau_sim)
         
         if not (ctrl_target is None):
-            self.data.ctrl = ctrl_target
+            self.data.ctrl[:] = ctrl_target
             
         for k in range(steps):
             mujoco.mj_step(self.model, self.data)
@@ -77,9 +77,9 @@ class MjSim:
     def setState(self, time: float, qpos: np.ndarray,
                  qvel: np.ndarray, ctrl: np.ndarray):
         self.data.time = time
-        self.data.qpos = qpos
-        self.data.qvel = qvel
-        self.data.ctrl = ctrl
+        self.data.qpos[:] = qpos
+        self.data.qvel[:] = qvel
+        self.data.ctrl[:] = ctrl
         mujoco.mj_forward(self.model, self.data)
         self.ctrl_time = time
         if self.viewer is not None:
