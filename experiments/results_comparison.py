@@ -8,8 +8,8 @@ from explore.env.mujoco_sim import MjSim
 
 
 explorer_paths = {
-    "rs": "data/Pandas/17-41-29",
-    "cma": "data/Pandas/17-34-44"
+    "rs": "data/Pandas/rs",
+    "cma": "data/Pandas/cma"
 }
 
 start_idx = 6
@@ -57,18 +57,18 @@ for k, v in explorer_paths.items():
         "path": path
     }
 
-start_state = trees["rs"]["path"][0]["state"][1]
-sim = MjSim("configs/franka_emika_panda/scene.xml", tau_sim=0.01, view=True)
-play_path(start_state, target_state, trees["rs"]["path"], sim, playback_time=10)
-play_path(start_state, target_state, trees["cma"]["path"], sim, playback_time=10, play_intro=False)
+# start_state = trees["rs"]["path"][0]["state"][1]
+# sim = MjSim("configs/franka_emika_panda/scene.xml", view=True)
+# play_path(start_state, target_state, trees["rs"]["path"], sim, playback_time=10)
+# play_path(start_state, target_state, trees["cma"]["path"], sim, playback_time=10, play_intro=False)
 
-# fig, ax = plt.subplots(1, 2, figsize=(16, 8))
-# methods = trees.keys()
-# costs = [float(trees[k]["cost"]) for k in methods]
-# times = [trees[k]["time"] for k in methods]
+fig, ax = plt.subplots(1, 2, figsize=(16, 8))
+methods = trees.keys()
+costs = [float(trees[k]["cost"]) for k in methods]
+times = [trees[k]["time"] for k in methods]
 
-# ax[0].bar(methods, costs)
-# ax[1].bar(methods, times)
-# ax[0].set_ylabel("Cost")
-# ax[1].set_ylabel("Time")
-# plt.show()
+ax[0].bar(methods, costs)
+ax[1].bar(methods, times)
+ax[0].set_ylabel("Cost")
+ax[1].set_ylabel("Time")
+plt.show()
