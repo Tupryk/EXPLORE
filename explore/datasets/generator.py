@@ -54,6 +54,9 @@ class Search:
         self.warm_start = cfg.warm_start
         self.threading = cfg.threading
         self.sampling_strategy = cfg.sampling_strategy
+        self.q_mask = np.array(cfg.q_mask)
+        if not self.q_mask.shape[0]:
+            self.q_mask = np.ones_like(self.configs[0])
         
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
@@ -85,7 +88,7 @@ class Search:
             self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
             state = self.sim[0].getState()
         
-            root = MultiSearchNode(-1, None, state, 0.)
+            root = MultiSearchNode(-1, np.zeros_like(self.configs_ctrl[0]), state, 0.)
             self.trees.append([root])
 
             kNN_tree = hnswlib.Index(space='l2', dim=state[1].shape[0])
@@ -102,6 +105,7 @@ class Search:
     def gauss_sample_ctrl(self, parent_node: MultiSearchNode, sample_count: int=1,
                           std_perc: float=0.25) -> np.ndarray:
         # Maybe try sampling over spline waypoints? (technically right now we have a spline with two waypoints)
+        # TODO: Consider issue with infinetly growing delta when using warm start
         mean = parent_node.action if self.warm_start else np.zeros_like(parent_node.action)
         if self.stepsize > 0.:
             std_devs = self.stepsize
@@ -244,20 +248,22 @@ class Search:
                 sim_sample = self.configs[target_config_idx]
             
             # Pick closest node
-            node_idx, _ = self.trees_kNNs[start_idx].knn_query(sim_sample, k=1)
+            node_idx, _ = self.trees_kNNs[start_idx].knn_query(sim_sample * self.q_mask, k=1)
             node_idx = node_idx[0][0]
             node: MultiSearchNode = self.trees[start_idx][node_idx]
 
             best_node_cost, best_state, best_q = self.action_sampler(node, sim_sample)
-                
+            
+            delta_q = (best_q - node.action).copy()
             best_node = MultiSearchNode(
-                node_idx, best_q.copy() - node.action, best_state,  # The copy here is to reduce memory usage: some weird numpy thing about views in arrays or smth...
+                node_idx, delta_q, best_state,  # The copy here is to reduce memory usage: some weird numpy thing about views in arrays or smth...
                 node.time + self.tau_action,
                 explore_node=exploring,
                 target_config_idx=target_config_idx)
             
             self.trees[start_idx].append(best_node)
-            self.trees_kNNs[start_idx].add_items(best_state[1].astype(np.float32), ids=[self.trees_kNNs_sizes[start_idx]])
+            knn_item = best_state[1].astype(np.float32) * self.q_mask
+            self.trees_kNNs[start_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[start_idx]])
             self.trees_kNNs_sizes[start_idx] += 1
             
             if (((self.start_idx == -1) and (i % nodes_per_tree == nodes_per_tree-1)) or
@@ -284,4 +290,3 @@ class Search:
         time_data_path = os.path.join(self.output_dir, f"time_taken.txt")
         with open(time_data_path, "w") as f:
             f.write(f"{total_time}")
-

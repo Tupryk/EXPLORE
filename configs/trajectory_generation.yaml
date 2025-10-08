@@ -2,11 +2,11 @@ RRT:
   max_nodes: 2000
   min_cost: 5e-2
   # stepsize: .3
-  stepsize: .02
+  stepsize: .1
   verbose: 1
   target_prob: .2
   sample_uniform: False
-  warm_start: True
+  warm_start: False
   threading: True
   # start_idx: 6
   start_idx: 1
@@ -15,6 +15,8 @@ RRT:
   sample_count: 1000
   sampling_strategy: "rs"
   output_dir: ${hydra:runtime.output_dir}
+  # q_mask: []
+  q_mask: [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
 
 # configs_path: "configs/pandasTable_ball.h5"
 configs_path: "configs/new_rnd_twoFingers.h5"
