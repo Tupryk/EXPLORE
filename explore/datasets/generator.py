@@ -50,6 +50,7 @@ class Search:
         self.sample_count = cfg.sample_count
         self.verbose = cfg.verbose
         self.sample_uniform = cfg.sample_uniform
+        self.warm_start = cfg.warm_start
         self.threading = cfg.threading
         self.sampling_strategy = cfg.sampling_strategy
         
@@ -97,29 +98,33 @@ class Search:
             self.trees_kNNs.append(kNN_tree)
             self.trees_kNNs_sizes.append(1)
     
-    def gauss_sample_ctrl(self, mean: np.ndarray, sample_count: int=1,
+    def gauss_sample_ctrl(self, parent_node: MultiSearchNode, sample_count: int=1,
                           std_perc: float=0.25) -> np.ndarray:
+        # Maybe try sampling over spline waypoints? (technically right now we have a spline with two waypoints)
+        mean = parent_node.action if self.warm_start else np.zeros_like(parent_node.action)
         std_devs = np.abs(self.ctrl_ranges[:, 0] - self.ctrl_ranges[:, 1]) * std_perc
         noise = np.random.randn(sample_count * self.ctrl_dim).reshape(sample_count, -1)
-        sample = noise * std_devs + mean
+        delta = noise * std_devs + mean
+        
+        sample = parent_node.state[3] + delta
         return sample
             
-    def random_sample_ctrls(self, origin: tuple, target: tuple
+    def random_sample_ctrls(self, parent_node: MultiSearchNode, target: tuple
                             ) -> tuple[float, np.ndarray, np.ndarray]:
         
-        sampled_ctrls = self.gauss_sample_ctrl(origin[3], self.sample_count)
+        sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count)
         
-        results = self.eval_multiple_ctrls(sampled_ctrls, origin, target)
+        results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)
                 
         best_node_cost, best_state, best_q = min(results, key=lambda x: x[0])
         return best_node_cost, best_state, best_q
     
-    def cma_sample_ctrls(self, origin: np.ndarray, target: np.ndarray
+    def cma_sample_ctrls(self, parent_node: MultiSearchNode, target: np.ndarray
                          ) -> tuple[float, np.ndarray, np.ndarray]:
         
         pop_size = 20
         initial_guess = np.random.randn(self.ctrl_dim)
-        initial_guess = origin[3]
+        initial_guess = parent_node.state[3]
         es = cma.CMAEvolutionStrategy(initial_guess, 0.5, {
             "popsize": pop_size,
             "maxfevals": self.sample_count,
@@ -129,7 +134,7 @@ class Search:
         while not es.stop():
             candidates = es.ask()
 
-            results = self.eval_multiple_ctrls(candidates, origin, target)
+            results = self.eval_multiple_ctrls(candidates, parent_node.state, target)
             fitness_values = [r[0] for r in results]
 
             es.tell(candidates, fitness_values)
@@ -137,7 +142,7 @@ class Search:
             if self.verbose > 3:
                 es.disp()
         
-        _, best_state, _ = self.eval_ctrl(es.result.xbest, origin, target)
+        _, best_state, _ = self.eval_ctrl(es.result.xbest, parent_node.state, target)
         return es.result.fbest, best_state, es.result.xbest
     
     def eval_multiple_ctrls(self, ctrls: np.ndarray, origin: tuple,
@@ -239,14 +244,11 @@ class Search:
             node_idx = node_idx[0][0]
             node: MultiSearchNode = self.trees[start_idx][node_idx]
 
-            node_start_time = node.time
-            start_state = node.state
-
-            best_node_cost, best_state, best_q = self.action_sampler(start_state, sim_sample)
+            best_node_cost, best_state, best_q = self.action_sampler(node, sim_sample)
                 
             best_node = MultiSearchNode(
-                node_idx, best_q.copy(), best_state,  # The copy here is to reduce memory usage: some weird numpy thing about views in arrays or smth...
-                node_start_time + self.tau_action,
+                node_idx, best_q.copy() - node.action, best_state,  # The copy here is to reduce memory usage: some weird numpy thing about views in arrays or smth...
+                node.time + self.tau_action,
                 explore_node=exploring,
                 target_config_idx=target_config_idx)
             

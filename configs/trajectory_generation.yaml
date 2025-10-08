@@ -5,6 +5,7 @@ RRT:
   verbose: 1
   target_prob: .2
   sample_uniform: False
+  warm_start: True
   threading: True
   start_idx: 6
   end_idx: 1

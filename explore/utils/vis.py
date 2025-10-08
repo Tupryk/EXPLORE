@@ -44,5 +44,5 @@ def play_path(start_state: np.ndarray, target_state: np.ndarray,
     sim.setState(*path[0]["state"])
     path.pop(0)
     for node in path:
-        q_target = node["action"]
+        q_target = node["state"][3]
         sim.step(tau_action, q_target, view=tau_action*playback_time)

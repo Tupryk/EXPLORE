@@ -19,14 +19,14 @@ ax.scatter(ball_x, ball_y, ball_z, alpha=.2)
 plt.axis("equal")
 plt.show()
 
-# sim = MjSim("configs/franka_emika_panda/scene.xml", view=True, verbose=1)
+sim = MjSim("configs/franka_emika_panda/scene.xml", view=True, verbose=1)
 
-# sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
+sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
 
-# # for i in sampled_configs:
-# for i, sc in enumerate(stable_configs):
-#     print(i)
-#     # sim.pushConfig(sc)
-#     sim.pushConfig(sc, stable_configs_ctrl[i])
-#     time.sleep(1)
-#     sim.step(1, view=.5)
+# for i in sampled_configs:
+for i, sc in enumerate(stable_configs):
+    print(i)
+    # sim.pushConfig(sc)
+    sim.pushConfig(sc, stable_configs_ctrl[i])
+    time.sleep(1)
+    sim.step(1, view=.5)
