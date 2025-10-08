@@ -1,6 +1,7 @@
 import os
 import cma
 import time
+import psutil
 import pickle
 import hnswlib
 import numpy as np
@@ -99,7 +100,10 @@ class Search:
     
     def gauss_sample_ctrl(self, mean: np.ndarray, sample_count: int=1,
                           std_perc: float=0.25) -> np.ndarray:
-        std_devs = np.abs(self.ctrl_ranges[:, 0] - self.ctrl_ranges[:, 1]) * std_perc
+        if self.stepsize > 0.:
+            std_devs = self.stepsize
+        else:
+            std_devs = np.abs(self.ctrl_ranges[:, 0] - self.ctrl_ranges[:, 1]) * std_perc
         noise = np.random.randn(sample_count * self.ctrl_dim).reshape(sample_count, -1)
         sample = noise * std_devs + mean
         return sample
@@ -264,9 +268,7 @@ class Search:
                 # Free memory
                 self.reset_trees()
 
-            if (i+1) % 1000 == 0:
-                import psutil
-
+            if self.verbose > 0 and (i+1) % 1000 == 0:
                 process = psutil.Process(os.getpid())
                 print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
                 print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
