@@ -16,14 +16,14 @@ from explore.utils.utils import randint_excluding
 class MultiSearchNode:
     def __init__(self,
                  parent: int,
-                 action: np.ndarray,
+                 delta_q: np.ndarray,
                  state: tuple,
                  time: float,
                  path: list=None,
                  explore_node: bool=False,
                  target_config_idx: int=-1):
         self.parent = parent
-        self.action = action
+        self.delta_q = delta_q
         self.state = state
         self.time = time
         self.path = path  # Motion
@@ -31,8 +31,6 @@ class MultiSearchNode:
         self.target_config_idx = target_config_idx
 
 class Search:
-    tau_action = 0.1
-    tau_sim = 0.01
 
     def __init__(self, mujoco_xml: str, configs: np.ndarray,
                  configs_ctrl: np.ndarray, cfg: DictConfig):
@@ -47,6 +45,9 @@ class Search:
 
         self.min_cost = cfg.min_cost
         self.output_dir = cfg.output_dir
+        
+        self.tau_sim = cfg.tau_sim
+        self.tau_action = cfg.tau_action
 
         self.sample_count = cfg.sample_count
         self.verbose = cfg.verbose
@@ -106,7 +107,7 @@ class Search:
                           std_perc: float=0.25) -> np.ndarray:
         # Maybe try sampling over spline waypoints? (technically right now we have a spline with two waypoints)
         # TODO: Consider issue with infinetly growing delta when using warm start
-        mean = parent_node.action if self.warm_start else np.zeros_like(parent_node.action)
+        mean = parent_node.delta_q if self.warm_start else np.zeros_like(parent_node.delta_q)
         if self.stepsize > 0.:
             std_devs = self.stepsize
         else:
@@ -114,7 +115,8 @@ class Search:
         noise = np.random.randn(sample_count * self.ctrl_dim).reshape(sample_count, -1)
         delta = noise * std_devs + mean
         
-        sample = parent_node.state[3] + delta
+        sample = delta + parent_node.state[3]
+        # Should maybe do ctrl_range checking here
         return sample
             
     def random_sample_ctrls(self, parent_node: MultiSearchNode, target: tuple
@@ -184,7 +186,7 @@ class Search:
         self.sim[sim_idx].step(self.tau_action, ctrl)
         state = self.sim[sim_idx].getState()
         
-        e = target - state[1]
+        e = (target - state[1]) * self.q_mask
         cost2target = e.T @ e
         
         return cost2target, state, ctrl
@@ -194,7 +196,7 @@ class Search:
         for node in self.trees[idx]:
             new_node = {
                 "parent": node.parent,
-                "action": node.action,
+                "delta_q": node.delta_q,
                 "state": node.state,
                 "time": node.time,
                 "path": node.path,
@@ -254,9 +256,9 @@ class Search:
 
             best_node_cost, best_state, best_q = self.action_sampler(node, sim_sample)
             
-            delta_q = (best_q - node.action).copy()
+            delta_q = (best_q - node.state[3]).copy()
             best_node = MultiSearchNode(
-                node_idx, delta_q, best_state,  # The copy here is to reduce memory usage: some weird numpy thing about views in arrays or smth...
+                node_idx, delta_q, best_state,
                 node.time + self.tau_action,
                 explore_node=exploring,
                 target_config_idx=target_config_idx)

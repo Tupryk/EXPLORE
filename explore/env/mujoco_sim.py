@@ -4,6 +4,8 @@ import mujoco
 import time, math
 import numpy as np
 import mujoco.viewer
+
+from explore.utils.mj import explain_qpos
 from explore.utils.utils import ND_BSpline
 
 
@@ -25,6 +27,7 @@ class MjSim:
         if self.verbose:
             print(f"Loaded config '{xml_path}' with position values:")
             print(self.data.qpos)
+            explain_qpos(self.model)
             
         frames = []
 

@@ -30,19 +30,23 @@ def AdjMap(costs: np.ndarray, min_value: float=0.0, max_value: float=0.1, save_a
 
 
 def play_path(start_state: np.ndarray, target_state: np.ndarray,
-              path: list[dict], sim: MjSim, playback_time: float=1., play_intro: bool=True):
+              path: list[dict], sim: MjSim, playback_time: float=1.,
+              tau_action: float=.1, play_intro: bool=True):
     
     print(f"Playing path with length {len(path)}")
 
     if play_intro:
         sim.pushConfig(start_state)
-        time.sleep(4)
+        time.sleep(3)
         sim.pushConfig(target_state)
-        time.sleep(4)
+        time.sleep(3)
+        sim.pushConfig(path[-1]["state"][1])
+        time.sleep(3)
 
-    tau_action = .1
     sim.setState(*path[0]["state"])
     path.pop(0)
     for node in path:
         q_target = node["state"][3]
         sim.step(tau_action, q_target, view=tau_action*playback_time)
+        
+    time.sleep(3)
