@@ -1,7 +1,7 @@
 RRT:
   max_nodes: 20000
   min_cost: 2e-2
-  stepsize: .1
+  stepsize: .01
   verbose: 1
   target_prob: .2
   sample_uniform: False
@@ -12,9 +12,9 @@ RRT:
   sample_count: 1000
   sampling_strategy: "rs"
   output_dir: ${hydra:runtime.output_dir}
-  q_mask: []
+  q_mask: [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
   tau_sim: 0.001
   tau_action: 0.1
 
-configs_path: "configs/fingerBox.h5"
-mujoco_xml: "configs/fingerBox.xml"
+configs_path: "configs/new_rnd_twoFingers.h5"
+mujoco_xml: "configs/twoFingers.xml"

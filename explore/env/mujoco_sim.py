@@ -56,16 +56,20 @@ class MjSim:
              ctrl_target: np.ndarray=None, view: float=0.0):
         
         steps = math.ceil(tau_action/self.tau_sim)
-        
+        prev_ctrl = self.data.ctrl[:]
+
         if not (ctrl_target is None):
             self.data.ctrl[:] = ctrl_target
-            
+        
         for k in range(steps):
+            
+            # if not (ctrl_target is None):
+            #     self.data.ctrl[:] = prev_ctrl * (1 - (k+1)/steps) + ctrl_target * ((k+1)/steps)
+            
             mujoco.mj_step(self.model, self.data)
             
             if view > 0.:
-                if self.viewer is not None:
-                    self.viewer.sync()
+                self.viewer.sync()
                 time.sleep(view/steps)
 
     def getState(self):
