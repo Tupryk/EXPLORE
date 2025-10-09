@@ -5,6 +5,7 @@ RRT:
   verbose: 1
   target_prob: .2
   sample_uniform: False
+  interpolate_actions: False
   warm_start: False
   threading: True
   start_idx: 1
@@ -14,7 +15,7 @@ RRT:
   output_dir: ${hydra:runtime.output_dir}
   q_mask: []
   tau_sim: 0.001
-  tau_action: 0.1
+  tau_action: 0.5
 
 configs_path: "configs/fingerBox.h5"
 mujoco_xml: "configs/fingerBox.xml"

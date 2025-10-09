@@ -11,12 +11,13 @@ from explore.utils.utils import ND_BSpline
 
 class MjSim:
 
-    def __init__(self, xml_path: str, tau_sim: float=1e-3, view: bool=False, verbose: int=0):
+    def __init__(self, xml_path: str, tau_sim: float=1e-3, view: bool=False, interpolate: bool=False, verbose: int=0):
         
         self.tau_sim = tau_sim
         self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.data = mujoco.MjData(self.model)
         self.model.opt.timestep = self.tau_sim
+        self.interpolate = interpolate
         self.verbose = verbose
 
         if view:
@@ -58,13 +59,13 @@ class MjSim:
         steps = math.ceil(tau_action/self.tau_sim)
         prev_ctrl = self.data.ctrl[:]
 
-        if not (ctrl_target is None):
+        if not self.interpolate and not (ctrl_target is None):
             self.data.ctrl[:] = ctrl_target
         
         for k in range(steps):
             
-            # if not (ctrl_target is None):
-            #     self.data.ctrl[:] = prev_ctrl * (1 - (k+1)/steps) + ctrl_target * ((k+1)/steps)
+            if self.interpolate and not (ctrl_target is None):
+                self.data.ctrl[:] = prev_ctrl * (1 - (k+1)/steps) + ctrl_target * ((k+1)/steps)
             
             mujoco.mj_step(self.model, self.data)
             

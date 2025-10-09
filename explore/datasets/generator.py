@@ -48,6 +48,7 @@ class Search:
         
         self.tau_sim = cfg.tau_sim
         self.tau_action = cfg.tau_action
+        self.interpolate_actions = cfg.interpolate_actions
 
         self.sample_count = cfg.sample_count
         self.verbose = cfg.verbose
@@ -63,7 +64,7 @@ class Search:
         self.end_idx = cfg.end_idx
         
         sim_count = 10 if self.threading else 1
-        self.sim = [MjSim(mujoco_xml, self.tau_sim, view=False, verbose=0) for _ in range(sim_count)]
+        self.sim = [MjSim(mujoco_xml, self.tau_sim, view=False, verbose=0, interpolate=self.interpolate_actions) for _ in range(sim_count)]
         assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
         
         self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
