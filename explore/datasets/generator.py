@@ -242,6 +242,7 @@ class Search:
             
             if exploring or self.end_idx == -1:
                 if self.sample_uniform:
+                    # TODO: Sampling ranges are not the same for each scene and each dim in the qpos...
                     sim_sample = np.random.uniform(low=-1., high=1., size=self.configs.shape[1])
                 else:
                     target_config_idx = randint_excluding(0, self.configs.shape[0], start_idx)  # TODO: exclude end_idx if end_idx != -1
