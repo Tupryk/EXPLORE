@@ -57,6 +57,7 @@ class MjSim:
              ctrl_target: np.ndarray=None, view: float=0.0):
         
         steps = math.ceil(tau_action/self.tau_sim)
+        # This prev ctrl is not quite right, as you would have to take the qpos for a proper interpolation
         prev_ctrl = self.data.ctrl[:]
 
         if not self.interpolate and not (ctrl_target is None):
