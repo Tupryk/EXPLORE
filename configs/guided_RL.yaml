@@ -3,12 +3,19 @@ verbose: 1
 total_timesteps: 2
 output_dir: ${hydra:runtime.output_dir}
 env:
-  start_config_idx: 80
-  target_config_idx: 32
-  max_steps: 50
+  tau_sim: 0.001
+  tau_action: 0.5
+  interpolate_actions: True
+  mujoco_xml: "configs/twoFingers.xml"
   stepsize: .1
-  tau: .1
+  max_steps: 50
   actions_noise_sigma: -1
   use_vel: False
   guiding: True
-  dataset: "trees"
+  start_config_idx: -1
+  target_config_idx: -1
+  goal_conditioning: True
+  stable_configs_path: "configs/new_rnd_twoFingers.h5"
+  trajectory_data_path: "data/twoFingerStart1"
+  error_thresh: 5e-2
+  verbose: 0

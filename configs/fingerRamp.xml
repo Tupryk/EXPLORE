@@ -1,0 +1,56 @@
+<mujoco model="ry_convert">
+  <asset />
+
+  <visual>
+      <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.1 0.1 0.1"/>
+      <map znear="0.01"/>
+      <global offwidth="1200" offheight="800"/>
+  </visual>
+
+  <default>
+    <default class="slider">
+        <position forcerange="-150 150" kp="1000" kv="10" ctrlrange="-10 10"/>
+        <!-- <position forcerange="-150 150"/> -->
+    </default>
+  </default>
+
+  <actuator>
+    <position name="l_joint1" joint="l_joint1" class="slider"/>
+    <position name="l_joint2" joint="l_joint2" class="slider" />
+    <position name="l_fing" joint="l_fing" class="slider" />
+  </actuator>
+
+  <worldbody>
+    <body name="l_base" pos="0.0 -0.5 0.4">
+      <body name="l_joint1">
+        <joint name="l_joint1" damping="0.1" type="slide" axis="1 0 0" />
+        <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
+        <body name="l_joint2">
+          <joint name="l_joint2" damping="0.1" type="slide" axis="0 1 0" />
+          <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
+          <body name="l_fing">
+            <joint name="l_fing" damping="0.1" type="slide" axis="0 0 1" />
+            <geom type="sphere" size="0.05" rgba="0 1 1 1" mass="0.1"/>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="base" pos="0.0 0.0 0.1">
+
+      <body name="table" pos="0.0 0.0 0.3" quat="0.97236992 0.23344536 0.0 0.0">
+        <geom type="box" size="0.4 0.5 0.05" />
+      </body>
+      <body name="wall_l" pos="0.45 0.0 0.3">
+        <geom type="box" size="0.05 0.5 0.25" />
+      </body>
+      <body name="wall_r" pos="-0.45 0.0 0.3">
+        <geom type="box" size="0.05 0.5 0.25" />
+      </body>
+    
+    </body>
+    <body name="obj" pos="0.0 0.0 0.7">
+      <freejoint />
+      <geom type="sphere" size="0.1" rgba="1 .5 0 1" mass="0.2"/>
+    </body>
+  </worldbody>
+</mujoco>

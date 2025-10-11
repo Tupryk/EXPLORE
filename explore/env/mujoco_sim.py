@@ -115,3 +115,9 @@ class MjSim:
                 contacts_vec[self.possible_contacts.index((c[1], c[0]))] = 1
         
         return contacts_vec
+    
+    def renderImg(self, w: int=640, h: int=480) -> np.ndarray:
+        renderer = mujoco.Renderer(self.model, w, h)
+        renderer.update_scene(self.data)
+        frame = renderer.render()
+        return frame

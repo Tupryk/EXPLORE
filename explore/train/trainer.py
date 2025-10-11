@@ -4,7 +4,7 @@ import logging
 from omegaconf import DictConfig
 from stable_baselines3 import PPO
 
-from explore.env.finger_balls_env import FingerBallsEnv
+from explore.env.stable_configs_env import StableConfigsEnv
 
 
 class RL_Trainer:
@@ -23,7 +23,7 @@ class RL_Trainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.logger.info(f"Using device: {self.device}")
         
-        self.env = FingerBallsEnv(cfg.env)
+        self.env = StableConfigsEnv(cfg.env)
 
         # Instantiate model, dataset, optimizer, loss
         if cfg.rl_method == "PPO":
