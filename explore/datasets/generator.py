@@ -101,7 +101,7 @@ class Search:
         trees_kNNs_sizes: list[int] = []
 
         if self.start_idx == -1:
-            max_knn_tree_size = int(np.ceil(self.max_nodes / self.configs) + 1)
+            max_knn_tree_size = int(np.ceil(self.max_nodes / self.configs.shape[0]) + 1)
         else:
             max_knn_tree_size = int(self.max_nodes + self.configs.shape[0])
 
