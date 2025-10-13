@@ -1,21 +1,24 @@
 RRT:
-  max_nodes: 20000
+  max_nodes: 15000
   min_cost: 2e-2
   stepsize: .1
   verbose: 1
   target_prob: .2
   sample_uniform: False
-  interpolate_actions: True
   warm_start: False
   threading: True
   start_idx: 1
-  end_idx: 0
-  sample_count: 1000
+  end_idx: -1
+  bidirectional: False
+  sample_count: 100
   sampling_strategy: "rs"
   output_dir: ${hydra:runtime.output_dir}
-  q_mask: []
-  tau_sim: 0.001
-  tau_action: 0.5
+  q_mask: [1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+  sim:
+    tau_sim: 0.001
+    tau_action: 0.5
+    interpolate_actions: True
+    joints_are_same_as_ctrl: True
+    mujoco_xml: "configs/fingerRamp.xml"
 
-configs_path: "configs/fingerBox.h5"
-mujoco_xml: "configs/fingerBox.xml"
+configs_path: "configs/fingerRamp_onRamp.h5"

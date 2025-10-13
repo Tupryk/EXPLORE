@@ -8,8 +8,10 @@ from explore.env.mujoco_sim import MjSim
 
 # h5_file = "configs/pandasTable_ball.h5"
 # mujoco_xml = "configs/franka_emika_panda/scene.xml"
-h5_file = "configs/fingerBox.h5"
-mujoco_xml = "configs/fingerBox.xml"
+# h5_file = "configs/fingerBox.h5"
+# mujoco_xml = "configs/fingerBox.xml"
+h5_file = "configs/fingerRamp_onRamp.h5"
+mujoco_xml = "configs/fingerRamp.xml"
 
 file = h5py.File(h5_file, 'r')
 stable_configs = file["qpos"]

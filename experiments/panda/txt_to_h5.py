@@ -5,9 +5,13 @@ from explore.utils.vis import AdjMap
 
 # txt_file = "data/joint_states.txt"
 # h5_file = "configs/pandasTable_ball.h5"
-txt_file = "data/joint_states_fingerBox.txt"
-h5_file = "configs/fingerBox.h5"
+# txt_file = "data/joint_states_fingerBox.txt"
+# h5_file = "configs/fingerBox.h5"
+txt_file = "data/joint_states_fingerRamp_onRamp.txt"
+h5_file = "configs/fingerRamp_onRamp.h5"
 
+# SAME_THRESH = 0.07
+SAME_THRESH = 0.05
 
 data = np.loadtxt(txt_file, dtype=np.float64)
 
@@ -39,7 +43,6 @@ for i, vec in enumerate(data):
 data_pos = np.array(new_data_pos)
 data_ctrl = np.array(new_data_ctrl)
 
-SAME_THRESH = 0.07
 i = 0
 while i < data_pos.shape[0]:
     keep = []

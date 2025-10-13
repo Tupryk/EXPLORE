@@ -7,7 +7,7 @@ env:
   max_steps: 50
   actions_noise_sigma: -1
   use_vel: False
-  guiding: True
+  guiding: False
   start_config_idx: -1
   target_config_idx: -1
   goal_conditioning: True

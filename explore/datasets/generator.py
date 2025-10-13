@@ -32,8 +32,7 @@ class MultiSearchNode:
 
 class Search:
 
-    def __init__(self, mujoco_xml: str, configs: np.ndarray,
-                 configs_ctrl: np.ndarray, cfg: DictConfig):
+    def __init__(self, configs: np.ndarray, configs_ctrl: np.ndarray, cfg: DictConfig):
         
         self.run_name = ""
         self.configs = configs
@@ -46,9 +45,11 @@ class Search:
         self.min_cost = cfg.min_cost
         self.output_dir = cfg.output_dir
         
-        self.tau_sim = cfg.tau_sim
-        self.tau_action = cfg.tau_action
-        self.interpolate_actions = cfg.interpolate_actions
+        self.tau_sim = cfg.sim.tau_sim
+        self.tau_action = cfg.sim.tau_action
+        self.interpolate_actions = cfg.sim.interpolate_actions
+        self.joints_are_same_as_ctrl = cfg.sim.joints_are_same_as_ctrl
+        self.mujoco_xml = cfg.sim.mujoco_xml
 
         self.sample_count = cfg.sample_count
         self.verbose = cfg.verbose
@@ -62,9 +63,16 @@ class Search:
         
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
+        self.bidirectional = cfg.bidirectional
+        if self.bidirectional and self.end_idx == -1:
+            print("It is recomended to have a specific target config when using bidirectional search.")
         
         sim_count = 10 if self.threading else 1
-        self.sim = [MjSim(mujoco_xml, self.tau_sim, view=False, verbose=0, interpolate=self.interpolate_actions) for _ in range(sim_count)]
+        self.sim = [
+            MjSim(
+                self.mujoco_xml, self.tau_sim, view=False, verbose=0,
+                interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl) for _ in range(sim_count)
+        ]
         assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
         
         self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
@@ -77,32 +85,42 @@ class Search:
         else:
             raise Exception(f"Sampling strategy '{self.sampling_strategy}' not implemented yet!")
         
+        if self.bidirectional:
+            if self.sampling_strategy == "rs":
+                self.backward_action_sampler = lambda o, t: self.backward_random_sample_ctrls(o, t)
+            else:
+                raise Exception(f"Sampling strategy '{self.sampling_strategy}' not implemented for backward search yet!")
+            
         if self.verbose:
             print(f"Starting search across {self.configs.shape[0]} configs!")
 
-    def reset_trees(self):
+    def init_trees(self) -> tuple:
 
-        self.trees: list[list[MultiSearchNode]] = []
-        self.trees_kNNs: list[hnswlib.Index] = []
-        self.trees_kNNs_sizes: list[int] = []
+        trees: list[list[MultiSearchNode]] = []
+        trees_kNNs: list[hnswlib.Index] = []
+        trees_kNNs_sizes: list[int] = []
+
+        if self.start_idx == -1:
+            max_knn_tree_size = int(np.ceil(self.max_nodes / self.configs) + 1)
+        else:
+            max_knn_tree_size = int(self.max_nodes + self.configs.shape[0])
+
         for i in range(self.configs.shape[0]):
             
             self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
             state = self.sim[0].getState()
         
             root = MultiSearchNode(-1, np.zeros_like(self.configs_ctrl[0]), state, 0.)
-            self.trees.append([root])
+            trees.append([root])
 
             kNN_tree = hnswlib.Index(space='l2', dim=state[1].shape[0])
-            if self.start_idx == -1:
-                max_tree_size = int(np.ceil(self.max_nodes / self.configs) + 1)
-            else:
-                max_tree_size = int(self.max_nodes + self.configs.shape[0])
-            kNN_tree.init_index(max_elements=max_tree_size, ef_construction=200, M=16)
+            kNN_tree.init_index(max_elements=max_knn_tree_size, ef_construction=200, M=16)
             kNN_tree.add_items(state[1].astype(np.float32), ids=[0])
 
-            self.trees_kNNs.append(kNN_tree)
-            self.trees_kNNs_sizes.append(1)
+            trees_kNNs.append(kNN_tree)
+            trees_kNNs_sizes.append(1)
+        
+        return trees, trees_kNNs, trees_kNNs_sizes
     
     def gauss_sample_ctrl(self, parent_node: MultiSearchNode, sample_count: int=1,
                           std_perc: float=0.25) -> np.ndarray:
@@ -120,7 +138,7 @@ class Search:
         # Should maybe do ctrl_range checking here
         return sample
             
-    def random_sample_ctrls(self, parent_node: MultiSearchNode, target: tuple
+    def random_sample_ctrls(self, parent_node: MultiSearchNode, target: np.ndarray
                             ) -> tuple[float, np.ndarray, np.ndarray]:
         
         sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count)
@@ -155,6 +173,19 @@ class Search:
         
         _, best_state, _ = self.eval_ctrl(es.result.xbest, parent_node.state, target)
         return es.result.fbest, best_state, es.result.xbest
+    
+    def backward_random_sample_ctrls(self, to_node: MultiSearchNode, from_target: np.ndarray
+                                     ) -> tuple[float, np.ndarray, np.ndarray]:
+        
+        # TODO: Sample distance to then sample noise on the plane defined by the distance vector as the normal
+        # Sample starting state
+
+        # Sample controls
+        sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count)
+
+        # Eval pairs (Depends on velocity!)
+
+        return best_cost, best_start_state, best_q
     
     def eval_multiple_ctrls(self, ctrls: np.ndarray, origin: tuple,
                             target: tuple) -> np.ndarray:
@@ -212,7 +243,9 @@ class Search:
 
     def run(self) -> tuple[list[MultiSearchNode], float]:
         
-        self.reset_trees()
+        self.trees, self.trees_kNNs, self.trees_kNNs_sizes = self.init_trees()
+        if self.bidirectional:
+            self.bi_trees, self.bi_trees_kNNs, self.bi_trees_kNNs_sizes = self.init_trees()
         
         trees_name = f"{self.run_name}trees"
         folder_path = os.path.join(self.output_dir, trees_name)
@@ -256,6 +289,7 @@ class Search:
             node_idx = node_idx[0][0]
             node: MultiSearchNode = self.trees[start_idx][node_idx]
 
+            # Expand node
             best_node_cost, best_state, best_q = self.action_sampler(node, sim_sample)
             
             delta_q = (best_q - node.state[3]).copy()
@@ -269,7 +303,36 @@ class Search:
             knn_item = best_state[1].astype(np.float32) * self.q_mask
             self.trees_kNNs[start_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[start_idx]])
             self.trees_kNNs_sizes[start_idx] += 1
-            
+
+            # Try to expand bi_tree backwards
+            if self.bidirectional:
+                if self.end_idx == -1:
+                    bi_tree_idx = randint_excluding(0, self.configs.shape[0], start_idx)
+                else:
+                    bi_tree_idx = self.end_idx
+                
+                from_state = best_node.state[1]
+                node_idx, _ = self.bi_trees_kNNs[bi_tree_idx].knn_query(from_state * self.q_mask, k=1)
+                node_idx = node_idx[0][0]
+                node: MultiSearchNode = self.bi_trees[bi_tree_idx][node_idx]
+
+                best_node_cost, best_state, best_q = self.backward_action_sampler(node, from_state)
+
+                delta_q = (best_q - node.state[3]).copy()
+                best_node = MultiSearchNode(
+                    node_idx, delta_q, best_state,
+                    node.time + self.tau_action,
+                    explore_node=exploring,
+                    target_config_idx=target_config_idx)
+                
+                self.bi_trees[bi_tree_idx][node_idx]
+
+                self.bi_trees[bi_tree_idx].append(best_node)
+                knn_item = best_state[1].astype(np.float32) * self.q_mask
+                self.bi_trees_kNNs[bi_tree_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[bi_tree_idx]])
+                self.bi_trees_kNNs_sizes[bi_tree_idx] += 1
+
+            # Store information when appropriate
             if (((self.start_idx == -1) and (i % nodes_per_tree == nodes_per_tree-1)) or
                 ((self.start_idx != -1) and (i == self.max_nodes-1))):
                 if self.verbose > 3:
@@ -278,9 +341,9 @@ class Search:
                 self.store_tree(start_idx, folder_path)
                 
                 # Free memory
-                self.reset_trees()
+                self.trees, self.trees_kNNs, self.trees_kNNs_sizes = self.init_trees()
 
-            if self.verbose > 0 and (i+1) % 1000 == 0:
+            if self.verbose > 2 and (i+1) % 1000 == 0:
                 process = psutil.Process(os.getpid())
                 print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
                 print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
