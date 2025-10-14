@@ -57,7 +57,8 @@ class Search:
         if not self.q_mask.shape[0]:
             self.q_mask = np.ones_like(self.configs[0])
         
-        # Only useful when you run a single instance of the python script
+        # Does not always provide faster execution! Depends on weird factors like tau_sim
+        # Does not work for the bi-tree for now
         self.threading = cfg.threading
         # Five Workers and ten simulators seem to be optimal
         self.max_workers = 5
