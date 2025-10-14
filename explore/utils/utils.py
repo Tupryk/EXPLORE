@@ -19,38 +19,6 @@ class ND_BSpline:
     def eval(self, t: float):
         point = np.array([s(t) for s in self.splines])
         return point
-        
-
-def compute_cost_new(state0: tuple,
-                     state1: tuple) -> float:
-
-    cost  = np.linalg.norm(state0[1][:3]  - state1[1][:3])
-    cost += np.linalg.norm(state0[1][3:6] - state1[1][3:6])
-    cost += np.linalg.norm(state0[1][6:9] - state1[1][6:9])
-
-    return cost
-
-
-def compute_cost(state0: tuple,
-                 state1: tuple,
-                 relevant_frames_idxs: list[int],
-                 relevant_frames_weight: list[float]=[]) -> float:
-
-    cost = 0.
-
-    for i, frame_idx in enumerate(relevant_frames_idxs):
-        
-        pos0 = state0[0][frame_idx][:3]
-        pos1 = state1[0][frame_idx][:3]
-        
-        err = pos0 - pos1
-        err = np.linalg.norm(err)
-        if len(relevant_frames_weight):
-            err *= relevant_frames_weight[i]
-        
-        cost += err
-
-    return cost
 
 
 def randint_excluding(low: int, high: int, exclude: int):

@@ -10,6 +10,7 @@ RRT:
   start_idx: 1
   end_idx: 0
   bidirectional: True
+  cost_max_method: False
   sample_count: 1000
   sampling_strategy: "rs"
   output_dir: ${hydra:runtime.output_dir}

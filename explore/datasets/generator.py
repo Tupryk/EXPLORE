@@ -49,14 +49,20 @@ class Search:
         self.mujoco_xml = cfg.sim.mujoco_xml
 
         self.sample_count = cfg.sample_count
-        self.verbose = cfg.verbose
+        self.cost_max_method = cfg.cost_max_method
         self.sample_uniform = cfg.sample_uniform
         self.warm_start = cfg.warm_start
-        self.threading = cfg.threading
         self.sampling_strategy = cfg.sampling_strategy
         self.q_mask = np.array(cfg.q_mask)
         if not self.q_mask.shape[0]:
             self.q_mask = np.ones_like(self.configs[0])
+        
+        # Only useful when you run a single instance of the python script
+        self.threading = cfg.threading
+        # Five Workers and ten simulators seem to be optimal
+        self.max_workers = 5
+        self.sim_count = 10 if self.threading else 1
+        self.verbose = cfg.verbose
         
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
@@ -65,16 +71,16 @@ class Search:
             print("It is recomended to have a specific target config when using bidirectional search.")
         assert not self.bidirectional or self.joints_are_same_as_ctrl
         
-        sim_count = 10 if self.threading else 1
         self.sim = [
             MjSim(
                 self.mujoco_xml, self.tau_sim, view=False, verbose=0,
-                interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl) for _ in range(sim_count)
+                interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl) for _ in range(self.sim_count)
         ]
         assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
         
         self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
         self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
+        self.state_dim = self.sim[0].data.qpos.shape[0]
         
         if self.sampling_strategy == "rs":
             self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
@@ -169,7 +175,7 @@ class Search:
             if self.verbose > 3:
                 es.disp()
         
-        _, best_state, _ = self.eval_ctrl(es.result.xbest, parent_node.state, target)
+        _, best_state, _ = self.eval_ctrl(es.result.xbest, parent_node.state, target, max_method=self.cost_max_method)
         return es.result.fbest, best_state, es.result.xbest
     
     def backward_random_sample_ctrls(self, to_node: MultiSearchNode, from_target: np.ndarray
@@ -178,13 +184,13 @@ class Search:
         # TODO: Sample distance to then sample noise on the plane defined by the distance vector as the normal
         # TODO: don't ignore velocities
         # Sample starting states
-        from_state  = from_target - to_node.state[1]
-        from_state /= np.linalg.norm(from_state)
-        from_state *= self.stepsize
-        from_state += to_node.state[1]
+        from_to_vec  = from_target - to_node.state[1]
+        from_to_vec_normed = from_to_vec / np.linalg.norm(from_to_vec)
+        from_to_vec_scaled = from_to_vec_normed * self.stepsize
+        from_state = from_to_vec_scaled + to_node.state[1]
         
-        noise = np.random.randn(self.sample_count * from_state.shape[0]) * self.stepsize
-        noise = noise.reshape(self.sample_count, from_state.shape[0])
+        noise = np.random.randn(self.sample_count * self.state_dim) * self.stepsize
+        noise = noise.reshape(self.sample_count, self.state_dim)
         states = noise + from_state
 
         origin = [
@@ -194,13 +200,31 @@ class Search:
             to_node.state[3].copy()
         ]
         best_cost = 1e6
-        for s in states:
-            origin[1] = s
-            origin[3] = s[:self.ctrl_dim]
-            res = self.eval_ctrl(to_node.state[3], origin, to_node.state[1])
-            if res[0] < best_cost:
-                best_cost = res[0]
-                best_start_state = s
+
+        if self.threading:
+            sim_count = len(self.sim)
+            futures = []
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                for i in range(self.sample_count):
+                    sim_idx = i % sim_count
+                    s = states[i]
+                    origin[1] = s
+                    origin[3] = s[:self.ctrl_dim]
+                    futures.append(executor.submit(self.eval_ctrl, to_node.state[3], origin, to_node.state[1], sim_idx, True))
+
+                for future in as_completed(futures):
+                    cost, s = future.result()[0], states[futures.index(future)]
+                    if cost < best_cost:
+                        best_cost = cost
+                        best_start_state = s
+        else:
+            for s in states:
+                origin[1] = s
+                origin[3] = s[:self.ctrl_dim]
+                res = self.eval_ctrl(to_node.state[3], origin, to_node.state[1], max_method=True)
+                if res[0] < best_cost:
+                    best_cost = res[0]
+                    best_start_state = s
 
         return best_cost, best_start_state
     
@@ -212,24 +236,29 @@ class Search:
             sim_count = len(self.sim)
             sample_batch_count = len(ctrls) // sim_count
             
-            for i in range(sample_batch_count):
-                # Five Workers and ten simulators seem to be optimal
-                with ThreadPoolExecutor(max_workers=5) as executor:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                for i in range(sample_batch_count):
                     futures = [
-                        executor.submit(self.eval_ctrl, ctrls[i*sim_count+sim_idx], origin, target, sim_idx)
+                        executor.submit(
+                            self.eval_ctrl,
+                            ctrls[i*sim_count+sim_idx],
+                            origin, target,
+                            sim_idx, self.cost_max_method
+                        )
                         for sim_idx in range(sim_count)
                     ]
                     for future in as_completed(futures):
                         results.append(future.result())
         else:
             for ctrl in ctrls:
-                res = self.eval_ctrl(ctrl, origin, target)
+                res = self.eval_ctrl(ctrl, origin, target, max_method=self.cost_max_method)
                 results.append(res)
         
         return results
     
     def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
-                  target: np.ndarray, sim_idx: int=0) -> tuple[float, np.ndarray, np.ndarray]:
+                  target: np.ndarray, sim_idx: int=0, max_method: bool=False
+                  ) -> tuple[float, np.ndarray, np.ndarray]:
         
         self.sim[sim_idx].setState(*origin)
         
@@ -237,7 +266,10 @@ class Search:
         state = self.sim[sim_idx].getState()
         
         e = (target - state[1]) * self.q_mask
-        cost2target = e.T @ e
+        if max_method:
+            cost2target = np.abs(e).max()
+        else:
+            cost2target = e.T @ e
         
         return cost2target, state, ctrl
     
@@ -326,34 +358,35 @@ class Search:
             # Try to expand bi_tree backwards
             if self.bidirectional:
                 if self.end_idx == -1:
-                    bi_tree_idx = randint_excluding(0, self.configs.shape[0], start_idx)
+                    bi_tree_idxs = range(self.configs.shape[0])
                 else:
-                    bi_tree_idx = self.end_idx
+                    bi_tree_idxs = [self.end_idx]
                 
-                from_state = best_node.state[1]
-                node_idx, _ = self.bi_trees_kNNs[bi_tree_idx].knn_query(from_state * self.q_mask, k=1)
-                node_idx = node_idx[0][0]
-                node: MultiSearchNode = self.bi_trees[bi_tree_idx][node_idx]
+                for bi_tree_idx in bi_tree_idxs:
+                    from_state = best_node.state[1]
+                    node_idx, _ = self.bi_trees_kNNs[bi_tree_idx].knn_query(from_state * self.q_mask, k=1)
+                    node_idx = node_idx[0][0]
+                    node: MultiSearchNode = self.bi_trees[bi_tree_idx][node_idx]
 
-                best_cost, best_state = self.backward_action_sampler(node, from_state)
-                
-                if best_cost < self.min_cost:
-                    state_tuple = (
-                        node.state[0] - self.tau_action,
-                        best_state,
-                        np.zeros_like(node.state[2]),
-                        best_state[:self.ctrl_dim].copy()
-                    )
-                    best_node = MultiSearchNode(node_idx, None, state_tuple)
+                    best_cost, best_state = self.backward_action_sampler(node, from_state)
                     
-                    self.bi_trees[bi_tree_idx][node_idx]
+                    if best_cost < self.min_cost:
+                        state_tuple = (
+                            node.state[0] - self.tau_action,
+                            best_state,
+                            np.zeros_like(node.state[2]),
+                            best_state[:self.ctrl_dim].copy()
+                        )
+                        best_node = MultiSearchNode(node_idx, None, state_tuple)
+                        
+                        self.bi_trees[bi_tree_idx][node_idx]
 
-                    self.bi_trees[bi_tree_idx].append(best_node)
-                    knn_item = best_state[1].astype(np.float32) * self.q_mask
-                    self.bi_trees_kNNs[bi_tree_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[bi_tree_idx]])
-                    self.bi_trees_kNNs_sizes[bi_tree_idx] += 1
+                        self.bi_trees[bi_tree_idx].append(best_node)
+                        knn_item = best_state[1].astype(np.float32) * self.q_mask
+                        self.bi_trees_kNNs[bi_tree_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[bi_tree_idx]])
+                        self.bi_trees_kNNs_sizes[bi_tree_idx] += 1
                 
-                if self.verbose and (i+1) % 100 == 0:
+                if self.verbose and (i+1) % 1000 == 0:
                     if self.end_idx != -1:
                         print(f"Bi-tree size at iter {i+1}: {len(self.bi_trees[self.end_idx])}")
                     else:
