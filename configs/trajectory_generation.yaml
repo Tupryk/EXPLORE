@@ -1,5 +1,5 @@
 RRT:
-  max_nodes: 250000
+  max_nodes: 5000
   min_cost: 2e-2
   stepsize: .1
   verbose: 1
@@ -8,8 +8,8 @@ RRT:
   warm_start: False
   threading: True
   start_idx: 1
-  end_idx: -1
-  bidirectional: False
+  end_idx: 0
+  bidirectional: True
   sample_count: 1000
   sampling_strategy: "rs"
   output_dir: ${hydra:runtime.output_dir}

@@ -18,14 +18,12 @@ class MultiSearchNode:
                  parent: int,
                  delta_q: np.ndarray,
                  state: tuple,
-                 time: float,
                  path: list=None,
                  explore_node: bool=False,
                  target_config_idx: int=-1):
         self.parent = parent
         self.delta_q = delta_q
         self.state = state
-        self.time = time
         self.path = path  # Motion
         self.explore_node = explore_node
         self.target_config_idx = target_config_idx
@@ -34,7 +32,6 @@ class Search:
 
     def __init__(self, configs: np.ndarray, configs_ctrl: np.ndarray, cfg: DictConfig):
         
-        self.run_name = ""
         self.configs = configs
         self.configs_ctrl = configs_ctrl
 
@@ -66,6 +63,7 @@ class Search:
         self.bidirectional = cfg.bidirectional
         if self.bidirectional and self.end_idx == -1:
             print("It is recomended to have a specific target config when using bidirectional search.")
+        assert not self.bidirectional or self.joints_are_same_as_ctrl
         
         sim_count = 10 if self.threading else 1
         self.sim = [
@@ -178,22 +176,42 @@ class Search:
                                      ) -> tuple[float, np.ndarray, np.ndarray]:
         
         # TODO: Sample distance to then sample noise on the plane defined by the distance vector as the normal
-        # Sample starting state
+        # TODO: don't ignore velocities
+        # Sample starting states
+        from_state  = from_target - to_node.state[1]
+        from_state /= np.linalg.norm(from_state)
+        from_state *= self.stepsize
+        from_state += to_node.state[1]
+        
+        noise = np.random.randn(self.sample_count * from_state.shape[0]) * self.stepsize
+        noise = noise.reshape(self.sample_count, from_state.shape[0])
+        states = noise + from_state
 
-        # Sample controls
-        sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count)
+        origin = [
+            to_node.state[0] - self.tau_action,
+            to_node.state[1].copy(),
+            np.zeros_like(to_node.state[2]),
+            to_node.state[3].copy()
+        ]
+        best_cost = 1e6
+        for s in states:
+            origin[1] = s
+            origin[3] = s[:self.ctrl_dim]
+            res = self.eval_ctrl(to_node.state[3], origin, to_node.state[1])
+            if res[0] < best_cost:
+                best_cost = res[0]
+                best_start_state = s
 
-        # Eval pairs (Depends on velocity!)
-
-        return best_cost, best_start_state, best_q
+        return best_cost, best_start_state
     
     def eval_multiple_ctrls(self, ctrls: np.ndarray, origin: tuple,
                             target: tuple) -> np.ndarray:
         results = []
-        sim_count = len(self.sim)
         
         if self.threading:
+            sim_count = len(self.sim)
             sample_batch_count = len(ctrls) // sim_count
+            
             for i in range(sample_batch_count):
                 # Five Workers and ten simulators seem to be optimal
                 with ThreadPoolExecutor(max_workers=5) as executor:
@@ -223,14 +241,13 @@ class Search:
         
         return cost2target, state, ctrl
     
-    def store_tree(self, idx: int, folder_path: str):
+    def store_tree(self, idx: int, folder_path: str, trees: list):
         dict_tree = []
-        for node in self.trees[idx]:
+        for node in trees[idx]:
             new_node = {
                 "parent": node.parent,
                 "delta_q": node.delta_q,
                 "state": node.state,
-                "time": node.time,
                 "path": node.path,
                 "explore_node": node.explore_node,
                 "target_config_idx": node.target_config_idx
@@ -247,12 +264,15 @@ class Search:
         if self.bidirectional:
             self.bi_trees, self.bi_trees_kNNs, self.bi_trees_kNNs_sizes = self.init_trees()
         
-        trees_name = f"{self.run_name}trees"
-        folder_path = os.path.join(self.output_dir, trees_name)
+        folder_path = os.path.join(self.output_dir, "trees")
         os.makedirs(folder_path, exist_ok=True)
         
-        [self.store_tree(i, folder_path) for i, _ in enumerate(self.trees)]
-
+        [self.store_tree(i, folder_path, self.trees) for i in range(self.configs.shape[0])]
+        
+        if self.bidirectional:
+            bi_folder_path = os.path.join(self.output_dir, "bi_trees")
+            os.makedirs(bi_folder_path, exist_ok=True)
+            
         if self.verbose > 0:
             pbar = trange(self.max_nodes, desc="Physics RRT Search", unit="epoch")
         else:
@@ -295,7 +315,6 @@ class Search:
             delta_q = (best_q - node.state[3]).copy()
             best_node = MultiSearchNode(
                 node_idx, delta_q, best_state,
-                node.time + self.tau_action,
                 explore_node=exploring,
                 target_config_idx=target_config_idx)
             
@@ -316,21 +335,29 @@ class Search:
                 node_idx = node_idx[0][0]
                 node: MultiSearchNode = self.bi_trees[bi_tree_idx][node_idx]
 
-                best_node_cost, best_state, best_q = self.backward_action_sampler(node, from_state)
-
-                delta_q = (best_q - node.state[3]).copy()
-                best_node = MultiSearchNode(
-                    node_idx, delta_q, best_state,
-                    node.time + self.tau_action,
-                    explore_node=exploring,
-                    target_config_idx=target_config_idx)
+                best_cost, best_state = self.backward_action_sampler(node, from_state)
                 
-                self.bi_trees[bi_tree_idx][node_idx]
+                if best_cost < self.min_cost:
+                    state_tuple = (
+                        node.state[0] - self.tau_action,
+                        best_state,
+                        np.zeros_like(node.state[2]),
+                        best_state[:self.ctrl_dim].copy()
+                    )
+                    best_node = MultiSearchNode(node_idx, None, state_tuple)
+                    
+                    self.bi_trees[bi_tree_idx][node_idx]
 
-                self.bi_trees[bi_tree_idx].append(best_node)
-                knn_item = best_state[1].astype(np.float32) * self.q_mask
-                self.bi_trees_kNNs[bi_tree_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[bi_tree_idx]])
-                self.bi_trees_kNNs_sizes[bi_tree_idx] += 1
+                    self.bi_trees[bi_tree_idx].append(best_node)
+                    knn_item = best_state[1].astype(np.float32) * self.q_mask
+                    self.bi_trees_kNNs[bi_tree_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[bi_tree_idx]])
+                    self.bi_trees_kNNs_sizes[bi_tree_idx] += 1
+                
+                if self.verbose and (i+1) % 100 == 0:
+                    if self.end_idx != -1:
+                        print(f"Bi-tree size at iter {i+1}: {len(self.bi_trees[self.end_idx])}")
+                    else:
+                        print(f"Bi-trees size at iter {i+1}: {sum([len(tree) for tree in self.bi_trees])}")
 
             # Store information when appropriate
             if (((self.start_idx == -1) and (i % nodes_per_tree == nodes_per_tree-1)) or
@@ -338,7 +365,7 @@ class Search:
                 if self.verbose > 3:
                     print(f"Storing tree {start_idx} at i {i}")
                 
-                self.store_tree(start_idx, folder_path)
+                self.store_tree(start_idx, folder_path, self.trees)
                 
                 # Free memory
                 self.trees, self.trees_kNNs, self.trees_kNNs_sizes = self.init_trees()
@@ -350,6 +377,8 @@ class Search:
         
         end_time = time.time()
         total_time = end_time - start_time
+
+        [self.store_tree(i, bi_folder_path, self.bi_trees) for i in range(self.configs.shape[0])]
         
         if self.verbose > 1:
             print(f"Total time taken: {total_time:.2f} seconds")
