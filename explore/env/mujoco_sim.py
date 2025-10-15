@@ -75,7 +75,8 @@ class MjSim:
         for k in range(steps):
             
             if self.interpolate and not (ctrl_target is None):
-                self.data.ctrl[:] = prev_ctrl * (1 - (k+1)/steps) + ctrl_target * ((k+1)/steps)
+                perc = (k+1)/steps
+                self.data.ctrl[:] = prev_ctrl * (1 - perc) + ctrl_target * perc
             
             mujoco.mj_step(self.model, self.data)
             
