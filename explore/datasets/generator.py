@@ -38,6 +38,7 @@ class Search:
         self.max_nodes = int(cfg.max_nodes)
         self.stepsize = cfg.stepsize
         self.target_prob = cfg.target_prob
+        self.bi_target_prob = bi_target_prob
 
         self.min_cost = cfg.min_cost
         self.output_dir = cfg.output_dir
@@ -291,6 +292,15 @@ class Search:
         with open(data_path, "wb") as f:
             pickle.dump(dict_tree, f)
 
+    def sample_state(self, start_idx: int=-1) -> np.ndarray:
+        if self.sample_uniform:
+            # TODO: Sampling ranges are not the same for each scene and each dim in the qpos...
+            sim_sample = np.random.uniform(low=-1., high=1., size=self.state_dim)
+        else:
+            target_config_idx = randint_excluding(0, self.configs.shape[0], start_idx)  # TODO: exclude end_idx if end_idx != -1
+            sim_sample = self.configs[target_config_idx]
+        return sim_sample
+
     def run(self) -> tuple[list[MultiSearchNode], float]:
         
         self.trees, self.trees_kNNs, self.trees_kNNs_sizes = self.init_trees()
@@ -327,12 +337,7 @@ class Search:
             target_config_idx = -1
             
             if exploring or self.end_idx == -1:
-                if self.sample_uniform:
-                    # TODO: Sampling ranges are not the same for each scene and each dim in the qpos...
-                    sim_sample = np.random.uniform(low=-1., high=1., size=self.configs.shape[1])
-                else:
-                    target_config_idx = randint_excluding(0, self.configs.shape[0], start_idx)  # TODO: exclude end_idx if end_idx != -1
-                    sim_sample = self.configs[target_config_idx]
+                sim_sample = self.sample_state(start_idx)
             else:
                 target_config_idx = self.end_idx
                 sim_sample = self.configs[target_config_idx]
@@ -364,7 +369,11 @@ class Search:
                     bi_tree_idxs = [self.end_idx]
                 
                 for bi_tree_idx in bi_tree_idxs:
-                    from_state = best_node.state[1]
+                    bi_exploring = not (np.random.uniform() < self.bi_target_prob)
+                    if bi_exploring:
+                        sim_sample = self.sample_state()
+                    else:
+                        from_state = best_node.state[1]
                     node_idx, _ = self.bi_trees_kNNs[bi_tree_idx].knn_query(from_state * self.q_mask, k=1)
                     node_idx = node_idx[0][0]
                     node: MultiSearchNode = self.bi_trees[bi_tree_idx][node_idx]

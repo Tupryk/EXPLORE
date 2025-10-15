@@ -132,7 +132,7 @@ class MjSim:
         return contacts_vec
     
     def setupRenderer(self, w: int=640, h: int=480, camera: str=""):
-        self.renderer = mujoco.Renderer(self.model, w, h)
+        self.renderer = mujoco.Renderer(self.model, h, w)
         self.camera = camera
 
     def renderImg(self) -> np.ndarray:
