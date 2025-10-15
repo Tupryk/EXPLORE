@@ -33,9 +33,11 @@ def AdjMap(costs: np.ndarray, min_value: float=0.0, max_value: float=0.1, save_a
 def play_path(start_state: np.ndarray, target_state: np.ndarray,
               path: list[dict], sim: MjSim, playback_time: float=1.,
               tau_action: float=.1, play_intro: bool=True, camera: str="",
-              save_as: str="path.gif"):
+              save_as: str="path.gif", reset_state: bool=False):
     
-    print(f"Playing path with length {len(path)}")
+    play_path = path.copy()
+    
+    print(f"Playing path with length {len(play_path)}")
     sim.setupRenderer(camera=camera)
 
     if play_intro:
@@ -47,7 +49,7 @@ def play_path(start_state: np.ndarray, target_state: np.ndarray,
         im_end = sim.renderImg()
         if sim.viewer != None:
             time.sleep(3)
-        sim.pushConfig(path[-1]["state"][1])
+        sim.pushConfig(play_path[-1]["state"][1])
         im_reached = sim.renderImg()
         if sim.viewer != None:
             time.sleep(3)
@@ -67,10 +69,14 @@ def play_path(start_state: np.ndarray, target_state: np.ndarray,
 
     frames = []
 
-    sim.setState(*path[0]["state"])
-    path.pop(0)
+    sim.setState(*play_path[0]["state"])
+    play_path.pop(0)
 
-    for node in path:
+    for node in play_path:
+        
+        if reset_state:
+            sim.setState(*node["state"])
+
         q_target = node["state"][3]
         f = sim.step(tau_action, q_target, view=tau_action*playback_time)
         if save_as:

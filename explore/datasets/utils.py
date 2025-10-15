@@ -32,3 +32,20 @@ def load_trees(tree_dataset: str, verbose: int=0) -> tuple[list[list[dict]], int
             total_nodes_count += len(tree)
     
     return trees, tree_count, total_nodes_count
+
+def build_path(tree: list[dict], node_idx: int, reverse: bool=True) -> list[dict]:
+    node = tree[node_idx]
+    path = []
+    
+    while True:
+        path.append(node)
+        if node["parent"] == -1: break
+        node = tree[node["parent"]]
+    
+    if reverse:
+        path.reverse()
+        assert path[0] == tree[0]
+    else:
+        assert path[0] == tree[node_idx]
+
+    return path

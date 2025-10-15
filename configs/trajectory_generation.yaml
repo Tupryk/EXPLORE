@@ -1,5 +1,5 @@
 RRT:
-  max_nodes: 5000
+  max_nodes: 50
   min_cost: 2e-2
   stepsize: .1
   verbose: 1
@@ -11,6 +11,7 @@ RRT:
   end_idx: 0
   bidirectional: True
   bi_target_prob: .5
+  bi_tree_tolerance: 2e-2
   cost_max_method: False
   camera: "fixed_cam"
   sample_count: 1000

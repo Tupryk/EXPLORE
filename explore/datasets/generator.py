@@ -39,8 +39,9 @@ class Search:
         self.stepsize = cfg.stepsize
         self.target_prob = cfg.target_prob
         self.bi_target_prob = cfg.bi_target_prob
-
+        
         self.min_cost = cfg.min_cost
+        self.bi_tree_tolerance = cfg.bi_tree_tolerance
         self.output_dir = cfg.output_dir
         
         self.tau_sim = cfg.sim.tau_sim
@@ -68,7 +69,7 @@ class Search:
         
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
-        self.bidirectional = cfg.bidirectional
+        self.bidirectional = cfg.bidirectional  # Performance seems very dependend on initial seed. Needs further investigation...
         if self.bidirectional and self.end_idx == -1:
             print("It is recomended to have a specific target config when using bidirectional search.")
         assert not self.bidirectional or self.joints_are_same_as_ctrl
@@ -83,6 +84,7 @@ class Search:
         self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
         self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
         self.state_dim = self.sim[0].data.qpos.shape[0]
+        self.config_count = self.configs.shape[0]
         
         if self.sampling_strategy == "rs":
             self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
@@ -191,7 +193,7 @@ class Search:
         from_to_vec_scaled = from_to_vec_normed * self.stepsize
         from_state = from_to_vec_scaled + to_node.state[1]
         
-        noise = np.random.randn(self.sample_count * self.state_dim) * self.stepsize
+        noise = np.random.randn(self.sample_count * self.state_dim) * self.stepsize * .5
         noise = noise.reshape(self.sample_count, self.state_dim)
         states = noise + from_state
 
@@ -386,8 +388,8 @@ class Search:
                     node: MultiSearchNode = self.bi_trees[bi_tree_idx][node_idx]
 
                     best_cost, best_state = self.backward_action_sampler(node, from_state)
-                    
-                    if best_cost < self.min_cost:
+
+                    if best_cost < self.bi_tree_tolerance:
                         state_tuple = (
                             node.state[0] - self.tau_action,
                             best_state,
@@ -403,7 +405,7 @@ class Search:
                         self.bi_trees_kNNs[bi_tree_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[bi_tree_idx]])
                         self.bi_trees_kNNs_sizes[bi_tree_idx] += 1
                 
-                if self.verbose and (i+1) % 1000 == 0:
+                if self.verbose and (i+1) % 10 == 0:
                     if self.end_idx != -1:
                         print(f"Bi-tree size at iter {i+1}: {len(self.bi_trees[self.end_idx])}")
                     else:
@@ -428,7 +430,7 @@ class Search:
         end_time = time.time()
         total_time = end_time - start_time
 
-        [self.store_tree(i, bi_folder_path, self.bi_trees) for i in range(self.configs.shape[0])]
+        [self.store_tree(i, bi_folder_path, self.bi_trees) for i in range(self.config_count)]
         
         if self.verbose > 1:
             print(f"Total time taken: {total_time:.2f} seconds")
