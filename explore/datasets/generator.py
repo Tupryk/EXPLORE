@@ -38,7 +38,7 @@ class Search:
         self.max_nodes = int(cfg.max_nodes)
         self.stepsize = cfg.stepsize
         self.target_prob = cfg.target_prob
-        self.bi_target_prob = bi_target_prob
+        self.bi_target_prob = cfg.bi_target_prob
 
         self.min_cost = cfg.min_cost
         self.output_dir = cfg.output_dir
@@ -205,20 +205,27 @@ class Search:
 
         if self.threading:
             sim_count = len(self.sim)
-            futures = []
+            sample_batch_count = self.sample_count // sim_count
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                for i in range(self.sample_count):
-                    sim_idx = i % sim_count
+                for i in range(sample_batch_count):
                     s = states[i]
                     origin[1] = s
                     origin[3] = s[:self.ctrl_dim]
-                    futures.append(executor.submit(self.eval_ctrl, to_node.state[3], origin, to_node.state[1], sim_idx, True))
+                    futures = [
+                        executor.submit(
+                            self.eval_ctrl,
+                            to_node.state[3],
+                            origin, to_node.state[1],
+                            sim_idx, True
+                        )
+                        for sim_idx in range(sim_count)
+                    ]
 
-                for future in as_completed(futures):
-                    cost, s = future.result()[0], states[futures.index(future)]
-                    if cost < best_cost:
-                        best_cost = cost
-                        best_start_state = s
+                    for future in as_completed(futures):
+                        cost, s = future.result()[0], states[futures.index(future)]
+                        if cost < best_cost:
+                            best_cost = cost
+                            best_start_state = s
         else:
             for s in states:
                 origin[1] = s
@@ -371,7 +378,7 @@ class Search:
                 for bi_tree_idx in bi_tree_idxs:
                     bi_exploring = not (np.random.uniform() < self.bi_target_prob)
                     if bi_exploring:
-                        sim_sample = self.sample_state()
+                        from_state = self.sample_state()
                     else:
                         from_state = best_node.state[1]
                     node_idx, _ = self.bi_trees_kNNs[bi_tree_idx].knn_query(from_state * self.q_mask, k=1)

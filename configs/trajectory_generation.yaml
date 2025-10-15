@@ -6,7 +6,7 @@ RRT:
   target_prob: .2
   sample_uniform: False
   warm_start: False
-  threading: True
+  threading: False
   start_idx: 1
   end_idx: 0
   bidirectional: True
