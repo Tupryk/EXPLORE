@@ -21,6 +21,8 @@
   </actuator>
 
   <worldbody>
+    <camera name="fixed_cam" pos="-1.104 1.275 0.847" xyaxes="-0.728 -0.686 0.000 0.225 -0.238 0.945"/>
+    
     <body name="l_base" pos="0.0 0.3 0.5">
       <body name="l_joint1">
         <joint name="l_joint1" damping="0.1" type="slide" axis="1 0 0" />

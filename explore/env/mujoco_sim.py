@@ -22,6 +22,9 @@ class MjSim:
         self.joints_are_same_as_ctrl = joints_are_same_as_ctrl
         self.verbose = verbose
 
+        self.frame_dt = 1.0 / 24.0
+        self.next_frame_time = 0.0
+
         if view:
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
         else:
@@ -56,7 +59,7 @@ class MjSim:
             self.viewer.sync()
 
     def step(self, tau_action: float,
-             ctrl_target: np.ndarray=None, view: float=0.0):
+             ctrl_target: np.ndarray=None, view: float=0.0) -> list:
         
         steps = math.ceil(tau_action/self.tau_sim)
         if self.joints_are_same_as_ctrl:
@@ -65,6 +68,7 @@ class MjSim:
             # This prev ctrl is not quite right, as you would have to take the qpos for a proper interpolation
             prev_ctrl = self.data.ctrl[:]
 
+        frames = []
         if not self.interpolate and not (ctrl_target is None):
             self.data.ctrl[:] = ctrl_target
         
@@ -76,8 +80,14 @@ class MjSim:
             mujoco.mj_step(self.model, self.data)
             
             if view > 0.:
-                self.viewer.sync()
-                time.sleep(view/steps)
+                if self.viewer != None:
+                    self.viewer.sync()
+                    time.sleep(view/steps)
+                if not (self.renderer is None) and self.data.time >= self.next_frame_time:
+                    frames.append(self.renderImg())
+                    self.next_frame_time = self.next_frame_time + self.frame_dt
+        
+        return frames
 
     def getState(self):
         state = (
@@ -121,8 +131,14 @@ class MjSim:
         
         return contacts_vec
     
-    def renderImg(self, w: int=640, h: int=480) -> np.ndarray:
-        renderer = mujoco.Renderer(self.model, w, h)
-        renderer.update_scene(self.data)
-        frame = renderer.render()
+    def setupRenderer(self, w: int=640, h: int=480, camera: str=""):
+        self.renderer = mujoco.Renderer(self.model, w, h)
+        self.camera = camera
+
+    def renderImg(self) -> np.ndarray:
+        if self.camera:
+            self.renderer.update_scene(self.data, self.camera)
+        else:
+            self.renderer.update_scene(self.data)
+        frame = self.renderer.render()
         return frame
