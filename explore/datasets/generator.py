@@ -100,7 +100,7 @@ class Search:
                 raise Exception(f"Sampling strategy '{self.sampling_strategy}' not implemented for backward search yet!")
             
         if self.verbose:
-            print(f"Starting search across {self.configs.shape[0]} configs!")
+            print(f"Starting search across {self.config_count} configs!")
 
     def init_trees(self) -> tuple:
 
@@ -109,11 +109,11 @@ class Search:
         trees_kNNs_sizes: list[int] = []
 
         if self.start_idx == -1:
-            max_knn_tree_size = int(np.ceil(self.max_nodes / self.configs.shape[0]) + 1)
+            max_knn_tree_size = int(np.ceil(self.max_nodes / self.config_count) + 1)
         else:
-            max_knn_tree_size = int(self.max_nodes + self.configs.shape[0])
+            max_knn_tree_size = int(self.max_nodes + self.config_count)
 
-        for i in range(self.configs.shape[0]):
+        for i in range(self.config_count):
             
             self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
             state = self.sim[0].getState()
@@ -304,11 +304,12 @@ class Search:
     def sample_state(self, start_idx: int=-1) -> np.ndarray:
         if self.sample_uniform:
             # TODO: Sampling ranges are not the same for each scene and each dim in the qpos...
+            target_config_idx = -1
             sim_sample = np.random.uniform(low=-1., high=1., size=self.state_dim)
         else:
-            target_config_idx = randint_excluding(0, self.configs.shape[0], start_idx)  # TODO: exclude end_idx if end_idx != -1
+            target_config_idx = randint_excluding(0, self.config_count, start_idx)  # TODO: exclude end_idx if end_idx != -1
             sim_sample = self.configs[target_config_idx]
-        return sim_sample
+        return sim_sample, target_config_idx
 
     def run(self) -> tuple[list[MultiSearchNode], float]:
         
@@ -319,7 +320,7 @@ class Search:
         folder_path = os.path.join(self.output_dir, "trees")
         os.makedirs(folder_path, exist_ok=True)
         
-        [self.store_tree(i, folder_path, self.trees) for i in range(self.configs.shape[0])]
+        [self.store_tree(i, folder_path, self.trees) for i in range(self.config_count)]
         
         if self.bidirectional:
             bi_folder_path = os.path.join(self.output_dir, "bi_trees")
@@ -330,7 +331,7 @@ class Search:
         else:
             pbar = range(self.max_nodes)
             
-        nodes_per_tree = self.max_nodes // self.configs.shape[0]
+        nodes_per_tree = self.max_nodes // self.config_count
         
         start_time = time.time()
         
@@ -343,10 +344,9 @@ class Search:
 
             # Sample random sim state
             exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
-            target_config_idx = -1
             
             if exploring or self.end_idx == -1:
-                sim_sample = self.sample_state(start_idx)
+                sim_sample, target_config_idx = self.sample_state(start_idx)
             else:
                 target_config_idx = self.end_idx
                 sim_sample = self.configs[target_config_idx]
@@ -373,16 +373,17 @@ class Search:
             # Try to expand bi_tree backwards
             if self.bidirectional:
                 if self.end_idx == -1:
-                    bi_tree_idxs = range(self.configs.shape[0])
+                    bi_tree_idxs = range(self.config_count)
                 else:
                     bi_tree_idxs = [self.end_idx]
                 
                 for bi_tree_idx in bi_tree_idxs:
                     bi_exploring = not (np.random.uniform() < self.bi_target_prob)
                     if bi_exploring:
-                        from_state = self.sample_state()
+                        from_state, target_config_idx = self.sample_state()
                     else:
                         from_state = best_node.state[1]
+                        target_config_idx = -1
                     node_idx, _ = self.bi_trees_kNNs[bi_tree_idx].knn_query(from_state * self.q_mask, k=1)
                     node_idx = node_idx[0][0]
                     node: MultiSearchNode = self.bi_trees[bi_tree_idx][node_idx]
@@ -396,7 +397,8 @@ class Search:
                             np.zeros_like(node.state[2]),
                             best_state[:self.ctrl_dim].copy()
                         )
-                        best_node = MultiSearchNode(node_idx, None, state_tuple)
+                        best_node = MultiSearchNode(
+                            node_idx, None, state_tuple, target_config_idx=target_config_idx)
                         
                         self.bi_trees[bi_tree_idx][node_idx]
 
@@ -429,8 +431,9 @@ class Search:
         
         end_time = time.time()
         total_time = end_time - start_time
-
-        [self.store_tree(i, bi_folder_path, self.bi_trees) for i in range(self.config_count)]
+        
+        if self.bidirectional:
+            [self.store_tree(i, bi_folder_path, self.bi_trees) for i in range(self.config_count)]
         
         if self.verbose > 1:
             print(f"Total time taken: {total_time:.2f} seconds")

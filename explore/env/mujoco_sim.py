@@ -48,6 +48,8 @@ class MjSim:
             del frames[0]
 
     def pushConfig(self, joint_state: np.ndarray, ctrl_state: np.ndarray=None):
+        self.data.time = 0.0
+        self.next_frame_time = 0.0
         self.data.qpos[:] = joint_state
         self.data.qvel[:] = np.zeros_like(self.data.qvel)
         if not (ctrl_state is None):
@@ -102,6 +104,7 @@ class MjSim:
     def setState(self, time: float, qpos: np.ndarray,
                  qvel: np.ndarray, ctrl: np.ndarray):
         self.data.time = time
+        self.next_frame_time = time
         self.data.qpos[:] = qpos
         self.data.qvel[:] = qvel
         self.data.ctrl[:] = ctrl

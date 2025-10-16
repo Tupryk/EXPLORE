@@ -1,5 +1,5 @@
 RRT:
-  max_nodes: 50
+  max_nodes: 10000
   min_cost: 2e-2
   stepsize: .1
   verbose: 1
@@ -20,7 +20,7 @@ RRT:
   q_mask: [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
   sim:
     tau_sim: 0.001
-    tau_action: 0.1
+    tau_action: 0.5
     interpolate_actions: True
     joints_are_same_as_ctrl: True
     mujoco_xml: "configs/twoFingers.xml"
