@@ -1,5 +1,5 @@
 RRT:
-  max_nodes: 10000
+  max_nodes: 100000
   min_cost: 2e-2
   stepsize: .1
   verbose: 1
@@ -7,22 +7,23 @@ RRT:
   sample_uniform: False
   warm_start: False
   threading: False
-  start_idx: 1
-  end_idx: 0
-  bidirectional: True
+  start_idx: -1
+  end_idx: -1
+  bidirectional: False
   bi_target_prob: .5
-  bi_tree_tolerance: 2e-2
+  bi_tree_tolerance: 3e-2
+  bi_stepsize: .1
   cost_max_method: False
   camera: "fixed_cam"
   sample_count: 1000
   sampling_strategy: "rs"
   output_dir: ${hydra:runtime.output_dir}
-  q_mask: [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+  q_mask: []
   sim:
     tau_sim: 0.001
-    tau_action: 0.5
+    tau_action: 0.1
     interpolate_actions: True
     joints_are_same_as_ctrl: True
-    mujoco_xml: "configs/twoFingers.xml"
+    mujoco_xml: "configs/fingerBox.xml"
 
-configs_path: "configs/new_rnd_twoFingers.h5"
+configs_path: "configs/fingerBox.h5"

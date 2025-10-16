@@ -21,6 +21,7 @@ class MjSim:
         self.interpolate = interpolate
         self.joints_are_same_as_ctrl = joints_are_same_as_ctrl
         self.verbose = verbose
+        self.renderer = None
 
         self.frame_dt = 1.0 / 24.0
         self.next_frame_time = 0.0

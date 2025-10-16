@@ -38,10 +38,8 @@ class Search:
         self.max_nodes = int(cfg.max_nodes)
         self.stepsize = cfg.stepsize
         self.target_prob = cfg.target_prob
-        self.bi_target_prob = cfg.bi_target_prob
         
         self.min_cost = cfg.min_cost
-        self.bi_tree_tolerance = cfg.bi_tree_tolerance
         self.output_dir = cfg.output_dir
         
         self.tau_sim = cfg.sim.tau_sim
@@ -70,6 +68,12 @@ class Search:
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
         self.bidirectional = cfg.bidirectional  # Performance seems very dependend on initial seed. Needs further investigation...
+
+        if self.bidirectional:
+            self.bi_stepsize = cfg.bi_stepsize
+            self.bi_target_prob = cfg.bi_target_prob
+            self.bi_tree_tolerance = cfg.bi_tree_tolerance
+
         if self.bidirectional and self.end_idx == -1:
             print("It is recomended to have a specific target config when using bidirectional search.")
         assert not self.bidirectional or self.joints_are_same_as_ctrl
@@ -190,10 +194,10 @@ class Search:
         # Sample starting states
         from_to_vec  = from_target - to_node.state[1]
         from_to_vec_normed = from_to_vec / np.linalg.norm(from_to_vec)
-        from_to_vec_scaled = from_to_vec_normed * self.stepsize
+        from_to_vec_scaled = from_to_vec_normed * self.bi_stepsize
         from_state = from_to_vec_scaled + to_node.state[1]
         
-        noise = np.random.randn(self.sample_count * self.state_dim) * self.stepsize * .5
+        noise = np.random.randn(self.sample_count * self.state_dim) * self.bi_stepsize * .5
         noise = noise.reshape(self.sample_count, self.state_dim)
         states = noise + from_state
 
@@ -407,7 +411,10 @@ class Search:
                         self.bi_trees_kNNs[bi_tree_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[bi_tree_idx]])
                         self.bi_trees_kNNs_sizes[bi_tree_idx] += 1
                 
-                if self.verbose and (i+1) % 10 == 0:
+                if self.verbose and (i+1) % 1 == 0:
+                    fte = np.abs(node.state[1]-best_state).max()
+                    print(f"Latest from-to node error: {fte}")
+                    print(f"Latest bi-tree node cost: {best_cost}")
                     if self.end_idx != -1:
                         print(f"Bi-tree size at iter {i+1}: {len(self.bi_trees[self.end_idx])}")
                     else:
