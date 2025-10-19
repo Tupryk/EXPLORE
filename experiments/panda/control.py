@@ -18,7 +18,7 @@ print(motor_qpos)
 joint_dim = sim.data.ctrl.shape
 print(joint_dim)
 
-tau_action = 10
+tau_action = 1
 
 ctrl_time = 0.0
 q_target = np.array([
@@ -35,4 +35,5 @@ time.sleep(5)
 sim.step(tau_action, ctrl_target=q_target, view=tau_action)
 sim.setupRenderer(camera="l_wrist_cam")
 img = sim.renderImg()
+print(img)
 plt.imsave("experiments/wrist_img.png", img)

@@ -14,6 +14,9 @@ env:
   stable_configs_path: "configs/new_rnd_twoFingers.h5"
   trajectory_data_path: "data/twoFingerStart1"
   error_thresh: 5e-2
+  use_vision: False
+  camera: "wrist_cam"
+  camera_filter: "blue_ball_params"
   verbose: 0
 
 checkpoint_dir: "checkpoints/trained_rl_policy.zip"

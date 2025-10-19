@@ -15,6 +15,9 @@ env:
   start_config_idx: -1
   target_config_idx: -1
   goal_conditioning: True
+  use_vision: False
+  camera: "wrist_cam"
+  camera_filter: "blue_ball_params"
   stable_configs_path: "configs/new_rnd_twoFingers.h5"
   trajectory_data_path: "data/twoFingerStart1"
   error_thresh: 5e-2

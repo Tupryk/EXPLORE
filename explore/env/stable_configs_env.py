@@ -7,8 +7,8 @@ from gymnasium import spaces
 from omegaconf import DictConfig
 
 from explore.env.mujoco_sim import MjSim
-from explore.utils.utils import randint_excluding
 from explore.datasets.utils import cost_computation
+from explore.utils.utils import randint_excluding, extract_ball_from_img
 
 
 def getFeasibleTransitionPairs(
@@ -63,6 +63,8 @@ class StableConfigsEnv(gym.Env):
         self.use_vel = cfg.use_vel
         self.guiding = cfg.guiding
         self.reward = None
+        
+        self.use_vision = cfg.use_vision
 
         # Setup sim
         self.start_config_idx = cfg.start_config_idx
@@ -117,17 +119,36 @@ class StableConfigsEnv(gym.Env):
         
         ctrl_dim = self.sim.data.ctrl.shape[0]
         self.action_space = spaces.Box(low=min_ctrl, high=max_ctrl, shape=(ctrl_dim,), dtype=np.float32)
+        
+        if self.use_vision:
+            self.sim.setupRenderer(camera=cfg.camera)
+            self.camera_filter = cfg.camera_filter
 
     def getState(self) -> np.ndarray:
         time_, qpos, qvel, ctrl = self.sim.getState()
         self.state = qpos
         
-        if self.use_vel:
-            self.state = np.concatenate((self.state, qvel))
-        
+        if self.use_vision:
+            img = self.sim.renderImg()
+            if self.camera_filter == "none":
+                self.state = img.astype(np.float32).flatten() / 255
+                raise Exception("No CNN stuff implemented yet! Refusing to feed full image to model.")
+            elif self.camera_filter == "blue_ball_mask":
+                _, mask = extract_ball_from_img(img, self.verbose-1)
+                self.state = mask
+                raise Exception("No CNN stuff implemented yet! Refusing to feed full image to model.")
+            elif self.camera_filter == "blue_ball_params":
+                ball_params, _ = extract_ball_from_img(img, self.verbose-1)
+                self.state = ball_params
+            else:
+                raise Exception(f"Camera filter {self.camera_filter} not implemented yet!")
+        else:
+            if self.use_vel:
+                self.state = np.concatenate((self.state, qvel))
+            
         if self.goal_conditioning:
             self.state = np.concatenate((self.state, self.target_state))
-        
+
         self.last_time = time_
         self.last_ctrl = ctrl
         return self.state
