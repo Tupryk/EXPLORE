@@ -1,3 +1,4 @@
 *.pth
 data_analysis.py
 *.gif
+*.png

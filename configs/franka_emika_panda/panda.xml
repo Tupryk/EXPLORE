@@ -195,6 +195,10 @@
                   <geom mesh="link6_16" material="white" class="visual"/>
                   <geom mesh="link6_c" class="collision"/>
                   <body name="link7" pos="0.088 0 0" quat="1 1 0 0">
+                    <body name="wrist_cam_base" pos="0.0566288 -0.0138618 0.158583" quat="0.0272688 -0.928034 -0.371288 0.0124238">
+                      <camera name="wrist_cam"/>
+                      <geom type="sphere" size="0.01" rgba="1 0 0 0.5"/>
+                    </body>
                     <inertial mass="7.35522e-01" pos="1.0517e-2 -4.252e-3 6.1597e-2"
                       fullinertia="1.2516e-2 1.0027e-2 4.815e-3 -4.28e-4 -1.196e-3 -7.41e-4"/>
                     <joint name="joint7"/>
