@@ -132,11 +132,11 @@ class StableConfigsEnv(gym.Env):
             img = self.sim.renderImg()
             if self.camera_filter == "none":
                 self.state = img.astype(np.float32).flatten() / 255
-                raise Exception("No CNN stuff implemented yet! Refusing to feed full image to model.")
+                raise Exception("No vision backbone implemented yet! Refusing to feed full image to model.")
             elif self.camera_filter == "blue_ball_mask":
                 _, mask = extract_ball_from_img(img, self.verbose-1)
                 self.state = mask
-                raise Exception("No CNN stuff implemented yet! Refusing to feed full image to model.")
+                raise Exception("No vision backbone implemented yet! Refusing to feed full image to model.")
             elif self.camera_filter == "blue_ball_params":
                 ball_params, _ = extract_ball_from_img(img, self.verbose-1)
                 self.state = ball_params
