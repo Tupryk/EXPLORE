@@ -3,44 +3,39 @@ import torch
 import logging
 from omegaconf import DictConfig
 from stable_baselines3 import PPO
+from stable_baselines3.common.logger import configure
 
 from explore.env.stable_configs_env import StableConfigsEnv
 
 
 class RL_Trainer:
-    
     def __init__(self, cfg: DictConfig, logger: logging.Logger):
         self.cfg = cfg
         self.logger = logger
         
         self.total_timesteps = cfg.total_timesteps
+        self.save_as = os.path.join(cfg.output_dir, "trained_rl_policy") if cfg.output_dir else "trained_rl_policy"
 
-        self.save_as = "trained_rl_policy"
-        if cfg.output_dir:
-            self.save_as = os.path.join(cfg.output_dir, self.save_as)
+        # Set up SB3 logger
+        log_dir = os.path.join(cfg.output_dir, "training_logs")
+        sb3_logger = configure(log_dir, ["stdout", "csv", "tensorboard"])
 
-        # Set device
+        # Environment
+        self.env = StableConfigsEnv(cfg.env)
+        
+        # Device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.logger.info(f"Using device: {self.device}")
         
-        self.env = StableConfigsEnv(cfg.env)
-
-        # Instantiate model, dataset, optimizer, loss
+        # Model
         if cfg.rl_method == "PPO":
             self.model = PPO("MlpPolicy", self.env, verbose=cfg.verbose)
+            self.model.set_logger(sb3_logger)
         else:
-            raise Exception(f"RL method '{cfg.rl_method}' not availible.")
-
+            raise Exception(f"RL method '{cfg.rl_method}' not available.")
+    
     def train(self):
         self.logger.info("Starting training...")
         self.model.learn(total_timesteps=self.total_timesteps)
         self.model.save(self.save_as)
-        
-class VAE_Trainer:
-    
-    def __init__(self, cfg: DictConfig, logger: logging.Logger):
-        self.cfg = cfg
-        self.logger = logger
-    
-    def train(self):
-        pass
+        self.logger.info(f"Model saved as {self.save_as}")

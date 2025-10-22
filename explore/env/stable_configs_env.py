@@ -1,49 +1,14 @@
 import os
 import h5py
-import pickle
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from explore.env.mujoco_sim import MjSim
-from explore.datasets.utils import cost_computation
 from explore.utils.utils import randint_excluding, extract_ball_from_img
+from explore.datasets.utils import load_trees, generate_adj_map, get_feasible_paths
 
-
-def getFeasibleTransitionPairs(
-    trees: list[list[dict]], feasible_thresh: float=5e-2,
-    start_idx: int=-1, end_idx: int=-1) -> tuple[list[tuple[int, int]], list[int]]:
-    
-    top_nodes = []
-    min_costs = []
-    
-    tree_count = len(trees)
-    for i in range(tree_count):
-
-        tree_min_costs = [float("inf") for _ in range(tree_count)]
-        tree_top_nodes = [-1 for _ in range(tree_count)]
-        
-        for n, node in enumerate(trees[i]):
-            for j in range(tree_count):
-                cost = cost_computation(node, trees[j][0])
-                if cost < tree_min_costs[j]:
-                    tree_min_costs[j] = cost
-                    tree_top_nodes[j] = n
-        
-        top_nodes.append(tree_top_nodes)
-        min_costs.append(tree_min_costs)
-    
-    feasible_pairs = []
-    end_nodes = []
-    for s in range(tree_count):
-        for e in range(tree_count):
-            if (s != e and min_costs[s][e] <= feasible_thresh
-                and (start_idx == -1 or start_idx == s) and (end_idx == -1 or end_idx == e)):
-                feasible_pairs.append((s, e))
-                end_nodes.append(top_nodes[s][e])
-
-    return feasible_pairs, end_nodes
 
 class StableConfigsEnv(gym.Env):
 
@@ -51,10 +16,11 @@ class StableConfigsEnv(gym.Env):
         
         super().__init__()
 
-        self.tau_sim = cfg.tau_sim
-        self.tau_action = cfg.tau_action
-        self.interpolate_actions = cfg.interpolate_actions
-        self.mujoco_xml = cfg.mujoco_xml
+        self.tau_sim = cfg.sim.tau_sim
+        self.tau_action = cfg.sim.tau_action
+        self.interpolate_actions = cfg.sim.interpolate_actions
+        self.joints_are_same_as_ctrl = cfg.sim.joints_are_same_as_ctrl
+        self.mujoco_xml = cfg.sim.mujoco_xml
         
         self.stepsize = cfg.stepsize
         self.max_steps = cfg.max_steps  # Gets overwriten if use_guiding = True
@@ -65,6 +31,7 @@ class StableConfigsEnv(gym.Env):
         self.reward = None
         
         self.use_vision = cfg.use_vision
+        assert (self.use_vision and not self.use_vel) or (not self.use_vision and self.use_vel)
 
         # Setup sim
         self.start_config_idx = cfg.start_config_idx
@@ -81,17 +48,17 @@ class StableConfigsEnv(gym.Env):
         self.guiding_path = []
         if self.guiding:
             
+            config_path = os.path.join(cfg.trajectory_data_path, ".hydra/config.yaml")
+            trees_cfg = OmegaConf.load(config_path)
+            
             tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
-            self.trees: list[list[dict]] = []
+            self.trees, _, _ = load_trees(tree_dataset)
 
-            for i in range(self.config_count):
-                data_path = os.path.join(tree_dataset, f"tree_{i}.pkl")
-                with open(data_path, "rb") as f:
-                    tree: list[dict] = pickle.load(f)
-                    self.trees.append(tree)
-
-            self.traj_pairs, self.traj_end_nodes = getFeasibleTransitionPairs(
-                self.trees, cfg.error_thresh, self.start_config_idx, self.end_config_idx)
+            q_mask = np.array(trees_cfg.RRT.q_mask)
+            
+            min_costs, top_nodes = generate_adj_map(self.trees, q_mask)
+            self.traj_pairs, self.traj_end_nodes, _ = get_feasible_paths(
+                min_costs, top_nodes, self.start_config_idx, self.end_config_idx, trees_cfg.RRT.min_cost)
             
             if not len(self.traj_pairs):
                 raise Exception(f"Not feasible trajectories in dataset '{cfg.trajectory_data_path}'!")
@@ -99,10 +66,13 @@ class StableConfigsEnv(gym.Env):
             if self.verbose:
                 print(f"Starting enviroment with guiding on {len(self.traj_pairs)} trajectories.")
             
-        self.sim = MjSim(self.mujoco_xml, self.tau_sim, interpolate=self.interpolate_actions)
+        self.sim = MjSim(self.mujoco_xml, self.tau_sim,
+                         interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl)
+        self.sim.setupRenderer(camera=cfg.sim.camera)
         
         state = self.sim.getState()
         state_n = state[1].shape[0]  # qpos
+        self.state_dim = state_n
         if self.use_vel:
             state_n += state[2].shape[0]  # qvel
         if self.goal_conditioning:
@@ -121,12 +91,10 @@ class StableConfigsEnv(gym.Env):
         self.action_space = spaces.Box(low=min_ctrl, high=max_ctrl, shape=(ctrl_dim,), dtype=np.float32)
         
         if self.use_vision:
-            self.sim.setupRenderer(camera=cfg.camera)
             self.camera_filter = cfg.camera_filter
 
     def getState(self) -> np.ndarray:
         time_, qpos, qvel, ctrl = self.sim.getState()
-        self.state = qpos
         
         if self.use_vision:
             img = self.sim.renderImg()
@@ -143,11 +111,12 @@ class StableConfigsEnv(gym.Env):
             else:
                 raise Exception(f"Camera filter {self.camera_filter} not implemented yet!")
         else:
+            self.state = qpos
             if self.use_vel:
                 self.state = np.concatenate((self.state, qvel))
             
         if self.goal_conditioning:
-            self.state = np.concatenate((self.state, self.target_state))
+            self.state = np.concatenate((self.state, self.target_state[:self.state_dim]))
 
         self.last_time = time_
         self.last_ctrl = ctrl
@@ -155,12 +124,15 @@ class StableConfigsEnv(gym.Env):
 
     def reset(self, *, seed: int=None, options: dict=None):
         super().reset(seed=seed)
+        np.random.seed(seed)
+        # TODO: manually set start and end nodes through options. What if no path?
 
         # Choose start and end configurations
         if self.guiding:
             traj_idx = np.random.randint(0, len(self.traj_pairs))
             s_cfg_idx = self.traj_pairs[traj_idx][0]
             e_cfg_idx = self.traj_pairs[traj_idx][1]
+            print(traj_idx)
         
         else:
             s_cfg_idx = self.start_config_idx if self.start_config_idx != -1 else np.random.randint(0, self.config_count)
@@ -169,6 +141,8 @@ class StableConfigsEnv(gym.Env):
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
         
         self.target_state = self.stable_configs["qpos"][e_cfg_idx]
+        if self.use_vel:
+            self.target_state = np.concatenate((self.target_state, np.zeros_like(self.sim.data.qvel)))
         
         # Reset simulation state
         self.sim.pushConfig(
@@ -200,7 +174,7 @@ class StableConfigsEnv(gym.Env):
         
         if self.verbose > 1:
             print(f"Reseting enviroment with start config {s_cfg_idx} and end config {e_cfg_idx}.")
-        
+
         return self.getState(), info
 
     def step(self, action: np.ndarray):
@@ -219,7 +193,7 @@ class StableConfigsEnv(gym.Env):
         ### Reward Computation ###
         # Distance to target state
         eval_state = self.state[:self.target_state.shape[0]]
-        goal_cost_scaler = .1 if self.iter < len(self.guiding_path) else 1.
+        goal_cost_scaler = .0 if self.iter < len(self.guiding_path) else 1.
         e = eval_state - self.target_state
         self.reward = -goal_cost_scaler * (e.T @ e)
         
@@ -236,6 +210,7 @@ class StableConfigsEnv(gym.Env):
         return self.state, self.reward, terminated, truncated, info
 
     def render(self, mode: str="") -> np.ndarray:
+        # Sepparate scene renderer from model vision
 
         print("Iter: ", self.iter, "Reward: ", self.reward)
 

@@ -1,8 +1,8 @@
 import os
 import hydra
 import imageio
-from omegaconf import DictConfig
 from stable_baselines3 import PPO
+from omegaconf import DictConfig, OmegaConf
 
 from explore.utils.logger import get_logger
 from explore.env.stable_configs_env import StableConfigsEnv
@@ -13,10 +13,16 @@ def main(cfg: DictConfig):
     logger = get_logger(cfg)
     logger.info("Starting evaluation...")
 
-    env = StableConfigsEnv(cfg.env)
-    model = PPO.load(cfg.checkpoint_dir, env=env)
+    config_path = os.path.join(cfg.checkpoint_dir, ".hydra/config.yaml")
+    train_cfg = OmegaConf.load(config_path)
+    
+    env = StableConfigsEnv(train_cfg.env)
+    
+    model_path = os.path.join(cfg.checkpoint_dir, "trained_rl_policy.zip")
+    model = PPO.load(model_path, env=env)
 
-    obs, _ = env.reset()
+    obs, info = env.reset()
+    logger.info(info)
     img = env.render()
     imgs = [img]
     done = False
@@ -29,8 +35,7 @@ def main(cfg: DictConfig):
         imgs.append(img)
 
     result_path = os.path.join(cfg.output_dir, "result.gif")
-    fps = len(imgs) * cfg.env.tau_action
-    imageio.mimsave(result_path, imgs, fps=fps)
+    imageio.mimsave(result_path, imgs, fps=24)
 
 
 if __name__ == "__main__":

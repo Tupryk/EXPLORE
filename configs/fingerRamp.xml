@@ -33,6 +33,7 @@
           <body name="l_fing">
             <joint name="l_fing" damping="0.1" type="slide" axis="0 0 1" />
             <geom type="sphere" size="0.05" rgba="0 1 1 1" mass="0.1"/>
+            <camera name="wrist_cam" pos="0.000 -0.491 0.405" xyaxes="1.000 0.016 0.000 -0.005 0.278 0.961"/>
           </body>
         </body>
       </body>

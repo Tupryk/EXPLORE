@@ -6,3 +6,4 @@ outputs/
 z.*
 outcmaes/
 MUJOCO_LOG.TXT
+*.scad
