@@ -17,9 +17,11 @@ def main(cfg: DictConfig):
     train_cfg = OmegaConf.load(config_path)
     
     env = StableConfigsEnv(train_cfg.env)
+
+    logger.info(f"Using device: {cfg.device}")
     
     model_path = os.path.join(cfg.checkpoint_dir, "trained_rl_policy.zip")
-    model = PPO.load(model_path, env=env)
+    model = PPO.load(model_path, env=env, device=cfg.device)
 
     obs, info = env.reset()
     logger.info(info)

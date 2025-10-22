@@ -39,6 +39,8 @@ class StableConfigsEnv(gym.Env):
         self.goal_conditioning = cfg.goal_conditioning
         if not self.goal_conditioning and cfg.target_config_idx == -1:
             raise Exception("Setting many goals but no goal conditioning!")
+        if self.goal_conditioning and cfg.target_config_idx != -1:
+            raise Exception("Using goal conditioning but only a single goal!")
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
         self.config_count = self.stable_configs["qpos"].shape[0]
@@ -192,15 +194,15 @@ class StableConfigsEnv(gym.Env):
         ### Reward Computation ###
         # Distance to target state
         eval_state = self.state[:self.target_state.shape[0]]
-        goal_cost_scaler = .0 if self.iter < len(self.guiding_path) else 1.
+        goal_cost_scaler = .0 if self.iter < len(self.guiding_path) else 0.1
         e = eval_state - self.target_state
-        self.reward = -goal_cost_scaler * (e.T @ e)
+        self.reward = -1.0 * goal_cost_scaler * np.sqrt(e.T @ e)
         
         # Distance to guiding path
         if self.guiding and self.iter < len(self.guiding_path):
             guiding_step = self.guiding_path[self.iter]
             e = eval_state - guiding_step
-            self.reward -= e.T @ e
+            self.reward -=  np.sqrt(e.T @ e) * 0.1
 
         truncated = self.iter >= self.max_steps
         terminated = truncated

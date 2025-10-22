@@ -1,7 +1,8 @@
 rl_method: "PPO"
 verbose: 1
-total_timesteps: 2e6
+total_timesteps: 2e7
 output_dir: ${hydra:runtime.output_dir}
+device: "cuda"
 env:
   stepsize: .1
   max_steps: 50

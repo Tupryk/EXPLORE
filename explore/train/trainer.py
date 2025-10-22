@@ -1,5 +1,4 @@
 import os
-import torch
 import logging
 from omegaconf import DictConfig
 from stable_baselines3 import PPO
@@ -24,12 +23,13 @@ class RL_Trainer:
         self.env = StableConfigsEnv(cfg.env)
         
         # Device
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = cfg.device
         self.logger.info(f"Using device: {self.device}")
         
         # Model
         if cfg.rl_method == "PPO":
-            self.model = PPO("MlpPolicy", self.env, verbose=cfg.verbose)
+            policy_kwargs = dict(net_arch=[256, 256, 128])
+            self.model = PPO("MlpPolicy", self.env, policy_kwargs=policy_kwargs, verbose=cfg.verbose, device=self.device)
             self.model.set_logger(sb3_logger)
         else:
             raise Exception(f"RL method '{cfg.rl_method}' not available.")
