@@ -1,4 +1,4 @@
-rl_method: "PPO"
+rl_method: "SAC"
 verbose: 1
 total_timesteps: 2e7
 output_dir: ${hydra:runtime.output_dir}

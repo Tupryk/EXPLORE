@@ -1,7 +1,7 @@
 import os
 import logging
 from omegaconf import DictConfig
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.logger import configure
 
 from explore.env.stable_configs_env import StableConfigsEnv
@@ -27,12 +27,31 @@ class RL_Trainer:
         self.logger.info(f"Using device: {self.device}")
         
         # Model
+
         if cfg.rl_method == "PPO":
             policy_kwargs = dict(net_arch=cfg.net_arch)
             self.model = PPO("MlpPolicy", self.env, policy_kwargs=policy_kwargs, verbose=cfg.verbose, device=self.device)
-            self.model.set_logger(sb3_logger)
+
+        elif cfg.rl_method == "SAC":
+            policy_kwargs = dict(
+                net_arch=dict(
+                    pi=cfg.net_arch,
+                    qf=cfg.net_arch
+                )
+            )
+            self.model = SAC(
+                "MlpPolicy",
+                self.env,
+                policy_kwargs=policy_kwargs,
+                verbose=cfg.verbose,
+                device=self.device
+            )
+            self.model = SAC("MlpPolicy", self.env, policy_kwargs=policy_kwargs, verbose=cfg.verbose, device=self.device)
+        
         else:
             raise Exception(f"RL method '{cfg.rl_method}' not available.")
+        
+        self.model.set_logger(sb3_logger)
     
     def train(self):
         self.logger.info("Starting training...")
