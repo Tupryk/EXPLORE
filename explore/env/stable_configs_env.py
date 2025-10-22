@@ -132,7 +132,6 @@ class StableConfigsEnv(gym.Env):
             traj_idx = np.random.randint(0, len(self.traj_pairs))
             s_cfg_idx = self.traj_pairs[traj_idx][0]
             e_cfg_idx = self.traj_pairs[traj_idx][1]
-            print(traj_idx)
         
         else:
             s_cfg_idx = self.start_config_idx if self.start_config_idx != -1 else np.random.randint(0, self.config_count)
