@@ -25,7 +25,7 @@ def main(cfg: DictConfig):
 
     obs, info = env.reset()
     logger.info(info)
-    img = env.render()
+    img = env.render(cfg.render_view)
     imgs = [img]
     done = False
 
@@ -33,7 +33,7 @@ def main(cfg: DictConfig):
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
-        img = env.render()
+        img = env.render(cfg.render_view)
         imgs.append(img)
 
     result_path = os.path.join(cfg.output_dir, "result.gif")

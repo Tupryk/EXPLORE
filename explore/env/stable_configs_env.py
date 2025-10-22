@@ -47,18 +47,17 @@ class StableConfigsEnv(gym.Env):
         
         self.verbose = cfg.verbose
 
+        config_path = os.path.join(cfg.trajectory_data_path, ".hydra/config.yaml")
+        trees_cfg = OmegaConf.load(config_path)
+        self.q_mask = np.array(trees_cfg.RRT.q_mask)
+
         self.guiding_path = []
         if self.guiding:
             
-            config_path = os.path.join(cfg.trajectory_data_path, ".hydra/config.yaml")
-            trees_cfg = OmegaConf.load(config_path)
-            
             tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
             self.trees, _, _ = load_trees(tree_dataset)
-
-            q_mask = np.array(trees_cfg.RRT.q_mask)
             
-            min_costs, top_nodes = generate_adj_map(self.trees, q_mask)
+            min_costs, top_nodes = generate_adj_map(self.trees, self.q_mask)
             self.traj_pairs, self.traj_end_nodes, _ = get_feasible_paths(
                 min_costs, top_nodes, self.start_config_idx, self.end_config_idx, trees_cfg.RRT.min_cost)
             
@@ -142,8 +141,8 @@ class StableConfigsEnv(gym.Env):
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
         
         self.target_state = self.stable_configs["qpos"][e_cfg_idx]
-        if self.use_vel:
-            self.target_state = np.concatenate((self.target_state, np.zeros_like(self.sim.data.qvel)))
+        # if self.use_vel:
+        #     self.target_state = np.concatenate((self.target_state, np.zeros_like(self.sim.data.qvel)))
         
         # Reset simulation state
         self.sim.pushConfig(
@@ -162,8 +161,8 @@ class StableConfigsEnv(gym.Env):
             self.guiding_path = []
             while True:
                 state = node["state"][1]
-                if self.use_vel:
-                    state = np.concatenate((state, node["state"][2]))
+                # if self.use_vel:
+                #     state = np.concatenate((state, node["state"][2]))
                 self.guiding_path.append(state)
                 if node["parent"] == -1: break
                 node = tree[node["parent"]]
@@ -194,15 +193,19 @@ class StableConfigsEnv(gym.Env):
         ### Reward Computation ###
         # Distance to target state
         eval_state = self.state[:self.target_state.shape[0]]
-        goal_cost_scaler = .0 if self.iter < len(self.guiding_path) else 0.1
-        e = eval_state - self.target_state
-        self.reward = -1.0 * goal_cost_scaler * np.sqrt(e.T @ e)
         
+        if self.iter < len(self.guiding_path):
+            self.reward = .0
+        else:
+            e = (eval_state - self.target_state) * self.q_mask
+            r = -0.1 * np.sqrt(e.T @ e)
+            
         # Distance to guiding path
         if self.guiding and self.iter < len(self.guiding_path):
             guiding_step = self.guiding_path[self.iter]
-            e = eval_state - guiding_step
-            self.reward -=  np.sqrt(e.T @ e) * 0.1
+            e = (eval_state - guiding_step) * self.q_mask
+            r = np.max((np.sqrt(e.T @ e) * -0.1, -2))
+            self.reward += r
 
         truncated = self.iter >= self.max_steps
         terminated = truncated
@@ -211,10 +214,13 @@ class StableConfigsEnv(gym.Env):
         return self.state, self.reward, terminated, truncated, info
 
     def render(self, mode: str="") -> np.ndarray:
-        # Sepparate scene renderer from model vision
+        # Separate scene renderer from model vision
 
         print("Iter: ", self.iter, "Reward: ", self.reward)
 
-        img = self.sim.renderImg()
+        if mode:
+            img = self.sim.renderImg(mode)
+        else:
+            img = self.sim.renderImg()
 
         return img

@@ -140,9 +140,13 @@ class MjSim:
         self.renderer = mujoco.Renderer(self.model, h, w)
         self.camera = camera
 
-    def renderImg(self) -> np.ndarray:
+    def renderImg(self, other_camera: str="") -> np.ndarray:
+        # TODO: Make this nicer
         if self.camera:
-            self.renderer.update_scene(self.data, self.camera)
+            if other_camera:
+                self.renderer.update_scene(self.data, other_camera)
+            else:
+                self.renderer.update_scene(self.data, self.camera)
         else:
             self.renderer.update_scene(self.data)
         frame = self.renderer.render()

@@ -28,7 +28,7 @@ class RL_Trainer:
         
         # Model
         if cfg.rl_method == "PPO":
-            policy_kwargs = dict(net_arch=[256, 256, 128])
+            policy_kwargs = dict(net_arch=cfg.net_arch)
             self.model = PPO("MlpPolicy", self.env, policy_kwargs=policy_kwargs, verbose=cfg.verbose, device=self.device)
             self.model.set_logger(sb3_logger)
         else:

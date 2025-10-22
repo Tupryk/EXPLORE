@@ -1,3 +1,4 @@
 checkpoint_dir: "checkpoints/inital_test_2e6"
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
+render_view: "fixed_cam"
