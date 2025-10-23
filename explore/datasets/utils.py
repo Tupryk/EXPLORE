@@ -51,9 +51,17 @@ def build_path(tree: list[dict], node_idx: int, reverse: bool=True) -> list[dict
 
     return path
 
-def generate_adj_map( trees: list[list[dict]], q_mask: np.ndarray=np.array([])
-    ) -> tuple[list[list[float]], list[list[int]]]:
+def generate_adj_map( trees: list[list[dict]], q_mask: np.ndarray=np.array([]),
+    check_cached: str="") -> tuple[list[list[float]], list[list[int]]]:
     
+    if check_cached:
+        cached_file_path = os.path.join(check_cached, "adj_map.pkl")
+        if os.path.exists(cached_file_path):
+            print("Loading cached Adjacency Map...")
+            with open(cached_file_path, "rb") as f:
+                min_costs, top_nodes = pickle.load(f)
+            return min_costs, top_nodes
+
     tree_count = len(trees)
     
     top_nodes = []
@@ -75,10 +83,14 @@ def generate_adj_map( trees: list[list[dict]], q_mask: np.ndarray=np.array([])
         top_nodes.append(tree_top_nodes)
         min_costs.append(tree_min_costs)
 
+    if check_cached:
+        with open(cached_file_path, "wb") as f:  # write in binary mode
+            pickle.dump((min_costs, top_nodes), f)
+
     return min_costs, top_nodes
 
 def get_feasible_paths(min_costs: list[list[float]], top_nodes: list[list[int]],
-    start_idx: int=-1, end_idx: int=-1, feasible_thresh: float=2e-2
+    start_idx: int=-1, end_idx: int=-1, feasible_thresh: float=2e-2,
     ) -> tuple[list[tuple[int, int]], list[int], list[float]]:
     
     tree_count = len(min_costs)

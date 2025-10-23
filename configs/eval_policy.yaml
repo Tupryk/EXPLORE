@@ -1,4 +1,7 @@
-checkpoint_dir: "checkpoints/inital_test_2e6"
+policy_dir: "data/policies/sac_init"
+checkpoint: "final_rl_policy"
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
-render_view: "fixed_cam"
+start_idx: 11
+end_idx: 25
+eval_view: "fixed_cam"

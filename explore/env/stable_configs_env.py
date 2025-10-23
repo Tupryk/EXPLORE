@@ -16,6 +16,7 @@ class StableConfigsEnv(gym.Env):
         
         super().__init__()
 
+        # TODO: Should this be copied from the tree dataset config?
         self.tau_sim = cfg.sim.tau_sim
         self.tau_action = cfg.sim.tau_action
         self.interpolate_actions = cfg.sim.interpolate_actions
@@ -57,20 +58,21 @@ class StableConfigsEnv(gym.Env):
             tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
             self.trees, _, _ = load_trees(tree_dataset)
             
-            min_costs, top_nodes = generate_adj_map(self.trees, self.q_mask)
+            min_costs, top_nodes = generate_adj_map(self.trees, self.q_mask, check_cached=cfg.trajectory_data_path)
             self.traj_pairs, self.traj_end_nodes, _ = get_feasible_paths(
                 min_costs, top_nodes, self.start_config_idx, self.end_config_idx, trees_cfg.RRT.min_cost)
             
             if not len(self.traj_pairs):
                 raise Exception(f"Not feasible trajectories in dataset '{cfg.trajectory_data_path}'!")
             
-            if self.verbose:
+            if self.verbose > 0:
                 print(f"Starting enviroment with guiding on {len(self.traj_pairs)} trajectories.")
             
         self.sim = MjSim(self.mujoco_xml, self.tau_sim,
                          interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl)
-        self.sim.setupRenderer(camera=cfg.sim.camera)
+        self.sim.setupRenderer(84, 84, camera=cfg.sim.camera)
         
+        # Defines observation space
         state = self.sim.getState()
         state_n = state[1].shape[0]  # qpos
         self.state_dim = state_n
@@ -78,8 +80,20 @@ class StableConfigsEnv(gym.Env):
             state_n += state[2].shape[0]  # qvel
         if self.goal_conditioning:
             state_n += state[1].shape[0]
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_n,), dtype=np.float32)
         
+        self.ctrl_dim = self.sim.data.ctrl.shape[0]
+
+        if self.use_vision:
+            obs_n = self.ctrl_dim + self.state_dim if self.goal_conditioning else self.ctrl_dim
+            self.observation_space = spaces.Dict({
+                "image": spaces.Box(low=0, high=255, shape=(84, 84, 3), dtype=np.uint8),
+                "proprio": spaces.Box(low=-np.inf, high=np.inf, shape=(obs_n,), dtype=np.float32),
+            })
+
+        else:
+            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_n,), dtype=np.float32)
+        
+        # Defines action space
         if self.stepsize != -1:
             min_ctrl = -1.0 * self.stepsize
             max_ctrl = self.stepsize
@@ -88,27 +102,37 @@ class StableConfigsEnv(gym.Env):
             min_ctrl = ctrl_ranges[:, 0]
             max_ctrl = ctrl_ranges[:, 1]
         
-        ctrl_dim = self.sim.data.ctrl.shape[0]
-        self.action_space = spaces.Box(low=min_ctrl, high=max_ctrl, shape=(ctrl_dim,), dtype=np.float32)
+        self.action_space = spaces.Box(low=min_ctrl, high=max_ctrl, shape=(self.ctrl_dim,), dtype=np.float32)
         
         if self.use_vision:
             self.camera_filter = cfg.camera_filter
 
     def getState(self) -> np.ndarray:
-        time_, qpos, qvel, ctrl = self.sim.getState()
+        
+        self.sim_state = self.sim.getState()
+        time_, qpos, qvel, ctrl = self.sim_state
         
         if self.use_vision:
+            
             img = self.sim.renderImg()
-            if self.camera_filter == "none":
-                self.state = img.astype(np.float32).flatten() / 255
-                raise Exception("No vision backbone implemented yet! Refusing to feed full image to model.")
+            
+            if not self.camera_filter or self.camera_filter == "none":
+                
+                prio = qpos[:self.ctrl_dim]
+
+                if self.goal_conditioning:
+                    prio = np.concatenate((prio, self.target_state[:self.state_dim]))
+
+                self.state = {
+                    "image": img.astype(np.uint8),
+                    "proprio": prio,
+                }
+            
             elif self.camera_filter == "blue_ball_mask":
                 _, mask = extract_ball_from_img(img, self.verbose-1)
                 self.state = mask
-                raise Exception("No vision backbone implemented yet! Refusing to feed full image to model.")
-            elif self.camera_filter == "blue_ball_params":
-                ball_params, _ = extract_ball_from_img(img, self.verbose-1)
-                self.state = ball_params
+                raise Exception("Not fully implemented yet!")
+            
             else:
                 raise Exception(f"Camera filter {self.camera_filter} not implemented yet!")
         else:
@@ -116,21 +140,33 @@ class StableConfigsEnv(gym.Env):
             if self.use_vel:
                 self.state = np.concatenate((self.state, qvel))
             
-        if self.goal_conditioning:
-            self.state = np.concatenate((self.state, self.target_state[:self.state_dim]))
+            if self.goal_conditioning:
+                self.state = np.concatenate((self.state, self.target_state[:self.state_dim]))
 
         self.last_time = time_
         self.last_ctrl = ctrl
         return self.state
 
-    def reset(self, *, seed: int=None, options: dict=None):
+    def reset(self, *, seed: int=None, options: dict={}):
         super().reset(seed=seed)
         np.random.seed(seed)
-        # TODO: manually set start and end nodes through options. What if no path?
+
+        self.eval_view = "" if not "eval_view" in options else options["eval_view"]
 
         # Choose start and end configurations
         if self.guiding:
-            traj_idx = np.random.randint(0, len(self.traj_pairs))
+            
+            if "traj_pair" in options and options["traj_pair"] != (-1, -1):
+
+                tp = options["traj_pair"]
+                if tp in self.traj_pairs:
+                    traj_idx = self.traj_pairs.index(tp)
+                else:
+                    raise Exception(f"Trajectory pair '{options['traj_pair']}' not in list! Availible pairs: {self.traj_pairs}")
+            
+            else:
+                traj_idx = np.random.randint(0, len(self.traj_pairs))
+            
             s_cfg_idx = self.traj_pairs[traj_idx][0]
             e_cfg_idx = self.traj_pairs[traj_idx][1]
         
@@ -186,41 +222,52 @@ class StableConfigsEnv(gym.Env):
         if self.stepsize != -1:
             action += self.last_ctrl
         
-        self.sim.step(self.tau_action, action)
+        frames = self.sim.step(self.tau_action, action, view=self.eval_view)
         self.getState()
         self.iter += 1
 
         ### Reward Computation ###
-        # Distance to target state
-        eval_state = self.state[:self.target_state.shape[0]]
         
-        if self.iter < len(self.guiding_path):
-            self.reward = .0
-        else:
+        eval_state = self.sim_state[1]
+        
+        goal_reward = 0.0
+        if self.iter >= len(self.guiding_path):
             e = (eval_state - self.target_state) * self.q_mask
-            r = -0.1 * np.sqrt(e.T @ e)
-            
-        # Distance to guiding path
+            goal_reward = -1.0 * (e.T @ e)
+            goal_reward = np.max((goal_reward, -5.0))
+        
+        guiding_reward = 0.0
         if self.guiding and self.iter < len(self.guiding_path):
             guiding_step = self.guiding_path[self.iter]
             e = (eval_state - guiding_step) * self.q_mask
-            r = np.max((np.sqrt(e.T @ e) * -0.1, -2))
-            self.reward += r
+            guiding_reward = -1.0 * (e.T @ e)
+            guiding_reward = np.max((guiding_reward, -5.0))
+
+        self.reward = goal_reward * 1.0 + guiding_reward * 0.1
 
         truncated = self.iter >= self.max_steps
         terminated = truncated
-        info = {}
+        info = {
+            "frames": frames,
+            "goal_reward": goal_reward,
+            "guiding_reward": guiding_reward
+        }
 
         return self.state, self.reward, terminated, truncated, info
 
-    def render(self, mode: str="") -> np.ndarray:
+    def render(self, mode: str="", config_idx: int=-1) -> np.ndarray:
         # Separate scene renderer from model vision
 
-        print("Iter: ", self.iter, "Reward: ", self.reward)
+        if config_idx != -1:
+            current_state = self.sim.getState()
+            self.sim.setState(*self.trees[config_idx][0]["state"])
 
         if mode:
             img = self.sim.renderImg(mode)
         else:
             img = self.sim.renderImg()
+
+        if config_idx != -1:
+            self.sim.setState(*current_state)
 
         return img

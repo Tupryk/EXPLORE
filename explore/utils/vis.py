@@ -30,29 +30,22 @@ def AdjMap(costs: np.ndarray, min_value: float=0.0, max_value: float=0.1, save_a
         plt.show()
 
 
-def play_path(start_state: np.ndarray, target_state: np.ndarray,
-              path: list[dict], sim: MjSim, playback_time: float=1.,
-              tau_action: float=.1, play_intro: bool=True, camera: str="",
-              save_as: str="path.gif", reset_state: bool=False):
+def play_path(path: list[dict], sim: MjSim,
+              start_state: np.ndarray, target_state: np.ndarray,
+              playback_time: float=1., tau_action: float=.1, save_intro_as: str="",
+              camera: str="", save_as: str="path.gif", reset_state: bool=False):
     
     play_path = path.copy()
     
     print(f"Playing path with length {len(play_path)}")
     sim.setupRenderer(camera=camera)
 
-    if play_intro:
-        sim.pushConfig(start_state)
-        im_start = sim.renderImg()
-        if sim.viewer != None:
-            time.sleep(3)
-        sim.pushConfig(target_state)
-        im_end = sim.renderImg()
-        if sim.viewer != None:
-            time.sleep(3)
-        sim.pushConfig(play_path[-1]["state"][1])
-        im_reached = sim.renderImg()
-        if sim.viewer != None:
-            time.sleep(3)
+    sim.pushConfig(start_state)
+    im_start = sim.renderImg()
+    sim.pushConfig(target_state)
+    im_end = sim.renderImg()
+    sim.pushConfig(play_path[-1]["state"][1])
+    im_reached = sim.renderImg()
     
     fig, axes = plt.subplots(1, 3, figsize=(30, 20))
     axes[0].set_title("Start Config", fontsize=24, fontweight="bold")
@@ -65,7 +58,11 @@ def play_path(start_state: np.ndarray, target_state: np.ndarray,
     axes[2].imshow(im_reached)
     axes[2].axis("off")
     plt.tight_layout()
-    plt.show()
+    
+    if not save_intro_as:
+        plt.show()
+    else:
+        plt.savefig(save_intro_as)
 
     frames = []
 
@@ -78,11 +75,11 @@ def play_path(start_state: np.ndarray, target_state: np.ndarray,
             sim.setState(*node["state"])
 
         q_target = node["state"][3]
-        f = sim.step(tau_action, q_target, view=tau_action*playback_time)
+        f = sim.step(tau_action, q_target, view=camera)
         if save_as:
             frames.extend(f)
 
     if sim.viewer != None:
         time.sleep(3)
     if save_as:
-        imageio.mimsave(save_as, frames, fps=24, loop=0)
+        imageio.mimsave(save_as, frames, fps=24 * playback_time, loop=0)

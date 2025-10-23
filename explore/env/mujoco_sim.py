@@ -62,7 +62,7 @@ class MjSim:
             self.viewer.sync()
 
     def step(self, tau_action: float,
-             ctrl_target: np.ndarray=None, view: float=0.0) -> list:
+             ctrl_target: np.ndarray=None, view: str="") -> list:
         
         steps = math.ceil(tau_action/self.tau_sim)
         if self.joints_are_same_as_ctrl:
@@ -83,12 +83,12 @@ class MjSim:
             
             mujoco.mj_step(self.model, self.data)
             
-            if view > 0.:
+            if view:
                 if self.viewer != None:
                     self.viewer.sync()
-                    time.sleep(view/steps)
+                    time.sleep(tau_action/steps)
                 if not (self.renderer is None) and self.data.time >= self.next_frame_time:
-                    frames.append(self.renderImg())
+                    frames.append(self.renderImg(view))
                     self.next_frame_time = self.next_frame_time + self.frame_dt
         
         return frames
