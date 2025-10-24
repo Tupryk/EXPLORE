@@ -1,7 +1,7 @@
-policy_dir: "data/policies/sac_init"
+policy_dir: "data/policies/sac_fixed"
 checkpoint: "final_rl_policy"
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
-start_idx: 11
-end_idx: 25
+start_idx: 1
+end_idx: 0
 eval_view: "fixed_cam"

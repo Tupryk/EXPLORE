@@ -16,7 +16,6 @@ class StableConfigsEnv(gym.Env):
         
         super().__init__()
 
-        # TODO: Should this be copied from the tree dataset config?
         self.tau_sim = cfg.sim.tau_sim
         self.tau_action = cfg.sim.tau_action
         self.interpolate_actions = cfg.sim.interpolate_actions
@@ -24,11 +23,12 @@ class StableConfigsEnv(gym.Env):
         self.mujoco_xml = cfg.sim.mujoco_xml
         
         self.stepsize = cfg.stepsize
-        self.max_steps = cfg.max_steps  # Gets overwriten if use_guiding = True
+        self.max_steps_default = cfg.max_steps  # Gets overwriten if use_guiding = True
         
         self.actions_noise_sigma = cfg.actions_noise_sigma
         self.use_vel = cfg.use_vel
         self.guiding = cfg.guiding
+        self.guiding_prob = cfg.guiding_prob
         self.reward = None
         
         self.use_vision = cfg.use_vision
@@ -51,6 +51,8 @@ class StableConfigsEnv(gym.Env):
         config_path = os.path.join(cfg.trajectory_data_path, ".hydra/config.yaml")
         trees_cfg = OmegaConf.load(config_path)
         self.q_mask = np.array(trees_cfg.RRT.q_mask)
+        self.dataset_tau_action = trees_cfg.RRT.sim.tau_action
+        self.time_scaling = np.ceil(self.tau_action / self.dataset_tau_action)
 
         self.guiding_path = []
         if self.guiding:
@@ -154,21 +156,31 @@ class StableConfigsEnv(gym.Env):
         self.eval_view = "" if not "eval_view" in options else options["eval_view"]
 
         # Choose start and end configurations
-        if self.guiding:
+        self.unknown_path = False
+        self.currently_guiding = self.guiding and np.random.random() < self.guiding_prob
+        if self.currently_guiding:
             
-            if "traj_pair" in options and options["traj_pair"] != (-1, -1):
+            if "no_exist_fine" in options and options["no_exist_fine"]:
+                s_cfg_idx = options["traj_pair"][0]
+                e_cfg_idx = options["traj_pair"][1]
+                self.unknown_path = True
+                if not (options["traj_pair"] in self.traj_pairs):
+                    print("Running unknown trajectory. Very scary!!")
 
-                tp = options["traj_pair"]
-                if tp in self.traj_pairs:
-                    traj_idx = self.traj_pairs.index(tp)
-                else:
-                    raise Exception(f"Trajectory pair '{options['traj_pair']}' not in list! Availible pairs: {self.traj_pairs}")
-            
             else:
-                traj_idx = np.random.randint(0, len(self.traj_pairs))
-            
-            s_cfg_idx = self.traj_pairs[traj_idx][0]
-            e_cfg_idx = self.traj_pairs[traj_idx][1]
+                if "traj_pair" in options and options["traj_pair"] != (-1, -1):
+
+                    tp = options["traj_pair"]
+                    if tp in self.traj_pairs:
+                        traj_idx = self.traj_pairs.index(tp)
+                    else:
+                        raise Exception(f"Trajectory pair '{options['traj_pair']}' not in list! Availible pairs: {self.traj_pairs}")
+                
+                else:
+                    traj_idx = np.random.randint(0, len(self.traj_pairs))
+                
+                s_cfg_idx = self.traj_pairs[traj_idx][0]
+                e_cfg_idx = self.traj_pairs[traj_idx][1]
         
         else:
             s_cfg_idx = self.start_config_idx if self.start_config_idx != -1 else np.random.randint(0, self.config_count)
@@ -189,12 +201,12 @@ class StableConfigsEnv(gym.Env):
         self.iter = 0
         
         # Load guiding trajectory
-        if self.guiding and (not len(self.guiding_path) or self.end_config_idx == -1):
+        self.guiding_path = []
+        if self.currently_guiding and not self.unknown_path and (not len(self.guiding_path) or self.end_config_idx == -1):
             tree = self.trees[s_cfg_idx]
             node = tree[self.traj_end_nodes[traj_idx]]
 
             # Build guiding trajectory from tree
-            self.guiding_path = []
             while True:
                 state = node["state"][1]
                 # if self.use_vel:
@@ -205,8 +217,11 @@ class StableConfigsEnv(gym.Env):
             
             self.guiding_path.reverse()
 
-            self.max_steps = int(len(self.guiding_path) * 1.5)
+            self.max_steps = int(len(self.guiding_path) * 1.5) * self.time_scaling
             info["guiding_traj_len"] = len(self.guiding_path)
+        
+        else:
+            self.max_steps = self.max_steps_default * self.time_scaling
         
         if self.verbose > 1:
             print(f"Reseting enviroment with start config {s_cfg_idx} and end config {e_cfg_idx}.")
@@ -231,14 +246,19 @@ class StableConfigsEnv(gym.Env):
         eval_state = self.sim_state[1]
         
         goal_reward = 0.0
-        if self.iter >= len(self.guiding_path):
+        if self.iter >= (len(self.guiding_path) * self.time_scaling):
+            
             e = (eval_state - self.target_state) * self.q_mask
+            
             goal_reward = -1.0 * (e.T @ e)
             goal_reward = np.max((goal_reward, -5.0))
         
         guiding_reward = 0.0
-        if self.guiding and self.iter < len(self.guiding_path):
-            guiding_step = self.guiding_path[self.iter]
+        if self.currently_guiding and not self.unknown_path and self.iter < (len(self.guiding_path) * self.time_scaling):
+            
+            path_idx = int(np.ceil(self.iter/self.time_scaling))
+            guiding_step = self.guiding_path[path_idx]
+
             e = (eval_state - guiding_step) * self.q_mask
             guiding_reward = -1.0 * (e.T @ e)
             guiding_reward = np.max((guiding_reward, -5.0))
