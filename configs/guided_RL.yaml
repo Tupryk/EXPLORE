@@ -4,22 +4,23 @@ total_timesteps: 2e7
 output_dir: ${hydra:runtime.output_dir}
 device: "cuda"
 net_arch: [256, 256]
-save_freq: 1e6
+save_freq: 25e4
 env:
-  stepsize: .1
+  stepsize: .03
   max_steps: 50
   actions_noise_sigma: 0.01
-  use_vel: False
+  use_vel: True
   guiding: True
+  guiding_prob: 0.5
   start_config_idx: -1
   target_config_idx: -1
   goal_conditioning: True
-  use_vision: True
+  use_vision: False
   camera_filter: ""
   verbose: 1
   sim:
     tau_sim: 0.001
-    tau_action: 0.5
+    tau_action: 0.1
     interpolate_actions: True
     joints_are_same_as_ctrl: true
     mujoco_xml: "configs/fingerRamp.xml"

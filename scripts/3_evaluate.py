@@ -32,7 +32,7 @@ def main(cfg: DictConfig):
     else:
         raise Exception(f"RL method '{train_cfg.rl_method}' not available.")
 
-    options = {"traj_pair": (cfg.start_idx, cfg.end_idx), "eval_view": cfg.eval_view}
+    options = {"traj_pair": (cfg.start_idx, cfg.end_idx), "eval_view": cfg.eval_view, "no_exist_fine": True}
     obs, init_info = env.reset(options=options)
     logger.info(init_info)
 
