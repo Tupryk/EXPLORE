@@ -6,7 +6,7 @@ from gymnasium import spaces
 from omegaconf import DictConfig, OmegaConf
 
 from explore.env.mujoco_sim import MjSim
-from explore.utils.utils import randint_excluding, extract_ball_from_img
+from explore.utils.utils import randint_excluding, extract_balls_mask
 from explore.datasets.utils import load_trees, generate_adj_map, get_feasible_paths
 
 
@@ -52,7 +52,7 @@ class StableConfigsEnv(gym.Env):
         trees_cfg = OmegaConf.load(config_path)
         self.q_mask = np.array(trees_cfg.RRT.q_mask)
         self.dataset_tau_action = trees_cfg.RRT.sim.tau_action
-        self.time_scaling = np.ceil(self.tau_action / self.dataset_tau_action)
+        self.time_scaling = np.ceil(self.dataset_tau_action / self.tau_action)
 
         self.guiding_path = []
         if self.guiding:
@@ -117,26 +117,25 @@ class StableConfigsEnv(gym.Env):
         if self.use_vision:
             
             img = self.sim.renderImg()
+            prio = qpos[:self.ctrl_dim]
+
+            if self.goal_conditioning:
+                prio = np.concatenate((prio, self.target_state[:self.state_dim]))
             
             if not self.camera_filter or self.camera_filter == "none":
-                
-                prio = qpos[:self.ctrl_dim]
-
-                if self.goal_conditioning:
-                    prio = np.concatenate((prio, self.target_state[:self.state_dim]))
-
-                self.state = {
-                    "image": img.astype(np.uint8),
-                    "proprio": prio,
-                }
+                pass
             
-            elif self.camera_filter == "blue_ball_mask":
-                _, mask = extract_ball_from_img(img, self.verbose-1)
-                self.state = mask
-                raise Exception("Not fully implemented yet!")
+            elif self.camera_filter == "balls_mask":
+                img = extract_balls_mask(img, self.verbose-1)
             
             else:
                 raise Exception(f"Camera filter {self.camera_filter} not implemented yet!")
+            
+            self.state = {
+                "image": img.astype(np.uint8),
+                "proprio": prio,
+            }
+            
         else:
             self.state = qpos
             if self.use_vel:
@@ -157,15 +156,19 @@ class StableConfigsEnv(gym.Env):
 
         # Choose start and end configurations
         self.unknown_path = False
-        self.currently_guiding = self.guiding and np.random.random() < self.guiding_prob
+        self.currently_guiding = (self.guiding and np.random.random() < self.guiding_prob) or "traj_pair" in options
         if self.currently_guiding:
             
             if "no_exist_fine" in options and options["no_exist_fine"]:
                 s_cfg_idx = options["traj_pair"][0]
                 e_cfg_idx = options["traj_pair"][1]
-                self.unknown_path = True
-                if not (options["traj_pair"] in self.traj_pairs):
+                
+                tp = options["traj_pair"]
+                if not (tp in self.traj_pairs):
+                    self.unknown_path = True
                     print("Running unknown trajectory. Very scary!!")
+                else:
+                    traj_idx = self.traj_pairs.index(tp)
 
             else:
                 if "traj_pair" in options and options["traj_pair"] != (-1, -1):
@@ -202,7 +205,9 @@ class StableConfigsEnv(gym.Env):
         
         # Load guiding trajectory
         self.guiding_path = []
-        if self.currently_guiding and not self.unknown_path and (not len(self.guiding_path) or self.end_config_idx == -1):
+        # TODO: Checkout this line, and make things nicer
+        # if self.currently_guiding and not self.unknown_path and (not len(self.guiding_path) or self.end_config_idx == -1):
+        if self.currently_guiding and not self.unknown_path:
             tree = self.trees[s_cfg_idx]
             node = tree[self.traj_end_nodes[traj_idx]]
 
@@ -221,7 +226,7 @@ class StableConfigsEnv(gym.Env):
             info["guiding_traj_len"] = len(self.guiding_path)
         
         else:
-            self.max_steps = self.max_steps_default * self.time_scaling
+            self.max_steps = self.max_steps_default
         
         if self.verbose > 1:
             print(f"Reseting enviroment with start config {s_cfg_idx} and end config {e_cfg_idx}.")
@@ -242,11 +247,11 @@ class StableConfigsEnv(gym.Env):
         self.iter += 1
 
         ### Reward Computation ###
-        
         eval_state = self.sim_state[1]
+        node_idx = int(np.ceil(self.iter/self.time_scaling))
         
         goal_reward = 0.0
-        if self.iter >= (len(self.guiding_path) * self.time_scaling):
+        if node_idx >= len(self.guiding_path):
             
             e = (eval_state - self.target_state) * self.q_mask
             
@@ -254,10 +259,9 @@ class StableConfigsEnv(gym.Env):
             goal_reward = np.max((goal_reward, -5.0))
         
         guiding_reward = 0.0
-        if self.currently_guiding and not self.unknown_path and self.iter < (len(self.guiding_path) * self.time_scaling):
+        if self.currently_guiding and not self.unknown_path and node_idx < len(self.guiding_path):
             
-            path_idx = int(np.ceil(self.iter/self.time_scaling))
-            guiding_step = self.guiding_path[path_idx]
+            guiding_step = self.guiding_path[node_idx]
 
             e = (eval_state - guiding_step) * self.q_mask
             guiding_reward = -1.0 * (e.T @ e)

@@ -7,16 +7,16 @@ net_arch: [256, 256]
 save_freq: 25e4
 env:
   stepsize: .03
-  max_steps: 50
+  max_steps: 125
   actions_noise_sigma: 0.01
-  use_vel: True
+  use_vel: False
   guiding: True
   guiding_prob: 0.5
   start_config_idx: -1
   target_config_idx: -1
   goal_conditioning: True
-  use_vision: False
-  camera_filter: ""
+  use_vision: True
+  camera_filter: "balls_mask"
   verbose: 1
   sim:
     tau_sim: 0.001

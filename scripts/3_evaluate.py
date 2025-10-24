@@ -45,7 +45,7 @@ def main(cfg: DictConfig):
         frames = info["frames"]
         imgs.extend(frames)
         done = terminated or truncated
-        print("Iter: ", env.iter, "Reward: ", env.reward)
+        print(f"Iter: {env.iter}; Reward: {env.reward:.4f} (Goal Reward: {info['goal_reward']:.4f} Guiding Reward: {info['guiding_reward']:.4f})")
 
     # Save results
     result_path = os.path.join(cfg.output_dir, "result.gif")

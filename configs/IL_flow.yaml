@@ -1,0 +1,4 @@
+device: "cuda"
+lr: 1e-4
+log_dir: "./runs/il_trainer"
+save_path: "./checkpoints/il_model.pt"

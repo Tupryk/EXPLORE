@@ -1,6 +1,7 @@
 import cv2
 import random
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.interpolate import make_interp_spline
 
 
@@ -116,3 +117,38 @@ def extract_ball_from_img(img: np.ndarray, verbose: int=0
         print("No blue ball detected.")
     
     return np.zeros(4), np.zeros_like(img)
+
+def extract_balls_mask(img: np.ndarray, verbose: int = 0) -> np.ndarray:
+
+    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+
+    lower_blue = np.array([90, 100, 50])
+    upper_blue = np.array([130, 255, 255])
+    mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
+    mask_blue = cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    mask_blue = cv2.morphologyEx(mask_blue, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+
+    lower_orange = np.array([5, 100, 100])
+    upper_orange = np.array([20, 255, 255])
+    mask_orange = cv2.inRange(hsv, lower_orange, upper_orange)
+    mask_orange = cv2.morphologyEx(mask_orange, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    mask_orange = cv2.morphologyEx(mask_orange, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+
+    masks_rgb = (
+        np.stack([mask_orange, mask_orange, mask_orange], axis=-1) * np.array([1.0, 0.5, 0.0]) +
+        np.stack([mask_blue, mask_blue, mask_blue], axis=-1) * np.array([0.0, 1.0, 1.0])
+    ).astype(np.uint8)
+
+    if verbose:
+        fig, axes = plt.subplots(1, 2, figsize=(20, 20))
+        axes[0].set_title("Original Image", fontsize=24, fontweight="bold")
+        axes[0].imshow(img)
+        axes[0].axis("off")
+        axes[1].set_title("Masked Result", fontsize=24, fontweight="bold")
+        axes[1].imshow(masks_rgb)
+        axes[1].axis("off")
+        plt.tight_layout()
+        plt.show()
+
+    return masks_rgb
+

@@ -1,7 +1,7 @@
 import hydra
 from omegaconf import DictConfig
 
-from explore.train.trainer import RL_Trainer
+from explore.train.rl_trainer import RL_Trainer
 from explore.utils.logger import get_logger
 
 
