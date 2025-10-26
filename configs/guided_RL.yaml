@@ -2,20 +2,20 @@ rl_method: "SAC"
 verbose: 1
 total_timesteps: 2e7
 output_dir: ${hydra:runtime.output_dir}
-device: "cuda"
+device: "cpu"
 net_arch: [256, 256]
 save_freq: 25e4
 env:
-  stepsize: .03
+  stepsize: 0.04
   max_steps: 125
   actions_noise_sigma: 0.01
-  use_vel: False
+  use_vel: True
   guiding: True
-  guiding_prob: 0.5
+  guiding_prob: 1.
   start_config_idx: -1
   target_config_idx: -1
   goal_conditioning: True
-  use_vision: True
+  use_vision: False
   camera_filter: "balls_mask"
   verbose: 1
   sim:

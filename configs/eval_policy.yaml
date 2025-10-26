@@ -1,7 +1,7 @@
-policy_dir: "data/policies/sac_random_guidance_wrong_time_scaling"
-checkpoint: "checkpoints/SAC_1250000_steps"
+policy_dir: "data/policies/sac_small_step"
+checkpoint: "checkpoints/SAC_15250000_steps"
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 start_idx: 11
-end_idx: 25
+end_idx: 1
 eval_view: "fixed_cam"

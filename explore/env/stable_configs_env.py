@@ -1,5 +1,6 @@
 import os
 import h5py
+import pickle
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
@@ -7,7 +8,6 @@ from omegaconf import DictConfig, OmegaConf
 
 from explore.env.mujoco_sim import MjSim
 from explore.utils.utils import randint_excluding, extract_balls_mask
-from explore.datasets.utils import load_trees, generate_adj_map, get_feasible_paths
 
 
 class StableConfigsEnv(gym.Env):
@@ -57,12 +57,16 @@ class StableConfigsEnv(gym.Env):
         self.guiding_path = []
         if self.guiding:
             
-            tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
-            self.trees, _, _ = load_trees(tree_dataset)
-            
-            min_costs, top_nodes = generate_adj_map(self.trees, self.q_mask, check_cached=cfg.trajectory_data_path)
-            self.traj_pairs, self.traj_end_nodes, _ = get_feasible_paths(
-                min_costs, top_nodes, self.start_config_idx, self.end_config_idx, trees_cfg.RRT.min_cost)
+            path_dataset_dir = os.path.join(cfg.trajectory_data_path, "processed/paths_data.pkl")
+            with open(path_dataset_dir, "rb") as f:
+                self.traj_pairs, paths_pre = pickle.load(f)
+
+            self.paths = []
+            for p in paths_pre:
+                path = []
+                for sp in p:
+                    path.extend([n["state"][1] for n in sp])
+                self.paths.append(path)
             
             if not len(self.traj_pairs):
                 raise Exception(f"Not feasible trajectories in dataset '{cfg.trajectory_data_path}'!")
@@ -101,14 +105,14 @@ class StableConfigsEnv(gym.Env):
             max_ctrl = self.stepsize
         else:
             ctrl_ranges = self.sim.model.actuator_ctrlrange
-            min_ctrl = ctrl_ranges[:, 0]
-            max_ctrl = ctrl_ranges[:, 1]
+            min_ctrl = ctrl_ranges[:, 0].astype(np.float32)
+            max_ctrl = ctrl_ranges[:, 1].astype(np.float32)
         
         self.action_space = spaces.Box(low=min_ctrl, high=max_ctrl, shape=(self.ctrl_dim,), dtype=np.float32)
         
         if self.use_vision:
             self.camera_filter = cfg.camera_filter
-
+        
     def getState(self) -> np.ndarray:
         
         self.sim_state = self.sim.getState()
@@ -208,19 +212,8 @@ class StableConfigsEnv(gym.Env):
         # TODO: Checkout this line, and make things nicer
         # if self.currently_guiding and not self.unknown_path and (not len(self.guiding_path) or self.end_config_idx == -1):
         if self.currently_guiding and not self.unknown_path:
-            tree = self.trees[s_cfg_idx]
-            node = tree[self.traj_end_nodes[traj_idx]]
-
-            # Build guiding trajectory from tree
-            while True:
-                state = node["state"][1]
-                # if self.use_vel:
-                #     state = np.concatenate((state, node["state"][2]))
-                self.guiding_path.append(state)
-                if node["parent"] == -1: break
-                node = tree[node["parent"]]
             
-            self.guiding_path.reverse()
+            self.guiding_path = self.paths[traj_idx]
 
             self.max_steps = int(len(self.guiding_path) * 1.5) * self.time_scaling
             info["guiding_traj_len"] = len(self.guiding_path)

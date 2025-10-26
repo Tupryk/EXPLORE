@@ -109,7 +109,7 @@ class MjSim:
         self.data.qpos[:] = qpos
         self.data.qvel[:] = qvel
         self.data.ctrl[:] = ctrl
-        mujoco.mj_forward(self.model, self.data)
+        mujoco.mj_forward(self.model, self.data)  # Investigate!!
         self.ctrl_time = time
         if self.viewer is not None:
             self.viewer.sync()
