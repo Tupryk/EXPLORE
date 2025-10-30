@@ -7,6 +7,7 @@ from gymnasium import spaces
 from omegaconf import DictConfig, OmegaConf
 
 from explore.env.mujoco_sim import MjSim
+from explore.datasets.utils import load_trees
 from explore.utils.utils import randint_excluding, extract_balls_mask
 
 
@@ -52,10 +53,13 @@ class StableConfigsEnv(gym.Env):
         trees_cfg = OmegaConf.load(config_path)
         self.q_mask = np.array(trees_cfg.RRT.q_mask)
         self.dataset_tau_action = trees_cfg.RRT.sim.tau_action
-        self.time_scaling = np.ceil(self.dataset_tau_action / self.tau_action)
+        self.time_scaling = np.ceil(self.dataset_tau_action / self.tau_action) if cfg.time_scaling == -1 else cfg.time_scaling
 
         self.guiding_path = []
         if self.guiding:
+
+            tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
+            self.trees, _, _ = load_trees(tree_dataset)
             
             path_dataset_dir = os.path.join(cfg.trajectory_data_path, "processed/paths_data.pkl")
             with open(path_dataset_dir, "rb") as f:
@@ -72,7 +76,7 @@ class StableConfigsEnv(gym.Env):
                 raise Exception(f"Not feasible trajectories in dataset '{cfg.trajectory_data_path}'!")
             
             if self.verbose > 0:
-                print(f"Starting enviroment with guiding on {len(self.traj_pairs)} trajectories.")
+                print(f"Starting enviroment with guiding on {len(self.traj_pairs)} trajectories with average length {sum(len(p) for p in self.paths)/len(self.traj_pairs)}.")
             
         self.sim = MjSim(self.mujoco_xml, self.tau_sim,
                          interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl)

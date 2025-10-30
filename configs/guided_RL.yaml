@@ -6,9 +6,10 @@ device: "cpu"
 net_arch: [256, 256]
 save_freq: 25e4
 env:
+  time_scaling: 1.0
   stepsize: 0.04
   max_steps: 125
-  actions_noise_sigma: 0.01
+  actions_noise_sigma: 0.001
   use_vel: True
   guiding: True
   guiding_prob: 1.
