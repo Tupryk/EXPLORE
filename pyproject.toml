@@ -27,7 +27,6 @@ scikit-learn = "1.7.1"
 tensorboard = "2.20.0"
 numpy = "*"
 matplotlib = "*"
-wandb = "*"
 
 [build-system]
 requires = ["poetry-core"]
