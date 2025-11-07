@@ -68,6 +68,7 @@ class Search:
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
         self.bidirectional = cfg.bidirectional  # Performance seems very dependend on initial seed. Needs further investigation...
+        self.knnK = cfg.knnK
 
         if self.bidirectional:
             self.bi_stepsize = cfg.bi_stepsize
@@ -356,8 +357,9 @@ class Search:
                 sim_sample = self.configs[target_config_idx]
             
             # Pick closest node
-            node_idx, _ = self.trees_kNNs[start_idx].knn_query(sim_sample * self.q_mask, k=1)
-            node_idx = node_idx[0][0]
+            k = min(self.knnK, self.trees_kNNs_sizes[start_idx])
+            node_idx, _ = self.trees_kNNs[start_idx].knn_query(sim_sample * self.q_mask, k=k)
+            node_idx = np.random.choice(node_idx[0])
             node: MultiSearchNode = self.trees[start_idx][node_idx]
 
             # Expand node
