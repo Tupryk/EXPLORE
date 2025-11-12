@@ -344,6 +344,8 @@ class Search:
             
             if self.start_idx == -1:
                 start_idx = i // nodes_per_tree
+                if start_idx >= self.config_count:  # TODO: Write a better fix
+                    start_idx = self.config_count-1
             else:
                 start_idx = self.start_idx
 
