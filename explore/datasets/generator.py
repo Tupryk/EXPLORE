@@ -6,7 +6,7 @@ import pickle
 import hnswlib
 import numpy as np
 from tqdm import trange
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from explore.env.mujoco_sim import MjSim
@@ -37,6 +37,8 @@ class Search:
 
         self.max_nodes = int(cfg.max_nodes)
         self.stepsize = cfg.stepsize
+        if isinstance(self.stepsize, ListConfig):
+            self.stepsize = np.array(self.stepsize)
         self.target_prob = cfg.target_prob
         
         self.min_cost = cfg.min_cost
@@ -72,6 +74,8 @@ class Search:
 
         if self.bidirectional:
             self.bi_stepsize = cfg.bi_stepsize
+            if isinstance(self.bi_stepsize, ListConfig):
+                self.bi_stepsize = np.array(self.bi_stepsize)
             self.bi_target_prob = cfg.bi_target_prob
             self.bi_tree_tolerance = cfg.bi_tree_tolerance
 
@@ -136,11 +140,11 @@ class Search:
         return trees, trees_kNNs, trees_kNNs_sizes
     
     def gauss_sample_ctrl(self, parent_node: MultiSearchNode, sample_count: int=1,
-                          std_perc: float=0.25) -> np.ndarray:
+                          std_perc: float=0.2) -> np.ndarray:
         # Maybe try sampling over spline waypoints? (technically right now we have a spline with two waypoints)
         # TODO: Consider issue with infinetly growing delta when using warm start
         mean = parent_node.delta_q if self.warm_start else np.zeros_like(parent_node.delta_q)
-        if self.stepsize > 0.:
+        if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
             std_devs = self.stepsize
         else:
             std_devs = np.abs(self.ctrl_ranges[:, 0] - self.ctrl_ranges[:, 1]) * std_perc
@@ -148,7 +152,7 @@ class Search:
         delta = noise * std_devs + mean
         
         sample = delta + parent_node.state[3]
-        # Should maybe do ctrl_range checking here
+        sample = np.clip(sample, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])  # Might be slow...
         return sample
             
     def random_sample_ctrls(self, parent_node: MultiSearchNode, target: np.ndarray

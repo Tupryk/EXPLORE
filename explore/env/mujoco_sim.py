@@ -72,6 +72,7 @@ class MjSim:
             prev_ctrl = self.data.ctrl[:]
 
         frames = []
+        states = []
         if not self.interpolate and not (ctrl_target is None):
             self.data.ctrl[:] = ctrl_target
         
@@ -89,9 +90,10 @@ class MjSim:
                     time.sleep(tau_action/steps)
                 if not (self.renderer is None) and self.data.time >= self.next_frame_time:
                     frames.append(self.renderImg(view))
+                    states.append(np.copy(self.data.qpos))
                     self.next_frame_time = self.next_frame_time + self.frame_dt
         
-        return frames
+        return frames, states
 
     def getState(self):
         state = (

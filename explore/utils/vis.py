@@ -13,8 +13,8 @@ def AdjMap(costs: np.ndarray, min_value: float=0.0, max_value: float=0.1, save_a
 
     im = ax.imshow(costs, cmap="Blues", interpolation="nearest", vmin=min_value, vmax=max_value)
 
-    green_cmap = ListedColormap(["red"])
-    overlay = ax.imshow(np.full_like(costs, np.nan), cmap=green_cmap, interpolation="nearest", alpha=0.6)
+    cmap = ListedColormap(["red"])
+    overlay = ax.imshow(np.full_like(costs, np.nan), cmap=cmap, interpolation="nearest", alpha=0.6)
     im.set_data(costs)
     mask = costs < min_value
     overlay.set_data(np.where(mask, 1, np.nan))
@@ -35,7 +35,10 @@ def play_path(path: list[dict], sim: MjSim,
               playback_time: float=1., tau_action: float=.1, save_intro_as: str="",
               camera: str="", save_as: str="path.gif", reset_state: bool=False) -> list[np.ndarray]:
     
-    play_path = path.copy()
+    if isinstance(path[0], dict):
+        play_path = [node["state"] for node in path]
+    else:
+        play_path = path.copy()
     
     print(f"Playing path with length {len(play_path)}")
     sim.setupRenderer(camera=camera)
@@ -46,7 +49,7 @@ def play_path(path: list[dict], sim: MjSim,
         im_start = sim.renderImg()
         sim.pushConfig(target_state)
         im_end = sim.renderImg()
-        sim.pushConfig(play_path[-1]["state"][1])
+        sim.pushConfig(play_path[-1][1])
         im_reached = sim.renderImg()
         
         fig, axes = plt.subplots(1, 3, figsize=(30, 20))
@@ -67,18 +70,20 @@ def play_path(path: list[dict], sim: MjSim,
             plt.savefig(save_intro_as)
 
     frames = []
+    states = []
 
-    sim.setState(*play_path[0]["state"])
+    sim.setState(*play_path[0])
 
     prev_node = play_path[0]
     for node in play_path[1:]:
         
         if reset_state:
-            sim.setState(*prev_node["state"])
+            sim.setState(*prev_node)
 
-        q_target = node["state"][3]
-        f = sim.step(tau_action, q_target, view=camera)
+        q_target = node[3]
+        f, s = sim.step(tau_action, q_target, view=camera)
         frames.extend(f)
+        states.extend(s)
         prev_node = node
 
     if sim.viewer != None:
@@ -86,4 +91,4 @@ def play_path(path: list[dict], sim: MjSim,
     if save_as:
         imageio.mimsave(save_as, frames, fps=24 * playback_time, loop=0)
     
-    return frames
+    return frames, states

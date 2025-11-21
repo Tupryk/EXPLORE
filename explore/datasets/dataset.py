@@ -4,25 +4,33 @@ import numpy as np
 from omegaconf import OmegaConf
 from torch.utils.data import Dataset
 
-from explore.datasets.utils import load_trees, generate_adj_map, get_feasible_paths, build_path
+from explore.datasets.utils import load_trees, get_diverse_paths
 
+
+class Normalizer:
+    def __init__(self, data: torch.Tensor):
+        self.mins, _ = data.min(dim=0)
+        self.maxs, _ = data.max(dim=0)
+        self.range = self.maxs - self.mins
+
+        self.range[self.range == 0] = 1.0
+
+    def normalize(self, x: torch.Tensor) -> torch.Tensor:
+        return (x - self.mins) / self.range
+
+    def de_normalize(self, x: torch.Tensor) -> torch.Tensor:
+        return x * self.range + self.mins
 
 class ExploreDataset(Dataset):
     def __init__(self,
                  data_dir: str,
                  horizon: int=1,
                  history: int=0,
-                 state_sigma: float=.0,
-                 goal_condition: bool=True,
-                 flatten_data: bool=True,
                  verbose: int=0):
         
         # TODO: Vision based
         self.horizon = horizon
         self.history = history
-        self.flatten_data = flatten_data
-        self.state_sigma = state_sigma
-        self.goal_condition = goal_condition
         self.verbose = verbose
         
         config_path = os.path.join(data_dir, ".hydra/config.yaml")
@@ -32,12 +40,11 @@ class ExploreDataset(Dataset):
         self.trees, _, _ = load_trees(tree_dataset)
         
         self.q_mask = np.array(dataset_cfg.RRT.q_mask)
-        min_costs, top_nodes = generate_adj_map(self.trees, self.q_mask, check_cached=data_dir)
-        self.traj_pairs, self.traj_end_nodes, _ = get_feasible_paths(min_costs, top_nodes,
-            dataset_cfg.RRT.start_idx, dataset_cfg.RRT.end_idx, dataset_cfg.RRT.min_cost)
+        self.paths, self.traj_pairs = get_diverse_paths(
+            self.trees, dataset_cfg.RRT.min_cost, self.q_mask, dataset_cfg.RRT.diff_thresh, data_dir)
         
         if not len(self.traj_pairs):
-                raise Exception(f"No feasible trajectories in dataset '{data_dir}'!")
+            raise Exception(f"No feasible trajectories in dataset '{data_dir}'!")
         
         self.q_mask = torch.tensor(dataset_cfg.RRT.q_mask)
     
@@ -45,71 +52,72 @@ class ExploreDataset(Dataset):
         self.episode_idxs = []
         self.goal_states = []
 
-        self.paths = []
+        self.states = []
+        self.actions = []
         for i, (start_idx, end_idx) in enumerate(self.traj_pairs):
             
-            path = build_path(self.trees[start_idx], self.traj_end_nodes[i])
-            self.paths.append(path)
+            path = self.paths[i]
+            path_states = []
+            path_actions = []
+            for node in path:
+                state = node[1].tolist()  # Pos
+                state.extend(node[2].tolist())  # Vel
+                path_states.append(state)
+                path_actions.append(node[3].tolist())
+                
+            path_states = torch.tensor(path_states, dtype=torch.float).unsqueeze(1)
+            path_actions = torch.tensor(path_actions, dtype=torch.float).unsqueeze(1)
+            self.states.append(path_states)
+            self.actions.append(path_actions)
             
             traj_len = len(path)
             self.episode_lengths.append(traj_len)
             self.episode_idxs.extend([i for _ in range(traj_len)])
-            self.goal_states.append(torch.tensor(self.trees[end_idx][0]["state"][1]))
+            goal = torch.tensor(self.trees[end_idx][0]["state"][1], dtype=torch.float) * self.q_mask
+            self.goal_states.append(goal)
+            
+        # TODO: Change tau_action
             
         if self.verbose > 0:
             print(f"Total episodes: {len(self.traj_pairs)}.")
             print(f"Avg. length: {sum(self.episode_lengths)/len(self.episode_lengths)} timesteps")
             print(f"Total timesteps: {len(self.episode_idxs)}")
+            print(f"Action shape: {self.actions[0][0].shape[1]}")
+            print(f"State shape: {self.states[0][0].shape[1]}")
+            
+        # self.action_normalizer = Normalizer()
+        # self.satte_normalizer = Normalizer()
         
         assert len(self.episode_idxs) == sum(self.episode_lengths)
 
     def __len__(self):
         return sum(self.episode_lengths)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
         episode_idx = self.episode_idxs[idx]
-        episode_data = self.paths[episode_idx]
+        episode_actions = self.actions[episode_idx]
+        episode_states = self.states[episode_idx]
+        episode_len = self.episode_lengths[episode_idx]
         timestep = idx - sum(self.episode_lengths[:episode_idx])
         
-        # TODO: use_vel
-        state = torch.tensor(episode_data[timestep]["state"][1])
-            
+        state = episode_states[timestep]
+        
         for i in range(1, self.history+1):
             idx = timestep-i
             if idx < 0:
                 idx = 0
-            old_state = torch.tensor(episode_data[idx]["state"][1])
-            state = torch.cat((old_state, state), dim=0)
+            state = torch.cat((episode_states[idx], state), dim=0)
         
-        state += torch.randn_like(state) * self.state_sigma
-
-        if self.goal_condition:
-            state = torch.cat((self.goal_states[episode_idx], state), dim=0)
-
-        if timestep+1 < len(episode_data):
-            # TODO: delta_q?
-            action = episode_data[timestep+1]["delta_q"]
-            action = torch.tensor(action).squeeze(0)
-            action = action.unsqueeze(0)
-        else:
-            action = torch.zeros((1, episode_data[1]["delta_q"].shape[-1]))
+        action = episode_actions[timestep+1] if timestep+1 < episode_len else episode_actions[-1]
 
         for i in range(1, self.horizon):
             idx = timestep+1+i
-            if idx < len(episode_data):
-                new_action = episode_data[idx]["delta_q"]
-                new_action = torch.tensor(new_action).squeeze(0)
-                new_action = new_action.unsqueeze(0)
-            else:
-                new_action = torch.zeros((1, action.shape[-1]))
+            if idx >= episode_len:
+                idx = -1
+            action = torch.cat((action, episode_actions[idx]), dim=0)
 
-            action = torch.cat((action, new_action), dim=0)
-        
-        if self.flatten_data:
-            state = state.flatten().float()
-            action = action.flatten().float()
-        return state, action
+        return action, state, self.goal_states[episode_idx]
 
     def play_episode(self, idx: int):
         # TODO

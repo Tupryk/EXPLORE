@@ -6,7 +6,7 @@ from explore.datasets.generator import Search
 
 
 @hydra.main(version_base="1.3",
-            config_path="../configs",
+            config_path="../configs/yaml",
             config_name="trajectory_generation")
 def main(cfg: DictConfig):
     

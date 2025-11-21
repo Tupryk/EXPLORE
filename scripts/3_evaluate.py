@@ -10,7 +10,7 @@ from explore.utils.logger import get_logger
 from explore.env.stable_configs_env import StableConfigsEnv
 
 
-@hydra.main(version_base="1.3", config_path="../configs", config_name="eval_policy")
+@hydra.main(version_base="1.3", config_path="../configs/yaml", config_name="eval_policy")
 def main(cfg: DictConfig):
     logger = get_logger(cfg)
     logger.info("Starting evaluation...")
@@ -71,7 +71,7 @@ def main(cfg: DictConfig):
         axes[2].set_title("Reached Config", fontsize=24, fontweight="bold")
         axes[2].imshow(im_reached)
         axes[2].axis("off")
-        plt.tight_layout()    
+        plt.tight_layout()
         plt.savefig(os.path.join(cfg.output_dir, f"intro{i}.png"))
         
         # TODO: Save full guiding path gif

@@ -10,21 +10,21 @@ env:
   stepsize: 0.04
   max_steps: 125
   actions_noise_sigma: 0.001
-  use_vel: True
-  guiding: True
+  use_vel: true
+  guiding: true
   guiding_prob: 1.
   start_config_idx: -1
   target_config_idx: -1
-  goal_conditioning: True
-  use_vision: False
+  goal_conditioning: true
+  use_vision: false
   camera_filter: "balls_mask"
   verbose: 1
   sim:
     tau_sim: 0.001
     tau_action: 0.1
-    interpolate_actions: True
+    interpolate_actions: true
     joints_are_same_as_ctrl: true
-    mujoco_xml: "configs/fingerRamp.xml"
+    mujoco_xml: "configs/mujoco_/fingerRamp.xml"
     camera: wrist_cam
-  trajectory_data_path: "data/fingerRamp_full"
-  stable_configs_path: "configs/fingerRamp_onRamp.h5"
+  trajectory_data_path: "data/fingerRamp_full"  # TODO: either make this optionam or remove stable_configs_path and mujoco_xml or idk.
+  stable_configs_path: "configs/stable/fingerRamp_onRamp.h5"

@@ -7,8 +7,8 @@ from explore.utils.vis import AdjMap
 # h5_file = "configs/pandasTable_ball.h5"
 # txt_file = "data/joint_states_fingerBox.txt"
 # h5_file = "configs/fingerBox.h5"
-txt_file = "data/joint_states_fingerRamp_onRamp.txt"
-h5_file = "configs/fingerRamp_onRamp.h5"
+txt_file = "data/grasp_configs.txt"
+h5_file = "configs/grasp_configs.h5"
 
 # SAME_THRESH = 0.07
 SAME_THRESH = 0.05
@@ -18,24 +18,24 @@ data = np.loadtxt(txt_file, dtype=np.float64)
 new_data_pos = []
 new_data_ctrl = []
 for i, vec in enumerate(data):
-    # state_vec = np.zeros(25)
+    state_vec = np.zeros(25)
     
-    # state_vec[:8] = vec[:8]
-    # state_vec[8] = vec[7]
-    # state_vec[9:17] = vec[8:16]
-    # state_vec[17] = vec[15]
+    state_vec[:8] = vec[:8]
+    state_vec[8] = vec[7]
+    state_vec[9:17] = vec[8:16]
+    state_vec[17] = vec[15]
     
-    # state_vec[18:21] = vec[16:]
-    # state_vec[21] = 1
+    state_vec[18:21] = vec[16:]
+    state_vec[21] = 1
     
-    # ctrl_vec = np.zeros(16)
-    # ctrl_vec[:8] = state_vec[:8]
-    # ctrl_vec[8:16] = state_vec[9:17]
-    # ctrl_vec[7] *= 255/0.04
-    # ctrl_vec[15] *= 255/0.04
+    ctrl_vec = np.zeros(16)
+    ctrl_vec[:8] = state_vec[:8]
+    ctrl_vec[8:16] = state_vec[9:17]
+    ctrl_vec[7] *= 255/0.04
+    ctrl_vec[15] *= 255/0.04
 
-    state_vec = vec
-    ctrl_vec = vec[:3]
+    # state_vec = vec
+    # ctrl_vec = vec[:3]
     
     new_data_pos.append(state_vec)
     new_data_ctrl.append(ctrl_vec)

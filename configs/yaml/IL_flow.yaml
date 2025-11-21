@@ -1,0 +1,54 @@
+data_dir: "data/fingerRamp_exp"
+batch_size: 256
+epochs: 8000
+trainer:
+  checkpoint_every: 1
+  lr: 3e-4
+  device: "cpu"
+  output_dir: ${hydra:runtime.output_dir}
+policy:
+  horizon: 8
+  history: 7
+  model_type: "transformer"
+  effective_horizon: 4
+  denoising_steps: 32
+  # network:  # Unet
+  #   t_embed: 16
+  #   down_dims: [32, 64, 128]
+  #   kernel_size: 3
+  #   n_groups: 8
+  #   verbose: 1
+  network:  # Transformer
+    n_layer: 4
+    n_head: 4
+    emb_dim: 128
+    p_drop_emb: 0.1
+    p_drop_attn: 0.1
+    causal_attn: false
+    obs_as_cond: false
+    n_cond_layers: 0
+    verbose: 1
+
+env:
+  time_scaling: 1.0
+  stepsize: 0.04
+  max_steps: 125
+  actions_noise_sigma: 0.001
+  use_vel: true
+  guiding: true
+  guiding_prob: 1.
+  start_config_idx: -1
+  target_config_idx: -1
+  goal_conditioning: true
+  use_vision: false
+  camera_filter: "balls_mask"
+  verbose: 1
+  sim:
+    tau_sim: 0.001
+    tau_action: 0.1
+    interpolate_actions: true
+    joints_are_same_as_ctrl: true
+    mujoco_xml: "configs/mujoco_/fingerRamp.xml"
+    camera: wrist_cam
+  trajectory_data_path: "data/fingerRamp_exp"  # TODO: either make this optionam or remove stable_configs_path and mujoco_xml or idk.
+  stable_configs_path: "configs/stable/fingerRamp_onRamp.h5"

@@ -13,7 +13,7 @@ from explore.datasets.utils import load_trees, generate_adj_map
 
 
 @hydra.main(version_base="1.3",
-            config_path="../configs",
+            config_path="../configs/yaml",
             config_name="postprocessing")
 def main(cfg: DictConfig):
 

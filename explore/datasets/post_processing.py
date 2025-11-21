@@ -2,12 +2,13 @@ from tqdm import tqdm
 from explore.datasets.utils import build_path
 
 
-def extract_all_paths(trees: list[list[dict]],
-                      min_costs: list[list[float]],
-                      top_nodes: list[list[int]],
-                      error_thresh: float,
-                      horizon: int=4
-                      ) -> tuple[list[tuple[int, int]], list[list[dict]], list[list[int]], list[list[int]]]:
+def extract_all_paths(
+    trees: list[list[dict]],
+    min_costs: list[list[float]],
+    top_nodes: list[list[int]],
+    error_thresh: float,
+    horizon: int=4
+    ) -> tuple[list[tuple[int, int]], list[list[dict]], list[list[int]], list[list[int]]]:
 
     assert horizon >= 1  # How many nodes into the past get optimized for a connection
     tree_count = len(trees)
@@ -43,6 +44,8 @@ def extract_all_paths(trees: list[list[dict]],
                 if start_idx == end_idx: continue
 
                 # TODO: Once a path is found the algo will not try to find a shorter path. Fix this.
+                # Also, play with diversity in the whole path glueing thing. Doesn't matter if a path between two configs was found.
+                # This also means looking at all paths when connecting nodes, and not just the best connections.
                 if not (end_idx in connections[start_idx]):
                     
                     # Check if the configs which are connected to our starting config have connections to the target config

@@ -61,6 +61,7 @@ class StableConfigsEnv(gym.Env):
             tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
             self.trees, _, _ = load_trees(tree_dataset)
             
+            # TODO: Maybe use ExploreDataset class here instead?
             path_dataset_dir = os.path.join(cfg.trajectory_data_path, "processed/paths_data.pkl")
             with open(path_dataset_dir, "rb") as f:
                 self.traj_pairs, paths_pre = pickle.load(f)
@@ -253,7 +254,7 @@ class StableConfigsEnv(gym.Env):
             e = (eval_state - self.target_state) * self.q_mask
             
             goal_reward = -1.0 * (e.T @ e)
-            goal_reward = np.max((goal_reward, -5.0))
+            goal_reward = np.max((goal_reward, -0.2))
         
         guiding_reward = 0.0
         if self.currently_guiding and not self.unknown_path and node_idx < len(self.guiding_path):
@@ -262,9 +263,9 @@ class StableConfigsEnv(gym.Env):
 
             e = (eval_state - guiding_step) * self.q_mask
             guiding_reward = -1.0 * (e.T @ e)
-            guiding_reward = np.max((guiding_reward, -5.0))
+            guiding_reward = np.max((guiding_reward, -0.2))
 
-        self.reward = goal_reward * 1.0 + guiding_reward * 0.1
+        self.reward = goal_reward * 0.65 + guiding_reward * 0.35
 
         truncated = self.iter >= self.max_steps
         terminated = truncated

@@ -1,43 +1,48 @@
 import os
 import torch
 import logging
+from tqdm import tqdm
 import torch.nn as nn
+import gymnasium as gym
 import torch.optim as optim
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
+
+from explore.env.utils import eval_il_policy
 
 
 class IL_Trainer:
     def __init__(
-        self, model: nn.Module, dataloader: DataLoader,
+        self, policy: nn.Module, dataloader: DataLoader,
         cfg: DictConfig, logger: logging.Logger
     ):
-        self.model = model.to(device)
+        self.device = cfg.device
+        self.checkpoint_every = cfg.checkpoint_every
+        self.policy = policy.to(self.device)
         self.dataloader = dataloader
-        self.device = device
         self.criterion = nn.MSELoss()   # Example: behavior cloning on continuous actions
-        self.optimizer = optim.Adam(model.parameters(), lr=lr)
+        self.optimizer = optim.AdamW(policy.parameters(), lr=cfg.lr)
+        log_dir = os.path.join(cfg.output_dir, "training_logs")
         self.writer = SummaryWriter(log_dir=log_dir)
-        self.save_path = save_path
 
         # Make sure checkpoint directory exists
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        self.checkpoint_path = os.path.join(cfg.output_dir, "checkpoints")
+        os.makedirs(os.path.dirname(self.checkpoint_path), exist_ok=True)
 
-    def train(self, epochs: int = 10, log_interval: int = 100):
+    def train(self, epochs: int = 10, log_interval: int = 100, env: gym.Env=None):
+        
         global_step = 0
 
         for epoch in range(1, epochs + 1):
-            self.model.train()
+            self.policy.train()
             epoch_loss = 0.0
 
             pbar = tqdm(self.dataloader, desc=f"Epoch {epoch}/{epochs}", leave=False)
-            for batch_idx, (obs, actions) in enumerate(pbar):
-                obs, actions = obs.to(self.device), actions.to(self.device)
+            for batch_idx, (actions, obs, goal_cond) in enumerate(pbar):
+                actions, obs, goal_cond = actions.to(self.device), obs.to(self.device), goal_cond.to(self.device)
 
-                # Forward (includes loss computation)
-                output = self.model(obs, actions)
+                output = self.policy(obs, goal_cond, actions)
                 loss = output["loss"]
 
                 self.optimizer.zero_grad()
@@ -53,8 +58,18 @@ class IL_Trainer:
             self.writer.add_scalar("Loss/epoch_avg", avg_loss, epoch)
             tqdm.write(f"[Epoch {epoch}] Avg Loss: {avg_loss:.6f}")
 
-            torch.save(self.model.state_dict(), self.save_path)
+            # Evaluate in sim and save checkpoint
+            if epoch % self.checkpoint_every == 0 or epoch == epochs:
+
+                name = f"final_policy_epoch_{epoch}" if epoch == epochs else f"epoch_{epoch}"
+                ckpt_path = os.path.join(self.checkpoint_path, name)
+                os.makedirs(ckpt_path, exist_ok=True)
+                
+                torch.save(self.policy.state_dict(), os.path.join(ckpt_path, "model"))
+                if env != None:
+                    eval_il_policy(self.policy, env, save_path=ckpt_path,
+                                   eval_count=8, history=self.policy.history, horizon=self.policy.horizon)
 
         self.writer.close()
-        print(f"Training complete. Model saved to {self.save_path}")
+        print(f"Training complete. Model saved to {self.checkpoint_path}")
         
