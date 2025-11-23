@@ -36,39 +36,33 @@ class FlowPolicy(nn.Module):
 
     def forward(self, obs, goal_cond=None, actions=None):
 
+        batch_size = obs.shape[0]
+        if goal_cond is not None:
+            goal_expanded = goal_cond.unsqueeze(1).expand(-1, obs.size(1), -1)
+            obs = torch.cat([obs, goal_expanded], axis=-1)
+        
         if actions is not None:
-            batch_size = obs.shape[0]
             
             sample = torch.randn_like(actions).to(self.device)
             timesteps = torch.rand((batch_size, 1, 1)).to(self.device)
             ones = torch.ones_like(timesteps).to(self.device)
             noised = sample * (ones - timesteps) + actions * timesteps
             
-            # pred_noise = self.net(noised, timesteps, obs, goal_cond)
-            if goal_cond is not None:
-                goal_expanded = goal_cond.unsqueeze(1).expand(-1, obs.size(1), -1)
-                obs = torch.cat([obs, goal_expanded], axis=-1)
-            
             pred_noise = self.net(noised, timesteps.flatten(), obs)
-            pred_actions = sample - pred_noise
             true_path = actions - sample
             
             loss = F.mse_loss(pred_noise, true_path)
-            return {"loss": loss, "pred": pred_actions}
+            return {"loss": loss}
         
         else:
-            batch_size = obs.shape[0]
+            
+            delta = 1.0 / self.denoising_steps
             x = torch.randn((batch_size, self.horizon, self.action_dim)).to(self.device)
-            
-            if goal_cond is not None:
-                goal_expanded = goal_cond.unsqueeze(1).expand(-1, obs.size(1), -1)
-                obs = torch.cat([obs, goal_expanded], axis=-1)
-            
             ts = torch.linspace(0.0, 1.0, self.denoising_steps)
             for t in ts:
                 timesteps = torch.full((batch_size,), t).to(self.device)
                 pred_noise = self.net(x, timesteps, obs)
-                x = x - (pred_noise / self.denoising_steps)
+                x += pred_noise * delta
             
             denoised_actions = x[:, :self.effective_horizon, :]
             return {"pred": denoised_actions}

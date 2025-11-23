@@ -69,6 +69,7 @@ def eval_il_policy(policy : nn.Module, env: gym.Env, history: int=1, horizon: in
             axes[2].axis("off")
             plt.tight_layout()
             plt.savefig(os.path.join(save_path, f"intro{i}.png"))
-        
+            plt.close('all')
+
     return all_rewards
     

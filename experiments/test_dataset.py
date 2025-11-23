@@ -1,15 +1,18 @@
+import os
+from omegaconf import OmegaConf
+
 from explore.datasets.dataset import ExploreDataset
 
 
-dataset = ExploreDataset("data/fingerRamp_full", horizon=4, history=2, goal_condition=True, verbose=1)
+cfg = OmegaConf.load("./configs/yaml/IL_flow.yaml")
+dataset = ExploreDataset(cfg.data_dir, cfg.policy.horizon, cfg.policy.history)
 
 dataset_len = len(dataset)
+print("Dataset size: ", dataset_len)
 
 for i in range(dataset_len):
-    dataset[i]
-    
-action, state, goal_cond = dataset[7]
+    action, state, goal_cond = dataset[i]
 
-print("Dataset size: ", dataset_len)
-print("State: ", state)
-print("Action: ", action)
+    print(f"---------------- {i} ----------------")
+    print("State:\n", state)
+    print("Action:\n", action)

@@ -4,13 +4,13 @@ epochs: 8000
 device: "mps"
 trainer:
   lr: 3e-4
-  checkpoint_every: 10
+  checkpoint_every: 100
   sim_eval_count: 8
   output_dir: ${hydra:runtime.output_dir}
 policy:
-  horizon: 4
-  history: 2
-  effective_horizon: 2
+  horizon: 8
+  history: 4
+  effective_horizon: 4
   denoising_steps: 32
   model_type: "transformer"
   # network:  # Unet
