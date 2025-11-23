@@ -121,8 +121,8 @@ def get_diverse_paths(
     error_thresh: float,
     q_mask: np.ndarray,
     diff_thresh: float,
-    min_len: int=1,
-    cached_folder: str=""
+    cached_folder: str="",
+    min_len: int=1
     ) -> tuple[list[list[dict]], list[tuple[int, int]]]:
     
     # TODO: There is probably a more efficient way to do this
@@ -148,7 +148,7 @@ def get_diverse_paths(
     path_counts = []
     end_nodes = []
 
-    print("Collecting nodes that arrive at a stable configuration...")
+    # print("Collecting nodes that arrive at a stable configuration...")
     for i in tqdm(range(tree_count)):
 
         tree_path_count = [0 for _ in range(tree_count)]

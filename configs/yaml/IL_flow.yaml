@@ -1,17 +1,18 @@
 data_dir: "data/fingerRamp_exp"
-batch_size: 256
+batch_size: 512
 epochs: 8000
+device: "mps"
 trainer:
-  checkpoint_every: 1
   lr: 3e-4
-  device: "cpu"
+  checkpoint_every: 10
+  sim_eval_count: 8
   output_dir: ${hydra:runtime.output_dir}
 policy:
-  horizon: 8
-  history: 7
-  model_type: "transformer"
-  effective_horizon: 4
+  horizon: 4
+  history: 2
+  effective_horizon: 2
   denoising_steps: 32
+  model_type: "transformer"
   # network:  # Unet
   #   t_embed: 16
   #   down_dims: [32, 64, 128]
@@ -19,13 +20,13 @@ policy:
   #   n_groups: 8
   #   verbose: 1
   network:  # Transformer
-    n_layer: 4
+    n_layer: 8
     n_head: 4
-    emb_dim: 128
-    p_drop_emb: 0.1
+    emb_dim: 256
+    p_drop_emb: 0.0
     p_drop_attn: 0.1
-    causal_attn: false
-    obs_as_cond: false
+    causal_attn: true
+    obs_as_cond: true
     n_cond_layers: 0
     verbose: 1
 
@@ -34,7 +35,7 @@ env:
   stepsize: 0.04
   max_steps: 125
   actions_noise_sigma: 0.001
-  use_vel: true
+  use_vel: false
   guiding: true
   guiding_prob: 1.
   start_config_idx: -1

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 def eval_il_policy(policy : nn.Module, env: gym.Env, history: int=1, horizon: int=1,
                    save_path: str="", eval_count: int=1) -> list[float]:
 
+    policy.eval()
     all_rewards = []
     for i in range(eval_count):
         
@@ -18,22 +19,33 @@ def eval_il_policy(policy : nn.Module, env: gym.Env, history: int=1, horizon: in
         imgs = []
         done = False
         obs = torch.from_numpy(new_obs)
-        obs = obs.expand(1, 8, obs.shape[0])
+        obs = obs.expand(1, history, obs.shape[0])
         
         episode_rewards = []
         while not done:
+            
             new_obs = torch.from_numpy(new_obs)
-            obs = obs[:, :history-1, :]
-            print(obs.shape)
-            print(new_obs.shape)
-            obs = torch.concat([obs, new_obs], axis=1)
-            action, _ = policy(obs)["pred"]
-            obs, reward, terminated, truncated, info = env.step(action)
-            frames = info["frames"]
-            imgs.extend(frames)
-            done = terminated or truncated
-            print(f"Iter: {env.iter}; Reward: {env.reward:.4f} (Goal Reward: {info['goal_reward']:.4f} Guiding Reward: {info['guiding_reward']:.4f})")
-            episode_rewards.append(reward)
+            history = obs.shape[1]
+            shifted = obs.clone()
+            shifted[:, :history-1, :] = obs[:, 1:, :]
+            shifted[:, -1, :] = new_obs
+            obs = shifted.float()
+
+            obs_in = obs[:, :, :-policy.cond_dim].clone()
+            goal_cond = obs[:, 0, -policy.cond_dim:].clone()
+
+            actions = policy(obs_in.to(policy.device), goal_cond.to(policy.device))["pred"]
+            actions = actions.detach().cpu().numpy()[0]
+            
+            for a in actions:
+                new_obs, reward, terminated, truncated, info = env.step(a)
+                
+                frames = info["frames"]
+                imgs.extend(frames)
+                done = terminated or truncated
+                episode_rewards.append(reward)
+                
+                print(f"Iter: {env.iter}; Reward: {env.reward:.4f} (Goal Reward: {info['goal_reward']:.4f} Guiding Reward: {info['guiding_reward']:.4f})")
         
         all_rewards.append(episode_rewards)
 

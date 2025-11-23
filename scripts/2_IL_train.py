@@ -25,10 +25,10 @@ def main(cfg: DictConfig):
     obs_dim = obs.shape[-1]
     cond_dim = cond.shape[-1]
     
-    policy = FlowPolicy(obs_dim, action_dim, cond_dim, cfg.policy)
+    policy = FlowPolicy(obs_dim, action_dim, cond_dim, cfg.policy, cfg.device)
     env = StableConfigsEnv(cfg.env)
 
-    trainer = IL_Trainer(policy, loader, cfg.trainer, logger)
+    trainer = IL_Trainer(policy, loader, cfg.trainer, logger, cfg.device)
     trainer.train(epochs=cfg.epochs, env=env)
 
 if __name__ == "__main__":

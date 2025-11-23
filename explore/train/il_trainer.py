@@ -14,11 +14,16 @@ from explore.env.utils import eval_il_policy
 
 class IL_Trainer:
     def __init__(
-        self, policy: nn.Module, dataloader: DataLoader,
-        cfg: DictConfig, logger: logging.Logger
+        self,
+        policy: nn.Module,
+        dataloader: DataLoader,
+        cfg: DictConfig,
+        logger: logging.Logger,
+        device: str="cpu"
     ):
-        self.device = cfg.device
+        self.device = device
         self.checkpoint_every = cfg.checkpoint_every
+        self.sim_eval_count = cfg.sim_eval_count
         self.policy = policy.to(self.device)
         self.dataloader = dataloader
         self.criterion = nn.MSELoss()   # Example: behavior cloning on continuous actions
@@ -41,7 +46,6 @@ class IL_Trainer:
             pbar = tqdm(self.dataloader, desc=f"Epoch {epoch}/{epochs}", leave=False)
             for batch_idx, (actions, obs, goal_cond) in enumerate(pbar):
                 actions, obs, goal_cond = actions.to(self.device), obs.to(self.device), goal_cond.to(self.device)
-
                 output = self.policy(obs, goal_cond, actions)
                 loss = output["loss"]
 
@@ -58,17 +62,21 @@ class IL_Trainer:
             self.writer.add_scalar("Loss/epoch_avg", avg_loss, epoch)
             tqdm.write(f"[Epoch {epoch}] Avg Loss: {avg_loss:.6f}")
 
-            # Evaluate in sim and save checkpoint
             if epoch % self.checkpoint_every == 0 or epoch == epochs:
-
+                
+                # Save checkpoint
                 name = f"final_policy_epoch_{epoch}" if epoch == epochs else f"epoch_{epoch}"
                 ckpt_path = os.path.join(self.checkpoint_path, name)
                 os.makedirs(ckpt_path, exist_ok=True)
-                
                 torch.save(self.policy.state_dict(), os.path.join(ckpt_path, "model"))
+                
+                # Eval in sim
+                self.policy.eval()
+                env_evals_path = os.path.join(ckpt_path, "env_evals")
+                os.makedirs(env_evals_path, exist_ok=True)
                 if env != None:
-                    eval_il_policy(self.policy, env, save_path=ckpt_path,
-                                   eval_count=8, history=self.policy.history, horizon=self.policy.horizon)
+                    eval_il_policy(self.policy, env, save_path=env_evals_path,
+                                   eval_count=self.sim_eval_count, history=self.policy.history, horizon=self.policy.horizon)
 
         self.writer.close()
         print(f"Training complete. Model saved to {self.checkpoint_path}")

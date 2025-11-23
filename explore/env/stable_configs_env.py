@@ -33,7 +33,7 @@ class StableConfigsEnv(gym.Env):
         self.reward = None
         
         self.use_vision = cfg.use_vision
-        assert (self.use_vision and not self.use_vel) or (not self.use_vision and self.use_vel)
+        assert (self.use_vision and not self.use_vel) or (not self.use_vision)
 
         # Setup sim
         self.start_config_idx = cfg.start_config_idx
@@ -129,7 +129,7 @@ class StableConfigsEnv(gym.Env):
             prio = qpos[:self.ctrl_dim]
 
             if self.goal_conditioning:
-                prio = np.concatenate((prio, self.target_state[:self.state_dim]))
+                prio = np.concatenate((prio, self.target_state))
             
             if not self.camera_filter or self.camera_filter == "none":
                 pass
@@ -151,7 +151,7 @@ class StableConfigsEnv(gym.Env):
                 self.state = np.concatenate((self.state, qvel))
             
             if self.goal_conditioning:
-                self.state = np.concatenate((self.state, self.target_state[:self.state_dim]))
+                self.state = np.concatenate((self.state, self.target_state))
 
         self.last_time = time_
         self.last_ctrl = ctrl
@@ -201,8 +201,6 @@ class StableConfigsEnv(gym.Env):
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
         
         self.target_state = self.stable_configs["qpos"][e_cfg_idx]
-        # if self.use_vel:
-        #     self.target_state = np.concatenate((self.target_state, np.zeros_like(self.sim.data.qvel)))
         
         # Reset simulation state
         self.sim.pushConfig(
@@ -240,7 +238,7 @@ class StableConfigsEnv(gym.Env):
         if self.stepsize != -1:
             action += self.last_ctrl
         
-        frames = self.sim.step(self.tau_action, action, view=self.eval_view)
+        frames, _ = self.sim.step(self.tau_action, action, view=self.eval_view)
         self.getState()
         self.iter += 1
 

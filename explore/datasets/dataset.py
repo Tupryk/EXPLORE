@@ -25,7 +25,7 @@ class ExploreDataset(Dataset):
     def __init__(self,
                  data_dir: str,
                  horizon: int=1,
-                 history: int=0,
+                 history: int=1,
                  verbose: int=0):
         
         # TODO: Vision based
@@ -41,7 +41,7 @@ class ExploreDataset(Dataset):
         
         self.q_mask = np.array(dataset_cfg.RRT.q_mask)
         self.paths, self.traj_pairs = get_diverse_paths(
-            self.trees, dataset_cfg.RRT.min_cost, self.q_mask, dataset_cfg.RRT.diff_thresh, data_dir)
+            self.trees, dataset_cfg.RRT.min_cost, self.q_mask, dataset_cfg.RRT.diff_thresh, cached_folder=data_dir)
         
         if not len(self.traj_pairs):
             raise Exception(f"No feasible trajectories in dataset '{data_dir}'!")
@@ -61,7 +61,7 @@ class ExploreDataset(Dataset):
             path_actions = []
             for node in path:
                 state = node[1].tolist()  # Pos
-                state.extend(node[2].tolist())  # Vel
+                # state.extend(node[2].tolist())  # Vel
                 path_states.append(state)
                 path_actions.append(node[3].tolist())
                 
@@ -103,7 +103,7 @@ class ExploreDataset(Dataset):
         
         state = episode_states[timestep]
         
-        for i in range(1, self.history+1):
+        for i in range(1, self.history):
             idx = timestep-i
             if idx < 0:
                 idx = 0
