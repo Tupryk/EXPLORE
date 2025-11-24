@@ -8,9 +8,9 @@ trainer:
   sim_eval_count: 8
   output_dir: ${hydra:runtime.output_dir}
 policy:
-  horizon: 6
+  horizon: 8
   history: 4
-  effective_horizon: 2
+  effective_horizon: 4
   denoising_steps: 32
   model_type: "transformer"
   # network:  # Unet
@@ -32,7 +32,7 @@ policy:
 
 env:
   time_scaling: 1.0
-  stepsize: 0.04
+  stepsize: -1
   max_steps: 125
   actions_noise_sigma: 0.001
   use_vel: false
@@ -46,10 +46,10 @@ env:
   verbose: 1
   sim:
     tau_sim: 0.001
-    tau_action: 0.1
+    tau_action: 0.5
     interpolate_actions: true
     joints_are_same_as_ctrl: true
     mujoco_xml: "configs/mujoco_/fingerRamp.xml"
-    camera: wrist_cam
+    camera: fixed_cam
   trajectory_data_path: "data/fingerRamp_exp"  # TODO: either make this optionam or remove stable_configs_path and mujoco_xml or idk.
   stable_configs_path: "configs/stable/fingerRamp_onRamp.h5"
