@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from explore.env.utils import eval_il_policy
+from explore.train.utils import warmup_cos_scheduler
 
 
 class IL_Trainer:
@@ -35,10 +36,11 @@ class IL_Trainer:
         self.checkpoint_path = os.path.join(cfg.output_dir, "checkpoints")
         os.makedirs(os.path.dirname(self.checkpoint_path), exist_ok=True)
 
-    def train(self, epochs: int = 10, log_interval: int = 100, env: gym.Env=None):
+    def train(self, epochs, log_interval: int=100, env: gym.Env=None):
         
-        global_step = 0
+        scheduler = warmup_cos_scheduler(self.optimizer, epochs, epochs//100)
 
+        global_step = 0
         for epoch in range(1, epochs + 1):
             self.policy.train()
             epoch_loss = 0.0
@@ -52,6 +54,7 @@ class IL_Trainer:
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
+                scheduler.step()
 
                 epoch_loss += loss.item()
                 if batch_idx % log_interval == 0:
@@ -75,9 +78,13 @@ class IL_Trainer:
                 env_evals_path = os.path.join(ckpt_path, "env_evals")
                 os.makedirs(env_evals_path, exist_ok=True)
                 if env != None:
-                    eval_il_policy(self.policy, env, save_path=env_evals_path,
-                                   eval_count=self.sim_eval_count, history=self.policy.history, horizon=self.policy.horizon)
-
+                    eval_il_policy(
+                        self.policy, env,
+                        save_path=env_evals_path,
+                        eval_count=self.sim_eval_count,
+                        history=self.policy.history
+                    )
+            
         self.writer.close()
         print(f"Training complete. Model saved to {self.checkpoint_path}")
         

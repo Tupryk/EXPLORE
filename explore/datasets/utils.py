@@ -9,6 +9,9 @@ class Normalizer:
     def __init__(self, data: torch.Tensor):
         pass
 
+    def to_device(self, device: str):
+        pass
+
     def normalize(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
@@ -22,6 +25,11 @@ class MinMaxNormalizer(Normalizer):
         self.range = self.maxs - self.mins
 
         self.range[self.range == 0] = 1.0
+
+    def to_device(self, device: str):
+        self.mins = self.mins.to(device)
+        self.maxs = self.maxs.to(device)
+        self.range = self.range.to(device)
 
     def normalize(self, x: torch.Tensor) -> torch.Tensor:
         return (x - self.mins) / self.range

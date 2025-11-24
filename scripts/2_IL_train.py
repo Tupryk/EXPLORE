@@ -25,7 +25,15 @@ def main(cfg: DictConfig):
     obs_dim = obs.shape[-1]
     cond_dim = cond.shape[-1]
     
-    policy = FlowPolicy(obs_dim, action_dim, cond_dim, cfg.policy, cfg.device)
+    policy = FlowPolicy(
+        obs_dim,
+        action_dim,
+        cond_dim,
+        cfg.policy,
+        device=cfg.device,
+        action_normalizer=dataset.action_normalizer,
+        state_normalizer=dataset.state_normalizer
+    )
     env = StableConfigsEnv(cfg.env)
 
     trainer = IL_Trainer(policy, loader, cfg.trainer, logger, cfg.device)

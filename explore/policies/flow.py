@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from omegaconf import DictConfig
 
 from explore.models.unet import UNet1D
+from explore.datasets.utils import Normalizer
 from explore.models.transformer import Transformer
 
 
@@ -14,6 +15,8 @@ class FlowPolicy(nn.Module):
         action_dim: int,
         cond_dim: int,
         cfg: DictConfig,
+        state_normalizer: Normalizer=None,
+        action_normalizer: Normalizer=None,
         device: str="cpu"):
         
         super().__init__()
@@ -26,6 +29,10 @@ class FlowPolicy(nn.Module):
         self.horizon = cfg.horizon
         self.denoising_steps = cfg.denoising_steps
         self.effective_horizon = cfg.effective_horizon
+        self.state_normalizer = state_normalizer
+        self.state_normalizer.to_device(device)
+        self.action_normalizer = action_normalizer
+        self.action_normalizer.to_device(device)
         
         if cfg.model_type == "unet":
             self.net = UNet1D(obs_dim, action_dim, cfg.network, cond_dim)
@@ -35,6 +42,14 @@ class FlowPolicy(nn.Module):
             raise Exception(f"Moder type '{cfg.model_type}' not implemented yet!")
 
     def forward(self, obs, goal_cond=None, actions=None):
+
+        if self.action_normalizer is not None and actions is not None:
+            actions = self.action_normalizer.normalize(actions)
+
+        if self.state_normalizer != None:
+            obs = self.state_normalizer.normalize(obs)
+            if goal_cond is not None:
+                goal_cond = self.state_normalizer.normalize(goal_cond)
 
         batch_size = obs.shape[0]
         if goal_cond is not None:
@@ -65,4 +80,6 @@ class FlowPolicy(nn.Module):
                 x += pred_noise * delta
             
             denoised_actions = x[:, :self.effective_horizon, :]
+            if self.action_normalizer is not None:
+                denoised_actions = self.action_normalizer.de_normalize(denoised_actions)
             return {"pred": denoised_actions}

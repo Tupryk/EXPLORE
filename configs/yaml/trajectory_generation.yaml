@@ -1,5 +1,5 @@
 RRT:
-  max_nodes: 2500
+  max_nodes: 1000000
   min_cost: 0.02
   stepsize: [
   # 5.79, 3.53, 5.79, 3.00, 5.79, 3.77, 5.79, 255.00
@@ -12,7 +12,7 @@ RRT:
   sample_uniform: false
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: 1
+  start_idx: -1
   end_idx: -1
   bidirectional: false
   cost_max_method: false

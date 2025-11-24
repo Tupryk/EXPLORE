@@ -53,6 +53,7 @@ class ExploreDataset(Dataset):
                 
             path_states = torch.tensor(path_states, dtype=torch.float).unsqueeze(1)
             path_actions = torch.tensor(path_actions, dtype=torch.float).unsqueeze(1)
+
             self.states.append(path_states)
             self.actions.append(path_actions)
             
@@ -61,9 +62,6 @@ class ExploreDataset(Dataset):
             self.episode_idxs.extend([i for _ in range(traj_len)])
             goal = torch.tensor(self.trees[end_idx][0]["state"][1], dtype=torch.float) * self.q_mask
             self.goal_states.append(goal)
-            
-        self.actions = torch.tensor(self.actions)
-        self.states = torch.tensor(self.states)
             
         # TODO: Change tau_action
             
@@ -75,8 +73,10 @@ class ExploreDataset(Dataset):
             print(f"State shape: {self.states[0][0].shape[1]}")
         
         print("Normalizing dataset...")
-        self.action_normalizer = MinMaxNormalizer(self.actions[:, 0, :])
-        self.state_normalizer = MinMaxNormalizer(self.states[:, 0, :])
+        min_max_states  = torch.cat(self.states, dim=0)
+        min_max_actions = torch.cat(self.actions, dim=0)
+        self.action_normalizer = MinMaxNormalizer(min_max_actions[:, 0, :])
+        self.state_normalizer = MinMaxNormalizer(min_max_states[:, 0, :])
         
         assert len(self.episode_idxs) == sum(self.episode_lengths)
 
@@ -107,8 +107,6 @@ class ExploreDataset(Dataset):
                 idx = -1
             action = torch.cat((action, episode_actions[idx]), dim=0)
 
-        action = self.action_normalizer.normalize(action)
-        state = self.state_normalizer.normalize(state)
         return action, state, self.goal_states[episode_idx]
 
     def play_episode(self, idx: int):
