@@ -20,8 +20,8 @@ class Normalizer:
 
 class MinMaxNormalizer(Normalizer):
     def __init__(self, data: torch.Tensor):
-        self.mins, _ = data.min(dim=0)
-        self.maxs, _ = data.max(dim=0)
+        self.mins = data.min(dim=0).values
+        self.maxs = data.max(dim=0).values
         self.range = self.maxs - self.mins
 
         self.range[self.range == 0] = 1.0
@@ -32,10 +32,11 @@ class MinMaxNormalizer(Normalizer):
         self.range = self.range.to(device)
 
     def normalize(self, x: torch.Tensor) -> torch.Tensor:
-        return (x - self.mins) / self.range
+        return 2 * (x - self.mins) / self.range - 1
 
     def de_normalize(self, x: torch.Tensor) -> torch.Tensor:
-        return x * self.range + self.mins
+        return (x + 1) * 0.5 * self.range + self.mins
+
 
 def cost_computation(node1: dict, node2: dict,
                      q_mask: np.ndarray=np.array([])) -> float:
