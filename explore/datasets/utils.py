@@ -1,8 +1,33 @@
 import os
+import torch
 import pickle
 import numpy as np
 from tqdm import tqdm
 
+
+class Normalizer:
+    def __init__(self, data: torch.Tensor):
+        pass
+
+    def normalize(self, x: torch.Tensor) -> torch.Tensor:
+        return x
+
+    def de_normalize(self, x: torch.Tensor) -> torch.Tensor:
+        return x
+
+class MinMaxNormalizer(Normalizer):
+    def __init__(self, data: torch.Tensor):
+        self.mins, _ = data.min(dim=0)
+        self.maxs, _ = data.max(dim=0)
+        self.range = self.maxs - self.mins
+
+        self.range[self.range == 0] = 1.0
+
+    def normalize(self, x: torch.Tensor) -> torch.Tensor:
+        return (x - self.mins) / self.range
+
+    def de_normalize(self, x: torch.Tensor) -> torch.Tensor:
+        return x * self.range + self.mins
 
 def cost_computation(node1: dict, node2: dict,
                      q_mask: np.ndarray=np.array([])) -> float:

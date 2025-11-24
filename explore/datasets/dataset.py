@@ -4,22 +4,8 @@ import numpy as np
 from omegaconf import OmegaConf
 from torch.utils.data import Dataset
 
-from explore.datasets.utils import load_trees, get_diverse_paths
+from explore.datasets.utils import MinMaxNormalizer, load_trees, get_diverse_paths
 
-
-class Normalizer:
-    def __init__(self, data: torch.Tensor):
-        self.mins, _ = data.min(dim=0)
-        self.maxs, _ = data.max(dim=0)
-        self.range = self.maxs - self.mins
-
-        self.range[self.range == 0] = 1.0
-
-    def normalize(self, x: torch.Tensor) -> torch.Tensor:
-        return (x - self.mins) / self.range
-
-    def de_normalize(self, x: torch.Tensor) -> torch.Tensor:
-        return x * self.range + self.mins
 
 class ExploreDataset(Dataset):
     def __init__(self,
@@ -76,6 +62,9 @@ class ExploreDataset(Dataset):
             goal = torch.tensor(self.trees[end_idx][0]["state"][1], dtype=torch.float) * self.q_mask
             self.goal_states.append(goal)
             
+        self.actions = torch.tensor(self.actions)
+        self.states = torch.tensor(self.states)
+            
         # TODO: Change tau_action
             
         if self.verbose > 0:
@@ -84,9 +73,10 @@ class ExploreDataset(Dataset):
             print(f"Total timesteps: {len(self.episode_idxs)}")
             print(f"Action shape: {self.actions[0][0].shape[1]}")
             print(f"State shape: {self.states[0][0].shape[1]}")
-            
-        # self.action_normalizer = Normalizer()
-        # self.satte_normalizer = Normalizer()
+        
+        print("Normalizing dataset...")
+        self.action_normalizer = MinMaxNormalizer(self.actions[:, 0, :])
+        self.state_normalizer = MinMaxNormalizer(self.states[:, 0, :])
         
         assert len(self.episode_idxs) == sum(self.episode_lengths)
 
@@ -117,6 +107,8 @@ class ExploreDataset(Dataset):
                 idx = -1
             action = torch.cat((action, episode_actions[idx]), dim=0)
 
+        action = self.action_normalizer.normalize(action)
+        state = self.state_normalizer.normalize(state)
         return action, state, self.goal_states[episode_idx]
 
     def play_episode(self, idx: int):
