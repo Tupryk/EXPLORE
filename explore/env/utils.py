@@ -50,7 +50,7 @@ def eval_il_policy(
                     done = terminated or truncated
                     episode_rewards.append(reward)
                     
-                    print(f"Iter: {env.iter}; Reward: {env.reward:.4f} (Goal Reward: {info['goal_reward']:.4f} Guiding Reward: {info['guiding_reward']:.4f}, Action: {a})")
+                    print(f"Iter: {env.iter}; Reward: {env.reward:.4f} (Goal Reward: {info['goal_reward']:.4f} Guiding Reward: {info['guiding_reward']:.4f})")
             
             all_rewards.append(episode_rewards)
 

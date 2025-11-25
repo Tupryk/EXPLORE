@@ -12,6 +12,9 @@ class ExploreDataset(Dataset):
                  data_dir: str,
                  horizon: int=1,
                  history: int=1,
+                 min_path_len: int=1,
+                 start_idx: int=-1,
+                 end_idx: int=-1,
                  verbose: int=0):
         
         # TODO: Vision based
@@ -27,7 +30,11 @@ class ExploreDataset(Dataset):
         
         self.q_mask = np.array(dataset_cfg.RRT.q_mask)
         self.paths, self.traj_pairs = get_diverse_paths(
-            self.trees, dataset_cfg.RRT.min_cost, self.q_mask, dataset_cfg.RRT.diff_thresh, cached_folder=data_dir)
+            self.trees, dataset_cfg.RRT.min_cost,
+            self.q_mask, dataset_cfg.RRT.path_diff_thresh,
+            min_path_len=min_path_len, cached_folder=data_dir,
+            start_idx=start_idx, end_idx=end_idx
+        )
         
         if not len(self.traj_pairs):
             raise Exception(f"No feasible trajectories in dataset '{data_dir}'!")

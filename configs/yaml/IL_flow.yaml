@@ -1,11 +1,11 @@
-data_dir: "data/fingerRamp_exp"
+data_dir: "data/pandasTable_exp"
 batch_size: 512
 epochs: 8000
-device: "cuda"
+device: "mps"
 trainer:
   lr: 3e-4
-  checkpoint_every: 100
-  sim_eval_count: 8
+  checkpoint_every: 1000
+  sim_eval_count: 4
   output_dir: ${hydra:runtime.output_dir}
 policy:
   horizon: 8
@@ -33,23 +33,25 @@ policy:
 env:
   time_scaling: 1.0
   stepsize: -1
-  max_steps: 125
+  max_steps: 48
   actions_noise_sigma: 0.001
   use_vel: false
-  guiding: true
+  guiding: false
   guiding_prob: 1.
-  start_config_idx: -1
+  start_config_idx: 1
   target_config_idx: -1
   goal_conditioning: true
   use_vision: false
   camera_filter: "balls_mask"
   verbose: 1
+  render_w: 640
+  render_h: 480
   sim:
-    tau_sim: 0.001
+    tau_sim: 0.005
     tau_action: 0.5
-    interpolate_actions: true
-    joints_are_same_as_ctrl: true
-    mujoco_xml: "configs/mujoco_/fingerRamp.xml"
+    interpolate_actions: false
+    joints_are_same_as_ctrl: false
+    mujoco_xml: "configs/mujoco_/franka_emika_panda/pandas_table.xml"
     camera: fixed_cam
-  trajectory_data_path: "data/fingerRamp_exp"  # TODO: either make this optionam or remove stable_configs_path and mujoco_xml or idk.
-  stable_configs_path: "configs/stable/fingerRamp_onRamp.h5"
+  trajectory_data_path: "data/pandasTable_exp"  # TODO: either make this optionam or remove stable_configs_path and mujoco_xml or idk.
+  stable_configs_path: "configs/stable/grasp_configs.h5"

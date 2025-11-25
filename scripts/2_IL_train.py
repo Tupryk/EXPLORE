@@ -13,7 +13,14 @@ from explore.env.stable_configs_env import StableConfigsEnv
 def main(cfg: DictConfig):
     logger = get_logger(cfg)
 
-    dataset = ExploreDataset(cfg.data_dir, cfg.policy.horizon, cfg.policy.history)
+    dataset = ExploreDataset(
+        cfg.data_dir,
+        horizon=cfg.policy.horizon,
+        history=cfg.policy.history,
+        min_path_len=cfg.policy.horizon,
+        start_idx=cfg.env.start_config_idx,
+        end_idx=cfg.env.target_config_idx,
+    )
     # TODO: Normalize data? -> normalizer = dataset.get_normalizer(); model.set_normalizer(normalizer); ema_model.set_normalizer(normalizer)
     loader = DataLoader(dataset, batch_size=cfg.batch_size, shuffle=True)
     

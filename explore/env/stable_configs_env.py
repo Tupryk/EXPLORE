@@ -55,12 +55,12 @@ class StableConfigsEnv(gym.Env):
         self.dataset_tau_action = trees_cfg.RRT.sim.tau_action
         self.time_scaling = np.ceil(self.dataset_tau_action / self.tau_action) if cfg.time_scaling == -1 else cfg.time_scaling
 
+        tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
+        self.trees, _, _ = load_trees(tree_dataset)
+            
         self.guiding_path = []
         if self.guiding:
 
-            tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
-            self.trees, _, _ = load_trees(tree_dataset)
-            
             # TODO: Maybe use ExploreDataset class here instead?
             path_dataset_dir = os.path.join(cfg.trajectory_data_path, "processed/paths_data.pkl")
             with open(path_dataset_dir, "rb") as f:
@@ -81,7 +81,7 @@ class StableConfigsEnv(gym.Env):
             
         self.sim = MjSim(self.mujoco_xml, self.tau_sim,
                          interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl)
-        self.sim.setupRenderer(84, 84, camera=cfg.sim.camera)
+        self.sim.setupRenderer(cfg.render_w, cfg.render_h, camera=cfg.sim.camera)
         
         # Defines observation space
         state = self.sim.getState()
@@ -204,8 +204,8 @@ class StableConfigsEnv(gym.Env):
         
         # Reset simulation state
         self.sim.pushConfig(
-            self.stable_configs["qpos"][s_cfg_idx],
-            self.stable_configs["ctrl"][s_cfg_idx]
+            self.trees[s_cfg_idx][0]["state"][1],
+            self.trees[s_cfg_idx][0]["state"][3]
         )
         
         self.iter = 0

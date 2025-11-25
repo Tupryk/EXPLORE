@@ -155,7 +155,10 @@ def get_diverse_paths(
     error_thresh: float,
     q_mask: np.ndarray,
     diff_thresh: float,
+    min_path_len: int=1,
     cached_folder: str="",
+    start_idx: int=-1,
+    end_idx: int=-1,
     min_len: int=1
     ) -> tuple[list[list[dict]], list[tuple[int, int]]]:
     
@@ -211,11 +214,18 @@ def get_diverse_paths(
             
             if si == ei or path_counts[si][ei] == 0:
                 continue
+            
+            if start_idx != -1 and start_idx != si:
+                continue
+            
+            if end_idx != -1 and end_idx != ei:
+                continue
 
             paths = []
             for end_node in end_nodes[si][ei]:
                 fp = build_path(trees[si], end_node, just_states=True)
-                paths.append(fp)
+                if len(fp) >= min_path_len:
+                    paths.append(fp)
                 
             path_count = len(paths)
             path_diffs = [[-1 for _ in range(path_count)] for _ in range(path_count)]
