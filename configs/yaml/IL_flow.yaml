@@ -1,7 +1,7 @@
 data_dir: "data/pandasTable_exp"
 batch_size: 512
 epochs: 8000
-device: "mps"
+device: "cuda"
 trainer:
   lr: 3e-4
   checkpoint_every: 1000

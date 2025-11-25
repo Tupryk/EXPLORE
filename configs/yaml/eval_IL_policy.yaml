@@ -1,0 +1,8 @@
+training_dir: "data/flow_policy_fingerRamp"
+checkpoint: "checkpoints/final_policy_epoch_8000/model"
+output_dir: ${hydra:runtime.output_dir}
+start_idx: -1
+end_idx: -1
+eval_count: 10
+eval_view: "fixed_cam"
+device: "cpu"
