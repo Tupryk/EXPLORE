@@ -173,7 +173,6 @@ class Transformer(nn.Module):
         goal_emb = self.goal_emb(goal).unsqueeze(1)
 
         cond_embeddings = torch.cat([time_emb, obs_emb, goal_emb], dim=1)
-        print(cond_embeddings.shape)
 
         ### ENCODER ###
         # (B, history + 1, n_emb)
