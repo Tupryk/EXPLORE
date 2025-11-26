@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 
 
 def eval_il_policy(
-    policy : nn.Module, env: gym.Env,
+    policy : nn.Module,
+    env: gym.Env,
     history: int=1,
     save_path: str="",
     eval_count: int=1,
@@ -50,7 +51,7 @@ def eval_il_policy(
                     done = terminated or truncated
                     episode_rewards.append(reward)
                     
-                    print(f"Iter: {env.iter}; Reward: {env.reward:.4f} (Goal Reward: {info['goal_reward']:.4f} Guiding Reward: {info['guiding_reward']:.4f})")
+                    print(f"Iter: {env.iter}/{env.max_steps}; Reward: {env.reward:.4f} (Goal Reward: {info['goal_reward']:.4f} Guiding Reward: {info['guiding_reward']:.4f})")
             
             all_rewards.append(episode_rewards)
 

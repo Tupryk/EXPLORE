@@ -1,35 +1,73 @@
 RRT:
   max_nodes: 1000000
   min_cost: 0.02
-  stepsize: [
-  # 5.79, 3.53, 5.79, 3.00, 5.79, 3.77, 5.79, 255.00
-    0.30, 0.30, 0.40, 0.50, 0.70, 0.6, 1.00, 125.00,
-    0.30, 0.30, 0.40, 0.50, 0.70, 0.6, 1.00, 125.00
-  ]
+  stepsize: 0.1
   verbose: 1
-  path_diff_thresh: 0.05
   target_prob: 0.2
+  diff_thresh: 
   sample_uniform: false
   warm_start: false
-  threading: true  # Depending on the hardware this may lead to faster computations.
+  threading: true
   start_idx: -1
   end_idx: -1
   bidirectional: false
   cost_max_method: false
-  sample_count: 1000
+  sample_count: 100
   sampling_strategy: rs
   output_dir: ${hydra:runtime.output_dir}
-  q_mask: [
-    1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.1, 0.1,  # Arm 1
-    1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.1, 0.1,  # Arm 2
-    10.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.0  # Ball
-  ]
-  knnK: 32
+  q_mask:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 0.15
+  - 0.15
+  - 0.15
+  - 0.15
+  knnK: 16
   sim:
     tau_sim: 0.005
     tau_action: 0.5
-    interpolate_actions: false
-    joints_are_same_as_ctrl: false
-    mujoco_xml: configs/mujoco_/franka_emika_panda/pandas_table.xml
+    interpolate_actions: true
+    joints_are_same_as_ctrl: true
+    mujoco_xml: configs/mujoco_/fingerBox.xml
     camera: fixed_cam
-configs_path: configs/stable/grasp_configs.h5
+configs_path: configs/stable/fingerBox.h5
+
+# RRT:
+#   max_nodes: 1000000
+#   min_cost: 0.02
+#   stepsize: [
+#   # 5.79, 3.53, 5.79, 3.00, 5.79, 3.77, 5.79, 255.00
+#     0.30, 0.30, 0.40, 0.50, 0.70, 0.6, 1.00, 125.00,
+#     0.30, 0.30, 0.40, 0.50, 0.70, 0.6, 1.00, 125.00
+#   ]
+#   verbose: 1
+#   path_diff_thresh: 0.05
+#   target_prob: 0.2
+#   sample_uniform: false
+#   warm_start: false
+#   threading: true  # Depending on the hardware this may lead to faster computations.
+#   start_idx: -1
+#   end_idx: -1
+#   bidirectional: false
+#   cost_max_method: false
+#   sample_count: 1000
+#   sampling_strategy: rs
+#   output_dir: ${hydra:runtime.output_dir}
+#   q_mask: [
+#     1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.1, 0.1,  # Arm 1
+#     1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.1, 0.1,  # Arm 2
+#     10.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.0  # Ball
+#   ]
+#   knnK: 32
+#   sim:
+#     tau_sim: 0.005
+#     tau_action: 0.5
+#     interpolate_actions: false
+#     joints_are_same_as_ctrl: false
+#     mujoco_xml: configs/mujoco_/franka_emika_panda/pandas_table.xml
+#     camera: fixed_cam
+# configs_path: configs/stable/grasp_configs.h5

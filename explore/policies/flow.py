@@ -34,14 +34,12 @@ class FlowPolicy(nn.Module):
         self.action_normalizer = action_normalizer
         self.action_normalizer.to_device(device)
         
-        if cfg.model_type == "unet":
-            self.net = UNet1D(obs_dim, action_dim, cfg.network, cond_dim)
-        elif cfg.model_type == "transformer":
-            self.net = Transformer(action_dim, self.horizon, self.history, obs_dim + cond_dim, cfg.network)
+        if cfg.model_type == "transformer":
+            self.net = Transformer(action_dim, self.horizon, self.history, obs_dim, cond_dim, cfg.network)
         else:
             raise Exception(f"Moder type '{cfg.model_type}' not implemented yet!")
 
-    def forward(self, obs, goal_cond=None, actions=None):
+    def forward(self, obs, goal_cond, actions=None):
 
         if self.action_normalizer is not None and actions is not None:
             actions = self.action_normalizer.normalize(actions)
@@ -52,9 +50,6 @@ class FlowPolicy(nn.Module):
                 goal_cond = self.state_normalizer.normalize(goal_cond)
 
         batch_size = obs.shape[0]
-        if goal_cond is not None:
-            goal_expanded = goal_cond.unsqueeze(1).expand(-1, obs.size(1), -1)
-            obs = torch.cat([obs, goal_expanded], axis=-1)
         
         if actions is not None:
             
@@ -63,7 +58,7 @@ class FlowPolicy(nn.Module):
             ones = torch.ones_like(timesteps).to(self.device)
             noised = sample * (ones - timesteps) + actions * timesteps
             
-            pred_noise = self.net(noised, timesteps.flatten(), obs)
+            pred_noise = self.net(noised, timesteps.flatten(), obs, goal_cond)
             true_path = actions - sample
             
             loss = F.mse_loss(pred_noise, true_path)
@@ -76,7 +71,7 @@ class FlowPolicy(nn.Module):
             ts = torch.linspace(0.0, 1.0, self.denoising_steps)
             for t in ts:
                 timesteps = torch.full((batch_size,), t).to(self.device)
-                pred_noise = self.net(x, timesteps, obs)
+                pred_noise = self.net(x, timesteps, obs, goal_cond)
                 x += pred_noise * delta
             
             denoised_actions = x[:, :self.effective_horizon, :]

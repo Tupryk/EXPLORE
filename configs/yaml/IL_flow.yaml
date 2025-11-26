@@ -1,57 +1,52 @@
-data_dir: "data/pandasTable_exp"
-batch_size: 512
-epochs: 8000
-device: "cuda"
+data_dir: data/fingerBox_exp2
+batch_size: 256
+epochs: 200
+device: cuda
 trainer:
-  lr: 3e-4
-  checkpoint_every: 1000
+  lr: 0.0003
+  weight_decay: 0.01
+  warmup_fraction: 0.03
+  checkpoint_every: 100
   sim_eval_count: 4
   output_dir: ${hydra:runtime.output_dir}
 policy:
   horizon: 8
-  history: 4
-  effective_horizon: 4
-  denoising_steps: 32
-  model_type: "transformer"
-  # network:  # Unet
-  #   t_embed: 16
-  #   down_dims: [32, 64, 128]
-  #   kernel_size: 3
-  #   n_groups: 8
-  #   verbose: 1
-  network:  # Transformer
+  history: 2
+  effective_horizon: 1
+  denoising_steps: 64
+  model_type: transformer
+  network:
     n_layer: 8
     n_head: 4
     emb_dim: 256
-    p_drop_emb: 0.0
+    p_drop_emb: 0.1
     p_drop_attn: 0.1
     causal_attn: true
     obs_as_cond: true
     n_cond_layers: 0
     verbose: 1
-
 env:
   time_scaling: 1.0
   stepsize: -1
-  max_steps: 48
+  max_steps: 100
   actions_noise_sigma: 0.001
   use_vel: false
   guiding: false
-  guiding_prob: 1.
-  start_config_idx: 1
+  guiding_prob: 1.0
+  start_config_idx: -1
   target_config_idx: -1
   goal_conditioning: true
   use_vision: false
-  camera_filter: "balls_mask"
+  camera_filter: balls_mask
+  render_w: 480
+  render_h: 320
   verbose: 1
-  render_w: 640
-  render_h: 480
   sim:
-    tau_sim: 0.005
+    tau_sim: 0.001
     tau_action: 0.5
-    interpolate_actions: false
-    joints_are_same_as_ctrl: false
-    mujoco_xml: "configs/mujoco_/franka_emika_panda/pandas_table.xml"
+    interpolate_actions: true
+    joints_are_same_as_ctrl: true
+    mujoco_xml: configs/mujoco_/fingerBox.xml
     camera: fixed_cam
-  trajectory_data_path: "data/pandasTable_exp"  # TODO: either make this optionam or remove stable_configs_path and mujoco_xml or idk.
-  stable_configs_path: "configs/stable/grasp_configs.h5"
+  trajectory_data_path: data/fingerBox_exp2
+  stable_configs_path: configs/stable/fingerBox.h5

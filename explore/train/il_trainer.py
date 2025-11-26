@@ -27,8 +27,12 @@ class IL_Trainer:
         self.sim_eval_count = cfg.sim_eval_count
         self.policy = policy.to(self.device)
         self.dataloader = dataloader
-        self.criterion = nn.MSELoss()   # Example: behavior cloning on continuous actions
-        self.optimizer = optim.AdamW(policy.parameters(), lr=cfg.lr)
+        self.optimizer = optim.AdamW(
+            policy.parameters(),
+            lr=cfg.lr,
+            weight_decay=cfg.weight_decay
+        )
+        self.warmup_fraction = cfg.warmup_fraction
         log_dir = os.path.join(cfg.output_dir, "training_logs")
         self.writer = SummaryWriter(log_dir=log_dir)
 
@@ -38,7 +42,8 @@ class IL_Trainer:
 
     def train(self, epochs, log_interval: int=100, env: gym.Env=None):
         
-        scheduler = warmup_cos_scheduler(self.optimizer, epochs, epochs//100)
+        warm_up_epochs = int(epochs * self.warmup_fraction)
+        scheduler = warmup_cos_scheduler(self.optimizer, warm_up_epochs, epochs)
 
         global_step = 0
         for epoch in range(1, epochs + 1):
