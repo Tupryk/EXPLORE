@@ -88,10 +88,16 @@ class MjSim:
                 if self.viewer != None:
                     self.viewer.sync()
                     time.sleep(tau_action/steps)
-                if not (self.renderer is None) and self.data.time >= self.next_frame_time:
-                    frames.append(self.renderImg(view))
+
+                if view == -1:
                     states.append(np.copy(self.data.qpos))
-                    self.next_frame_time = self.next_frame_time + self.frame_dt
+                
+                else:
+                    if self.data.time >= self.next_frame_time:
+                        if not (self.renderer is None):
+                            frames.append(self.renderImg(view))
+                        states.append(np.copy(self.data.qpos))
+                        self.next_frame_time = self.next_frame_time + self.frame_dt
         
         return frames, states
 

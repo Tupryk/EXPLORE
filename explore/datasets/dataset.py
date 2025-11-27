@@ -1,9 +1,11 @@
 import os
 import torch
 import numpy as np
+from tqdm import tqdm
 from omegaconf import OmegaConf
 from torch.utils.data import Dataset
 
+from explore.env.mujoco_sim import MjSim
 from explore.datasets.utils import MinMaxNormalizer, load_trees, get_diverse_paths
 
 
@@ -15,6 +17,7 @@ class ExploreDataset(Dataset):
                  min_path_len: int=1,
                  start_idx: int=-1,
                  end_idx: int=-1,
+                 tau_action: float=-1,
                  verbose: int=0):
         
         # TODO: Vision based
@@ -47,31 +50,66 @@ class ExploreDataset(Dataset):
 
         self.states = []
         self.actions = []
-        for i, (start_idx, end_idx) in enumerate(self.traj_pairs):
+
+        traj_pairs_loop = enumerate(self.traj_pairs)
+        if tau_action != -1:
+            print(f"Running paths in sim for smaller tau_action {tau_action}...")
+            sim_cfg = dataset_cfg.RRT.sim
+            assert tau_action < sim_cfg.tau_action
+            sim = MjSim(
+                sim_cfg.mujoco_xml, tau_sim=sim_cfg.tau_sim, interpolate=sim_cfg.interpolate_actions,
+                joints_are_same_as_ctrl=sim_cfg.joints_are_same_as_ctrl, view=False
+            )
+            traj_pairs_loop = tqdm(traj_pairs_loop)
+
+        for i, (start_idx, end_idx) in traj_pairs_loop:
             
             path = self.paths[i]
             path_states = []
             path_actions = []
-            for node in path:
-                state = node[1].tolist()  # Pos
-                # state.extend(node[2].tolist())  # Vel
-                path_states.append(state)
-                path_actions.append(node[3].tolist())
+
+            if tau_action != -1:
+
+                sim.setState(*path[0])
+
+                prev_node = path[0]
+                for node in path[1:]:
+                    
+                    sim.setState(*prev_node)
+
+                    q_target = node[3]
+                    _, s = sim.step(sim_cfg.tau_action, q_target, view=-1)
+
+                    state_samples = int(sim_cfg.tau_action / tau_action)
+                    state_step = int(len(s)/state_samples)
+
+                    state_slices = s[::state_step]
+                    path_states.extend(state_slices)
+                    path_actions.extend([q_target.tolist() for _ in range(state_samples)])
+                    prev_node = node
+                    
+                    assert len(state_slices) == state_samples
+
+            else:
+               
+                for node in path:
+                    state = node[1].tolist()  # Pos
+                    # state.extend(node[2].tolist())  # Vel
+                    path_states.append(state)
+                    path_actions.append(node[3].tolist())
                 
-            path_states = torch.tensor(path_states, dtype=torch.float).unsqueeze(1)
-            path_actions = torch.tensor(path_actions, dtype=torch.float).unsqueeze(1)
+            path_states = torch.tensor(np.array(path_states), dtype=torch.float).unsqueeze(1)
+            path_actions = torch.tensor(np.array(path_actions), dtype=torch.float).unsqueeze(1)
 
             self.states.append(path_states)
             self.actions.append(path_actions)
             
-            traj_len = len(path)
+            traj_len = len(path_states)
             self.episode_lengths.append(traj_len)
             self.episode_idxs.extend([i for _ in range(traj_len)])
             goal = torch.tensor(self.trees[end_idx][0]["state"][1], dtype=torch.float) * self.q_mask
             self.goal_states.append(goal)
-            
-        # TODO: Change tau_action
-            
+        
         if self.verbose > 0:
             print(f"Total episodes: {len(self.traj_pairs)}.")
             print(f"Avg. length: {sum(self.episode_lengths)/len(self.episode_lengths)} timesteps")
@@ -86,6 +124,7 @@ class ExploreDataset(Dataset):
         self.state_normalizer = MinMaxNormalizer(min_max_states[:, 0, :])
         
         assert len(self.episode_idxs) == sum(self.episode_lengths)
+
 
     def __len__(self):
         return sum(self.episode_lengths)

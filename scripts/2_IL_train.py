@@ -20,6 +20,8 @@ def main(cfg: DictConfig):
         min_path_len=cfg.policy.horizon,
         start_idx=cfg.env.start_config_idx,
         end_idx=cfg.env.target_config_idx,
+        tau_action=cfg.data_tau_action,
+        verbose=1
     )
     # TODO: Normalize data? -> normalizer = dataset.get_normalizer(); model.set_normalizer(normalizer); ema_model.set_normalizer(normalizer)
     loader = DataLoader(dataset, batch_size=cfg.batch_size, shuffle=True)

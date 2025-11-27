@@ -1,7 +1,8 @@
-data_dir: data/fingerRamp_exp
+data_dir: data/fingerBox_exp2
 batch_size: 256
 epochs: 200
-device: mps
+data_tau_action: 0.1
+device: cuda
 trainer:
   lr: 0.0003
   weight_decay: 0.01
@@ -17,8 +18,8 @@ trainer:
     min_value: 0.0
     max_value: 0.9999
 policy:
-  horizon: 8
-  history: 2
+  horizon: 16
+  history: 8
   effective_horizon: 1
   denoising_steps: 64
   model_type: transformer
@@ -49,11 +50,11 @@ env:
   render_h: 320
   verbose: 1
   sim:
-    tau_sim: 0.001
-    tau_action: 0.5
+    tau_sim: 0.005
+    tau_action: 0.1
     interpolate_actions: true
     joints_are_same_as_ctrl: true
-    mujoco_xml: configs/mujoco_/fingerRamp.xml
+    mujoco_xml: configs/mujoco_/fingerBox.xml
     camera: fixed_cam
-  trajectory_data_path: data/fingerRamp_exp
-  stable_configs_path: configs/stable/fingerRamp_onRamp.h5
+  trajectory_data_path: data/fingerBox_exp2
+  stable_configs_path: configs/stable/fingerBox.h5
