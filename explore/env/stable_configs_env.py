@@ -238,7 +238,7 @@ class StableConfigsEnv(gym.Env):
         if self.stepsize != -1:
             action += self.last_ctrl
         
-        frames, _ = self.sim.step(self.tau_action, action, view=self.eval_view)
+        frames, _, _ = self.sim.step(self.tau_action, action, view=self.eval_view)
         self.getState()
         self.iter += 1
 
