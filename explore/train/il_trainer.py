@@ -1,4 +1,6 @@
 import os
+import copy
+import hydra
 import torch
 import logging
 from tqdm import tqdm
@@ -9,6 +11,7 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+from explore.models.ema import EMAModel
 from explore.env.utils import eval_il_policy
 from explore.train.utils import warmup_cos_scheduler
 
@@ -25,6 +28,7 @@ class IL_Trainer:
         self.device = device
         self.checkpoint_every = cfg.checkpoint_every
         self.sim_eval_count = cfg.sim_eval_count
+        self.use_ema = cfg.use_ema
         self.policy = policy.to(self.device)
         self.dataloader = dataloader
         self.optimizer = optim.AdamW(
@@ -40,6 +44,17 @@ class IL_Trainer:
         self.checkpoint_path = os.path.join(cfg.output_dir, "checkpoints")
         os.makedirs(os.path.dirname(self.checkpoint_path), exist_ok=True)
 
+        if self.use_ema:
+            self.ema_model = copy.deepcopy(self.policy).to(device)
+            self.ema = EMAModel(
+                self.ema_model,
+                update_after_step=cfg.ema.update_after_step,
+                inv_gamma=cfg.ema.inv_gamma,
+                power=cfg.ema.power,
+                min_value=cfg.ema.min_value,
+                max_value=cfg.ema.max_value
+            )
+        
     def train(self, epochs, log_interval: int=100, env: gym.Env=None):
         
         warm_up_epochs = int(epochs * self.warmup_fraction)
@@ -60,6 +75,9 @@ class IL_Trainer:
                 loss.backward()
                 self.optimizer.step()
                 scheduler.step()
+                
+                if self.use_ema:
+                    self.ema.step(self.policy)
 
                 epoch_loss += loss.item()
                 if batch_idx % log_interval == 0:
@@ -72,22 +90,24 @@ class IL_Trainer:
 
             if epoch % self.checkpoint_every == 0 or epoch == epochs:
                 
+                eval_policy = self.ema_model if self.use_ema else self.policy
+                
                 # Save checkpoint
                 name = f"final_policy_epoch_{epoch}" if epoch == epochs else f"epoch_{epoch}"
                 ckpt_path = os.path.join(self.checkpoint_path, name)
                 os.makedirs(ckpt_path, exist_ok=True)
-                torch.save(self.policy.state_dict(), os.path.join(ckpt_path, "model"))
+                torch.save(eval_policy.state_dict(), os.path.join(ckpt_path, "model"))
                 
                 # Eval in sim
-                self.policy.eval()
+                eval_policy.eval()
                 env_evals_path = os.path.join(ckpt_path, "env_evals")
                 os.makedirs(env_evals_path, exist_ok=True)
                 if env != None:
                     eval_il_policy(
-                        self.policy, env,
+                        eval_policy, env,
                         save_path=env_evals_path,
                         eval_count=self.sim_eval_count,
-                        history=self.policy.history
+                        history=eval_policy.history
                     )
             
         self.writer.close()

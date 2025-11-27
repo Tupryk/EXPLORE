@@ -1,7 +1,7 @@
-data_dir: data/fingerBox_exp2
+data_dir: data/fingerRamp_exp
 batch_size: 256
 epochs: 200
-device: cuda
+device: mps
 trainer:
   lr: 0.0003
   weight_decay: 0.01
@@ -9,6 +9,13 @@ trainer:
   checkpoint_every: 100
   sim_eval_count: 4
   output_dir: ${hydra:runtime.output_dir}
+  use_ema: true
+  ema:
+    update_after_step: 0
+    inv_gamma: 1.0
+    power: 0.75
+    min_value: 0.0
+    max_value: 0.9999
 policy:
   horizon: 8
   history: 2
@@ -46,7 +53,7 @@ env:
     tau_action: 0.5
     interpolate_actions: true
     joints_are_same_as_ctrl: true
-    mujoco_xml: configs/mujoco_/fingerBox.xml
+    mujoco_xml: configs/mujoco_/fingerRamp.xml
     camera: fixed_cam
-  trajectory_data_path: data/fingerBox_exp2
-  stable_configs_path: configs/stable/fingerBox.h5
+  trajectory_data_path: data/fingerRamp_exp
+  stable_configs_path: configs/stable/fingerRamp_onRamp.h5
