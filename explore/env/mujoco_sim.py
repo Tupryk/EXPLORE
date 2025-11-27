@@ -62,7 +62,7 @@ class MjSim:
             self.viewer.sync()
 
     def step(self, tau_action: float,
-             ctrl_target: np.ndarray=None, view: str="") -> list:
+             ctrl_target: np.ndarray=None, view: str="") -> tuple[list, list, list]:
         
         steps = math.ceil(tau_action/self.tau_sim)
         if self.joints_are_same_as_ctrl:
@@ -73,6 +73,7 @@ class MjSim:
 
         frames = []
         states = []
+        ctrls = []
         if not self.interpolate and not (ctrl_target is None):
             self.data.ctrl[:] = ctrl_target
         
@@ -91,6 +92,7 @@ class MjSim:
 
                 if view == -1:
                     states.append(np.copy(self.data.qpos))
+                    ctrls.append(np.copy(self.data.ctrl))
                 
                 else:
                     if self.data.time >= self.next_frame_time:
@@ -99,7 +101,7 @@ class MjSim:
                         states.append(np.copy(self.data.qpos))
                         self.next_frame_time = self.next_frame_time + self.frame_dt
         
-        return frames, states
+        return frames, states, ctrls
 
     def getState(self):
         state = (

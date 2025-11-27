@@ -78,14 +78,17 @@ class ExploreDataset(Dataset):
                     sim.setState(*prev_node)
 
                     q_target = node[3]
-                    _, s = sim.step(sim_cfg.tau_action, q_target, view=-1)
+                    _, s, c = sim.step(sim_cfg.tau_action, q_target, view=-1)
 
                     state_samples = int(sim_cfg.tau_action / tau_action)
                     state_step = int(len(s)/state_samples)
 
                     state_slices = s[::state_step]
+                    ctrl_slices = c[::state_step]
+                    
                     path_states.extend(state_slices)
-                    path_actions.extend([q_target.tolist() for _ in range(state_samples)])
+                    path_actions.extend(ctrl_slices)
+
                     prev_node = node
                     
                     assert len(state_slices) == state_samples

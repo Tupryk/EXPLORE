@@ -81,7 +81,7 @@ def play_path(path: list[dict], sim: MjSim,
             sim.setState(*prev_node)
 
         q_target = node[3]
-        f, s = sim.step(tau_action, q_target, view=camera)
+        f, s, c = sim.step(tau_action, q_target, view=camera)
         frames.extend(f)
         states.extend(s)
         prev_node = node
