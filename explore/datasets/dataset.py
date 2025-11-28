@@ -87,7 +87,8 @@ class ExploreDataset(Dataset):
                     ctrl_slices = c[::state_step]
                     
                     path_states.extend(state_slices)
-                    path_actions.extend(ctrl_slices)
+                    # path_actions.extend(ctrl_slices)
+                    path_actions.extend([q_target for _ in range(state_samples)])
 
                     prev_node = node
                     
@@ -135,10 +136,11 @@ class ExploreDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
         episode_idx = self.episode_idxs[idx]
-        episode_actions = self.actions[episode_idx]
-        episode_states = self.states[episode_idx]
         episode_len = self.episode_lengths[episode_idx]
         timestep = idx - sum(self.episode_lengths[:episode_idx])
+        
+        episode_actions = self.actions[episode_idx]
+        episode_states = self.states[episode_idx]
         
         state = episode_states[timestep]
         
