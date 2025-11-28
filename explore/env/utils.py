@@ -1,6 +1,7 @@
 import os
 import torch
 import imageio
+import numpy as np
 import torch.nn as nn
 import gymnasium as gym
 import matplotlib.pyplot as plt
@@ -12,6 +13,7 @@ def eval_il_policy(
     history: int=1,
     save_path: str="",
     eval_count: int=1,
+    substates: int=-1
     ) -> list[float]:
 
     with torch.no_grad():
@@ -26,6 +28,7 @@ def eval_il_policy(
             done = False
             obs = torch.from_numpy(new_obs)
             obs = obs.expand(1, history, obs.shape[0])
+            obs_slice = obs[:, :, :-policy.cond_dim].clone().float()
             
             episode_rewards = []
             while not done:
@@ -37,7 +40,7 @@ def eval_il_policy(
                 shifted[:, -1, :] = new_obs
                 obs = shifted.float()
 
-                obs_in = obs[:, :, :-policy.cond_dim].clone()
+                obs_in = obs[:, :, :-policy.cond_dim].clone() if substates == -1 else obs_slice
                 goal_cond = obs[:, 0, -policy.cond_dim:].clone()
 
                 actions = policy(obs_in.to(policy.device), goal_cond.to(policy.device))["pred"]
@@ -46,6 +49,10 @@ def eval_il_policy(
                 for a in actions:
                     new_obs, reward, terminated, truncated, info = env.step(a)
                     
+                    if substates:
+                        obs_slice = info["states"][::int(len(info["states"])//substates)][-history:]
+                        obs_slice = torch.tensor(np.array(obs_slice)).float().unsqueeze(0)
+
                     frames = info["frames"]
                     imgs.extend(frames)
                     done = terminated or truncated

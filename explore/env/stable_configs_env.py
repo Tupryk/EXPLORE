@@ -238,7 +238,12 @@ class StableConfigsEnv(gym.Env):
         if self.stepsize != -1:
             action += self.last_ctrl
         
-        frames, _, _ = self.sim.step(self.tau_action, action, view=self.eval_view)
+        frames, ss, cs = self.sim.step(
+            self.tau_action,
+            action,
+            view=self.eval_view,
+            log_all=bool(self.eval_view)
+        )
         self.getState()
         self.iter += 1
 
@@ -269,6 +274,8 @@ class StableConfigsEnv(gym.Env):
         terminated = truncated
         info = {
             "frames": frames,
+            "states": ss,
+            "ctrls": cs,
             "goal_reward": goal_reward,
             "guiding_reward": guiding_reward
         }

@@ -46,7 +46,7 @@ def main(cfg: DictConfig):
     env = StableConfigsEnv(cfg.env)
 
     trainer = IL_Trainer(policy, loader, cfg.trainer, logger, cfg.device)
-    trainer.train(epochs=cfg.epochs, env=env)
+    trainer.train(epochs=cfg.epochs, env=env, substates=dataset.sub_states)
 
 if __name__ == "__main__":
     main()

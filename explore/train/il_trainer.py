@@ -55,7 +55,12 @@ class IL_Trainer:
                 max_value=cfg.ema.max_value
             )
         
-    def train(self, epochs, log_interval: int=100, env: gym.Env=None):
+    def train(self,
+              epochs,
+              log_interval: int=100,
+              env: gym.Env=None,
+              substates: int=-1
+            ):
         
         warm_up_epochs = int(epochs * self.warmup_fraction)
         scheduler = warmup_cos_scheduler(self.optimizer, warm_up_epochs, epochs)
@@ -107,7 +112,8 @@ class IL_Trainer:
                         eval_policy, env,
                         save_path=env_evals_path,
                         eval_count=self.sim_eval_count,
-                        history=eval_policy.history
+                        history=eval_policy.history,
+                        substates=substates
                     )
             
         self.writer.close()

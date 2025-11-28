@@ -1,5 +1,5 @@
-training_dir: "data/flow_policy_fingerRamp"
-checkpoint: "checkpoints/final_policy_epoch_8000/model"
+training_dir: "outputs/2025-11-28/15-51-02"
+checkpoint: "checkpoints/final_policy_epoch_200/model"
 output_dir: ${hydra:runtime.output_dir}
 start_idx: -1
 end_idx: -1

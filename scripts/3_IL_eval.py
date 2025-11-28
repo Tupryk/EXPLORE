@@ -24,6 +24,7 @@ def main(cfg: DictConfig):
         min_path_len=train_cfg.policy.horizon,
         start_idx=train_cfg.env.start_config_idx,
         end_idx=train_cfg.env.target_config_idx,
+        tau_action=train_cfg.data_tau_action
     )
 
     actions, obs, cond = dataset[0]
@@ -52,7 +53,8 @@ def main(cfg: DictConfig):
         policy, env,
         save_path=cfg.output_dir,
         eval_count=cfg.eval_count,
-        history=policy.history
+        history=policy.history,
+        substates=dataset.sub_states
     )
 
 if __name__ == "__main__":

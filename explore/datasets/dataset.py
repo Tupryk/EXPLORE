@@ -62,6 +62,8 @@ class ExploreDataset(Dataset):
             )
             traj_pairs_loop = tqdm(traj_pairs_loop)
 
+        self.sub_states = -1 if tau_action == -1 else int(sim_cfg.tau_action / tau_action)
+
         for i, (start_idx, end_idx) in traj_pairs_loop:
             
             path = self.paths[i]
@@ -78,21 +80,20 @@ class ExploreDataset(Dataset):
                     sim.setState(*prev_node)
 
                     q_target = node[3]
-                    _, s, c = sim.step(sim_cfg.tau_action, q_target, view=-1)
+                    _, s, c = sim.step(sim_cfg.tau_action, q_target, view=1, log_all=True)
 
-                    state_samples = int(sim_cfg.tau_action / tau_action)
-                    state_step = int(len(s)/state_samples)
+                    state_step = int(len(s)/self.sub_states)
 
                     state_slices = s[::state_step]
                     ctrl_slices = c[::state_step]
                     
                     path_states.extend(state_slices)
                     # path_actions.extend(ctrl_slices)
-                    path_actions.extend([q_target for _ in range(state_samples)])
+                    path_actions.extend([q_target for _ in range(self.sub_states)])
 
                     prev_node = node
                     
-                    assert len(state_slices) == state_samples
+                    assert len(state_slices) == self.sub_states
 
             else:
                
