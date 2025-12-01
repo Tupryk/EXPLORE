@@ -17,7 +17,7 @@ def main(cfg: DictConfig):
     logger = get_logger(cfg)
     
     # Load flow policy
-    train_config_path = os.path.join(cfg.training_dir, ".hydra/config.yaml")
+    train_config_path = os.path.join(cfg.flow_policy_dir, ".hydra/config.yaml")
     train_cfg = OmegaConf.load(train_config_path)
 
     dataset = ExploreDataset(
@@ -54,10 +54,6 @@ def main(cfg: DictConfig):
     env = FlowPolicyEnvWrapper(env, policy)
     
     # Setup and run DSRL
-    post_linear_modules = None
-    if cfg.train.use_layer_norm:
-        post_linear_modules = [torch.nn.LayerNorm]
-
     net_arch = []
     for _ in range(cfg.train.num_layers):
         net_arch.append(cfg.train.layer_size)
@@ -65,7 +61,6 @@ def main(cfg: DictConfig):
         net_arch=dict(pi=net_arch, qf=net_arch),
         activation_fn=torch.nn.Tanh,
         log_std_init=0.0,
-        post_linear_modules=post_linear_modules,
         n_critics=cfg.train.n_critics,
     )
     

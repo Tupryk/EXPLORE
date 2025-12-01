@@ -39,6 +39,8 @@ class FlowPolicy(nn.Module):
         else:
             raise Exception(f"Moder type '{cfg.model_type}' not implemented yet!")
 
+        self.net.to(device)
+
     def forward(self, obs, goal_cond, actions=None, noise=None):
 
         if self.action_normalizer is not None and actions is not None:
@@ -51,7 +53,7 @@ class FlowPolicy(nn.Module):
 
         batch_size = obs.shape[0]
         
-        if actions is not None and not custom_noise:
+        if actions is not None:
             
             sample = torch.randn_like(actions).to(self.device)
             timesteps = torch.rand((batch_size, 1, 1)).to(self.device)

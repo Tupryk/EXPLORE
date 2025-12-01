@@ -17,8 +17,8 @@ class FlowPolicyEnvWrapper(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         self.action_space = spaces.Box(low=-6, high=6, shape=(action_dim,), dtype=np.float32)
     
-    def reset(self):
-        new_obs, info = self.env.reset()
+    def reset(self, *, seed: int=None, options: dict={}):
+        new_obs, info = self.env.reset(seed=seed, options=options)
         
         self.obs = torch.from_numpy(new_obs)
         self.obs = self.obs.expand(1, self.policy.history, self.obs.shape[0])
@@ -28,10 +28,15 @@ class FlowPolicyEnvWrapper(gym.Env):
     def step(self, action):
         
         with torch.no_grad():
-            obs_in = self.obs[:, :, :-self.policy.cond_dim].clone()
-            goal_cond = self.obs[:, 0, -self.policy.cond_dim:].clone()
+            obs_in = self.obs[:, :, :-self.policy.cond_dim].clone().float()
+            goal_cond = self.obs[:, 0, -self.policy.cond_dim:].clone().float()
+            noise = torch.from_numpy(action).float()
 
-            actions = self.policy(obs_in.to(self.policy.device), goal_cond.to(self.policy.device), noise=action)["pred"]
+            actions = self.policy(
+                obs_in.to(self.policy.device),
+                goal_cond.to(self.policy.device),
+                noise=noise.to(self.policy.device)
+            )["pred"]
             actions = actions.detach().cpu().numpy()[0]
         
         for a in actions:
