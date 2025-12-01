@@ -32,13 +32,6 @@ def eval_il_policy(
             
             episode_rewards = []
             while not done:
-                
-                new_obs = torch.from_numpy(new_obs)
-                history = obs.shape[1]
-                shifted = obs.clone()
-                shifted[:, :history-1, :] = obs[:, 1:, :]
-                shifted[:, -1, :] = new_obs
-                obs = shifted.float()
 
                 obs_in = obs[:, :, :-policy.cond_dim].clone() if substates == -1 else obs_slice
                 goal_cond = obs[:, 0, -policy.cond_dim:].clone()
@@ -57,6 +50,12 @@ def eval_il_policy(
                     imgs.extend(frames)
                     done = terminated or truncated
                     episode_rewards.append(reward)
+                    
+                    new_obs = torch.from_numpy(new_obs)
+                    shifted = obs.clone()
+                    shifted[:, :history-1, :] = obs[:, 1:, :]
+                    shifted[:, -1, :] = new_obs
+                    obs = shifted.float()
                     
                     print(f"Iter: {env.iter}/{env.max_steps}; Reward: {env.reward:.4f} (Goal Reward: {info['goal_reward']:.4f} Guiding Reward: {info['guiding_reward']:.4f})")
             
@@ -85,4 +84,3 @@ def eval_il_policy(
                 plt.close('all')
 
     return all_rewards
-    

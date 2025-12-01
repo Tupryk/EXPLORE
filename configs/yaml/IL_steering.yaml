@@ -1,0 +1,46 @@
+verbose: 1
+total_timesteps: 2e7
+output_dir: ${hydra:runtime.output_dir}
+device: "cpu"
+flow_device: "cuda"
+save_freq: 25e4
+flow_policy_dir: "outputs/2025-11-28/15-51-02"
+flow_policy_checkpoint: "checkpoints/final_policy_epoch_200/model"
+train:
+  tau: 0.005 # Target update rate
+  actor_lr: 3e-4
+  batch_size: 256
+  train_freq: 2 # Update model after this many environment steps
+  utd: 20 # Number of gradient steps to take per update
+  use_layer_norm: True
+  layer_size: 1024
+  num_layers: 3
+  discount: 0.99
+  ent_coef: -1
+  target_ent: 0.0
+  n_critics: 2
+env:
+  time_scaling: 1.0
+  stepsize: -1
+  max_steps: 32
+  actions_noise_sigma: 0.001
+  use_vel: false
+  guiding: false
+  guiding_prob: 1.0
+  start_config_idx: -1
+  target_config_idx: -1
+  goal_conditioning: true
+  use_vision: false
+  camera_filter: balls_mask
+  render_w: 480
+  render_h: 320
+  verbose: 1
+  sim:
+    tau_sim: 0.005
+    tau_action: 0.5
+    interpolate_actions: true
+    joints_are_same_as_ctrl: true
+    mujoco_xml: configs/mujoco_/fingerRamp.xml
+    camera: fixed_cam
+  trajectory_data_path: data/fingerRamp_exp
+  stable_configs_path: configs/stable/fingerRamp_onRamp.h5

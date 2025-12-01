@@ -39,7 +39,7 @@ class FlowPolicy(nn.Module):
         else:
             raise Exception(f"Moder type '{cfg.model_type}' not implemented yet!")
 
-    def forward(self, obs, goal_cond, actions=None):
+    def forward(self, obs, goal_cond, actions=None, noise=None):
 
         if self.action_normalizer is not None and actions is not None:
             actions = self.action_normalizer.normalize(actions)
@@ -51,7 +51,7 @@ class FlowPolicy(nn.Module):
 
         batch_size = obs.shape[0]
         
-        if actions is not None:
+        if actions is not None and not custom_noise:
             
             sample = torch.randn_like(actions).to(self.device)
             timesteps = torch.rand((batch_size, 1, 1)).to(self.device)
@@ -67,7 +67,10 @@ class FlowPolicy(nn.Module):
         else:
             
             delta = 1.0 / self.denoising_steps
-            x = torch.randn((batch_size, self.horizon, self.action_dim)).to(self.device)
+            if noise is not None:
+                x = noise.reshape((batch_size, self.horizon, self.action_dim))
+            else:
+                x = torch.randn((batch_size, self.horizon, self.action_dim)).to(self.device)
             ts = torch.linspace(0.0, 1.0, self.denoising_steps)
             for t in ts:
                 timesteps = torch.full((batch_size,), t).to(self.device)
