@@ -41,7 +41,7 @@ class FlowPolicy(nn.Module):
 
         self.net.to(device)
 
-    def forward(self, obs, goal_cond, actions=None, noise=None):
+    def forward(self, obs, goal_cond=None, actions=None, noise=None):
 
         if self.action_normalizer is not None and actions is not None:
             actions = self.action_normalizer.normalize(actions)

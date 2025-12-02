@@ -32,7 +32,7 @@ def main(cfg: DictConfig):
     print("Condition shape: ", cond.shape)
     action_dim = actions.shape[-1]
     obs_dim = obs.shape[-1]
-    cond_dim = cond.shape[-1]
+    cond_dim = cond.shape[-1] if cfg.env.target_config_idx == -1 else -1
     
     policy = FlowPolicy(
         obs_dim,

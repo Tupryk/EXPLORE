@@ -33,10 +33,13 @@ def eval_il_policy(
             episode_rewards = []
             while not done:
 
-                obs_in = obs[:, :, :-policy.cond_dim].clone() if substates == -1 else obs_slice
-                goal_cond = obs[:, 0, -policy.cond_dim:].clone()
+                obs_in = obs[:, :, :-policy.cond_dim].clone().float() if substates == -1 else obs_slice
+                if policy.cond_dim != -1:
+                    goal_cond = obs[:, 0, -policy.cond_dim:].clone().float().to(policy.device)
+                else:
+                    goal_cond = None
 
-                actions = policy(obs_in.to(policy.device), goal_cond.to(policy.device))["pred"]
+                actions = policy(obs_in.to(policy.device), goal_cond)["pred"]
                 actions = actions.detach().cpu().numpy()[0]
                 
                 for a in actions:

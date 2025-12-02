@@ -64,7 +64,10 @@ class ExploreDataset(Dataset):
 
         self.sub_states = -1 if tau_action == -1 else int(sim_cfg.tau_action / tau_action)
 
-        for i, (start_idx, end_idx) in traj_pairs_loop:
+        for i, (si, ei) in traj_pairs_loop:
+
+            if start_idx != -1 and si != start_idx: continue
+            if end_idx != -1 and ei != end_idx: continue
             
             path = self.paths[i]
             path_states = []
@@ -102,7 +105,7 @@ class ExploreDataset(Dataset):
                     # state.extend(node[2].tolist())  # Vel
                     path_states.append(state)
                     path_actions.append(node[3].tolist())
-                
+            
             path_states = torch.tensor(np.array(path_states), dtype=torch.float).unsqueeze(1)
             path_actions = torch.tensor(np.array(path_actions), dtype=torch.float).unsqueeze(1)
 
@@ -110,14 +113,17 @@ class ExploreDataset(Dataset):
             self.actions.append(path_actions)
             
             traj_len = len(path_states)
+            self.episode_idxs.extend([len(self.episode_lengths) for _ in range(traj_len)])
             self.episode_lengths.append(traj_len)
-            self.episode_idxs.extend([i for _ in range(traj_len)])
-            goal = torch.tensor(self.trees[end_idx][0]["state"][1], dtype=torch.float) * self.q_mask
+            goal = torch.tensor(self.trees[ei][0]["state"][1], dtype=torch.float) * self.q_mask
             self.goal_states.append(goal)
         
         if self.verbose > 0:
-            print(f"Total episodes: {len(self.traj_pairs)}.")
-            print(f"Avg. length: {sum(self.episode_lengths)/len(self.episode_lengths)} timesteps")
+            avg_traj_len = sum(self.episode_lengths)/len(self.episode_lengths)
+            print(f"Total episodes: {len(self.traj_pairs)}")
+            if start_idx != -1 or end_idx != -1:
+                print(f"Total episodes for specific targets: {len(self.episode_lengths)}")
+            print(f"Avg. length: {avg_traj_len:.2f} timesteps")
             print(f"Total timesteps: {len(self.episode_idxs)}")
             print(f"Action shape: {self.actions[0][0].shape[1]}")
             print(f"State shape: {self.states[0][0].shape[1]}")
@@ -129,7 +135,6 @@ class ExploreDataset(Dataset):
         self.state_normalizer = MinMaxNormalizer(min_max_states[:, 0, :])
         
         assert len(self.episode_idxs) == sum(self.episode_lengths)
-
 
     def __len__(self):
         return sum(self.episode_lengths)

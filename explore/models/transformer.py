@@ -32,9 +32,13 @@ class Transformer(nn.Module):
         self.time_emb = SinusoidalPosEmb(self.emb_dim)
         self.input_emb = nn.Linear(output_dim, self.emb_dim)
         self.obs_emb = nn.Linear(obs_dim, self.emb_dim)
-        self.goal_emb = nn.Linear(goal_dim, self.emb_dim)
+        self.goal_emb = None
+        if goal_dim != -1:
+            self.goal_emb = nn.Linear(goal_dim, self.emb_dim)
 
-        T_cond = history + 2
+        T_cond = history + 1
+        if goal_dim != -1:
+            T_cond += 1
 
         self.pos_emb = nn.Parameter(torch.zeros(1, horizon, self.emb_dim))
         self.cond_pos_emb = nn.Parameter(torch.zeros(1, T_cond, self.emb_dim))
@@ -170,9 +174,12 @@ class Transformer(nn.Module):
         time_emb = self.time_emb(timestep).unsqueeze(1)
         input_emb = self.input_emb(sample)
         obs_emb = self.obs_emb(obs)
-        goal_emb = self.goal_emb(goal).unsqueeze(1)
-
-        cond_embeddings = torch.cat([time_emb, obs_emb, goal_emb], dim=1)
+        
+        if self.goal_emb is not None:
+            goal_emb = self.goal_emb(goal).unsqueeze(1)
+            cond_embeddings = torch.cat([time_emb, obs_emb, goal_emb], dim=1)
+        else:
+            cond_embeddings = torch.cat([time_emb, obs_emb], dim=1)
 
         ### ENCODER ###
         # (B, history + 1, n_emb)

@@ -41,8 +41,8 @@ class StableConfigsEnv(gym.Env):
         self.goal_conditioning = cfg.goal_conditioning
         if not self.goal_conditioning and cfg.target_config_idx == -1:
             raise Exception("Setting many goals but no goal conditioning!")
-        if self.goal_conditioning and cfg.target_config_idx != -1:
-            raise Exception("Using goal conditioning but only a single goal!")
+        # if self.goal_conditioning and cfg.target_config_idx != -1:
+        #     raise Exception("Using goal conditioning but only a single goal!")
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
         self.config_count = self.stable_configs["qpos"].shape[0]
