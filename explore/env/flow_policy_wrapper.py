@@ -15,21 +15,28 @@ class FlowPolicyEnvWrapper(gym.Env):
         action_dim = policy.action_dim * policy.horizon
         
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
-        self.action_space = spaces.Box(low=-6, high=6, shape=(action_dim,), dtype=np.float32)
+        self.action_space = spaces.Box(low=-3.0, high=3.0, shape=(action_dim,), dtype=np.float32)
+
+    def segment_obs(self) -> tuple[torch.Tensor, torch.Tensor]:
+        obs_in = self.obs[:, :, :-self.policy.cond_dim].clone().float()
+        goal_cond = self.obs[:, 0, -self.policy.cond_dim:].clone().float()
+        return obs_in, goal_cond
     
     def reset(self, *, seed: int=None, options: dict={}):
         new_obs, info = self.env.reset(seed=seed, options=options)
         
         self.obs = torch.from_numpy(new_obs)
         self.obs = self.obs.expand(1, self.policy.history, self.obs.shape[0])
-            
-        return self.obs.flatten(), info
+
+        obs_in, goal_cond = self.segment_obs()
+        obs = torch.cat([obs_in, goal_cond.unsqueeze(0)], dim=1).flatten()
+
+        return obs, info
     
     def step(self, action):
         
         with torch.no_grad():
-            obs_in = self.obs[:, :, :-self.policy.cond_dim].clone().float()
-            goal_cond = self.obs[:, 0, -self.policy.cond_dim:].clone().float()
+            obs_in, goal_cond = self.segment_obs()
             noise = torch.from_numpy(action).float()
 
             actions = self.policy(
@@ -47,5 +54,8 @@ class FlowPolicyEnvWrapper(gym.Env):
             shifted[:, :self.policy.history-1, :] = self.obs[:, 1:, :]
             shifted[:, -1, :] = new_obs
             self.obs = shifted.float()
-                    
-        return self.obs.flatten(), reward, terminated, truncated, info
+        
+        obs_in, goal_cond = self.segment_obs()
+        obs = torch.cat([obs_in, goal_cond.unsqueeze(0)], dim=1).flatten()
+
+        return obs, reward, terminated, truncated, info

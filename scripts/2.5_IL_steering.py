@@ -50,7 +50,7 @@ def main(cfg: DictConfig):
     policy.load_state_dict(state_dict)
     
     # Load environment with flow policy
-    env = StableConfigsEnv(cfg.env)
+    env = StableConfigsEnv(train_cfg.env)
     env = FlowPolicyEnvWrapper(env, policy)
     
     # Setup and run DSRL
