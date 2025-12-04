@@ -45,11 +45,11 @@ def play_path(path: list[dict], sim: MjSim,
 
     
     if len(start_state) and len(target_state):
-        sim.pushConfig(start_state)
+        sim.pushConfig(start_state, ignore_warn=True)
         im_start = sim.renderImg()
-        sim.pushConfig(target_state)
+        sim.pushConfig(target_state, ignore_warn=True)
         im_end = sim.renderImg()
-        sim.pushConfig(play_path[-1][1])
+        sim.pushConfig(play_path[-1][1], ignore_warn=True)
         im_reached = sim.renderImg()
         
         fig, axes = plt.subplots(1, 3, figsize=(30, 20))

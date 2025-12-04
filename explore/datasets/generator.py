@@ -275,7 +275,7 @@ class Search:
         return best_cost, best_start_state
     
     def eval_multiple_ctrls(self, ctrls: np.ndarray, origin: tuple,
-                            target: tuple) -> np.ndarray:
+                            target: tuple) -> list[tuple[float, np.ndarray, np.ndarray]]:
         results = []
         
         if self.threading:

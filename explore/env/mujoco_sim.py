@@ -57,17 +57,18 @@ class MjSim:
         
         self.spline_ref = None
         if self.use_spline_ref:
+            import robotic as ry
             self.spline_ref = ry.BSpline()
             self.spline_ref.set(2, self.data.ctrl.reshape(1, -1), [0.0])
-
-    def pushConfig(self, joint_state: np.ndarray, ctrl_state: np.ndarray=None):
+        
+    def pushConfig(self, joint_state: np.ndarray, ctrl_state: np.ndarray=None, ignore_warn: bool=False):
         self.data.time = 0.0
         self.next_frame_time = 0.0
         self.data.qpos[:] = joint_state
         self.data.qvel[:] = np.zeros_like(self.data.qvel)
         
         if ctrl_state is None:
-            assert self.joints_are_same_as_ctrl
+            assert self.joints_are_same_as_ctrl or ignore_warn
             ctrl_state = joint_state[:self.ctrl_dim]
         
         self.data.ctrl[:] = ctrl_state
@@ -144,21 +145,28 @@ class MjSim:
             np.copy(self.data.qpos),
             np.copy(self.data.qvel),
             np.copy(self.data.ctrl),
-            np.copy(self.spline_ref)
+            np.copy(self.spline_ref.getKnots()),
+            np.copy(self.spline_ref.getCtrlPoints())
         )
         return state
 
     def setState(self, time: float, qpos: np.ndarray,
-                 qvel: np.ndarray, ctrl: np.ndarray, spline_ref=None):
+                 qvel: np.ndarray, ctrl: np.ndarray,
+                 knots: np.ndarray=None, ctrlPts: np.ndarray=None):
         self.data.time = time
         self.next_frame_time = time
         self.data.qpos[:] = qpos
         self.data.qvel[:] = qvel
         self.data.ctrl[:] = ctrl
-        self.spline_ref = spline_ref
         mujoco.mj_forward(self.model, self.data)  # Investigate!!
         if self.viewer is not None:
             self.viewer.sync()
+
+        if knots is not None and ctrlPts is not None:
+            if knots.shape[0] == 6:
+                self.spline_ref.set(2, ctrl.reshape(1, -1), [0.0])
+            else:
+                self.spline_ref.set(2, ctrlPts, knots[2:-2])
         
     def getContacts(self) -> np.ndarray:
         contacts = []
