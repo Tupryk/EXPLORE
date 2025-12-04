@@ -1,0 +1,59 @@
+<mujoco model="ry_convert">
+  <compiler angle="radian" meshdir="unitree_g1/assets"/>
+
+  <!-- <asset>
+    <mesh file="right_hip_pitch_link.STL"/>
+    <mesh file="right_hip_roll_link.STL"/>
+    <mesh file="right_hip_yaw_link.STL"/>
+    <mesh file="right_knee_link.STL"/>
+    <mesh file="right_ankle_pitch_link.STL"/>
+    <mesh file="right_ankle_roll_link.STL"/>
+  <asset /> -->
+
+  <visual>
+      <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.1 0.1 0.1"/>
+      <map znear="0.01"/>
+      <global offwidth="1200" offheight="800"/>
+  </visual>
+
+  <default>
+    <default class="slider_x">
+        <position forcerange="-150 150" kp="1000" kv="10" ctrlrange="-0.5 0.5"/>
+    </default>
+    <default class="slider_y">
+        <position forcerange="-150 150" kp="1000" kv="10" ctrlrange="0.0 1.0"/>
+    </default>
+    <default class="slider_z">
+        <position forcerange="-150 150" kp="1000" kv="10" ctrlrange="-0.5 0.5"/>
+    </default>
+  </default>
+
+  <actuator>
+    <position name="l_joint1" joint="l_joint1" class="slider_x"/>
+    <position name="l_joint2" joint="l_joint2" class="slider_y" />
+    <position name="l_fing" joint="l_fing" class="slider_z" />
+  </actuator>
+
+  <worldbody>
+    <camera name="fixed_cam" pos="0.003 -1.149 1.424" xyaxes="1.000 0.003 0.000 -0.002 0.702 0.712"/>
+
+    <body name="l_base" pos="0.0 -0.5 0.4">
+      <body name="l_joint1">
+        <joint name="l_joint1" damping="0.1" type="slide" axis="1 0 0" />
+        <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
+        <body name="l_joint2">
+          <joint name="l_joint2" damping="0.1" type="slide" axis="0 1 0" />
+          <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
+          <body name="l_fing">
+            <joint name="l_fing" damping="0.1" type="slide" axis="0 0 1" />
+            <geom type="sphere" size="0.05" rgba="0 1 1 1" mass="0.1"/>
+            <camera name="wrist_cam" pos="0.000 -0.491 0.405" xyaxes="1.000 0.016 0.000 -0.005 0.278 0.961"/>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="floor" pos="0.0 0.0 0.3">
+      <geom type="box" size="1.0 1.0 0.025" />
+    </body>
+  </worldbody>
+</mujoco>

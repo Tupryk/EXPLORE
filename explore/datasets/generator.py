@@ -71,6 +71,7 @@ class Search:
         self.end_idx = cfg.end_idx
         self.bidirectional = cfg.bidirectional  # Performance seems very dependend on initial seed. Needs further investigation...
         self.knnK = cfg.knnK
+        self.n_best_actions = cfg.n_best_actions
 
         if self.bidirectional:
             self.bi_stepsize = cfg.bi_stepsize
@@ -86,7 +87,9 @@ class Search:
         self.sim = [
             MjSim(
                 self.mujoco_xml, self.tau_sim, view=False, verbose=0,
-                interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl) for _ in range(self.sim_count)
+                interpolate=self.interpolate_actions,
+                joints_are_same_as_ctrl=self.joints_are_same_as_ctrl,
+                use_spline_ref=cfg.sim.use_spline_ref) for _ in range(self.sim_count)
         ]
         assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
         
@@ -121,6 +124,8 @@ class Search:
             max_knn_tree_size = int(np.ceil(self.max_nodes / self.config_count) + 1)
         else:
             max_knn_tree_size = int(self.max_nodes + self.config_count)
+        action_mutliplier = self.sample_count if self.n_best_actions == -1 else self.n_best_actions
+        max_knn_tree_size *= action_mutliplier
 
         for i in range(self.config_count):
             
@@ -155,27 +160,42 @@ class Search:
         sample = np.clip(sample, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])  # Might be slow...
         return sample
             
-    def random_sample_ctrls(self, parent_node: MultiSearchNode, target: np.ndarray
-                            ) -> tuple[float, np.ndarray, np.ndarray]:
-        
+    def random_sample_ctrls(
+            self,
+            parent_node: MultiSearchNode,
+            target: np.ndarray
+        ) -> list[tuple[float, np.ndarray, np.ndarray]]:
+
         sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count)
-        
+
         results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)
-                
-        best_node_cost, best_state, best_q = min(results, key=lambda x: x[0])
-        return best_node_cost, best_state, best_q
-    
-    def cma_sample_ctrls(self, parent_node: MultiSearchNode, target: np.ndarray
-                         ) -> tuple[float, np.ndarray, np.ndarray]:
         
+        if self.n_best_actions != -1:
+            best_results = sorted(results, key=lambda x: x[0])[:self.n_best_actions]
+        else:
+            best_results = results
+
+        return best_results
+    
+    def cma_sample_ctrls(
+            self,
+            parent_node: MultiSearchNode,
+            target: np.ndarray
+        ) -> list[tuple[float, np.ndarray, np.ndarray]]:
+
         pop_size = 20
-        initial_guess = np.random.randn(self.ctrl_dim)
         initial_guess = parent_node.state[3]
-        es = cma.CMAEvolutionStrategy(initial_guess, 0.5, {
-            "popsize": pop_size,
-            "maxfevals": self.sample_count,
-            "verbose": -1
-        })
+
+        es = cma.CMAEvolutionStrategy(
+            initial_guess, 0.5,
+            {
+                "popsize": pop_size,
+                "maxfevals": self.sample_count,
+                "verbose": -1
+            },
+        )
+
+        all_results = []
 
         while not es.stop():
             candidates = es.ask()
@@ -183,13 +203,19 @@ class Search:
             results = self.eval_multiple_ctrls(candidates, parent_node.state, target)
             fitness_values = [r[0] for r in results]
 
+            all_results.extend(results)
+
             es.tell(candidates, fitness_values)
-            
+
             if self.verbose > 3:
                 es.disp()
-        
-        _, best_state, _ = self.eval_ctrl(es.result.xbest, parent_node.state, target, max_method=self.cost_max_method)
-        return es.result.fbest, best_state, es.result.xbest
+
+        if self.n_best_actions != -1:
+            best_results = sorted(all_results, key=lambda x: x[0])[:self.n_best_actions]
+        else:
+            best_results = all_results
+
+        return best_results
     
     def backward_random_sample_ctrls(self, to_node: MultiSearchNode, from_target: np.ndarray
                                      ) -> tuple[float, np.ndarray, np.ndarray]:
@@ -369,18 +395,18 @@ class Search:
             node: MultiSearchNode = self.trees[start_idx][node_idx]
 
             # Expand node
-            best_node_cost, best_state, best_q = self.action_sampler(node, sim_sample)
-            
-            delta_q = (best_q - node.state[3]).copy()
-            best_node = MultiSearchNode(
-                node_idx, delta_q, best_state,
-                explore_node=exploring,
-                target_config_idx=target_config_idx)
-            
-            self.trees[start_idx].append(best_node)
-            knn_item = best_state[1].astype(np.float32) * self.q_mask
-            self.trees_kNNs[start_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[start_idx]])
-            self.trees_kNNs_sizes[start_idx] += 1
+            best_expansions = self.action_sampler(node, sim_sample)
+            for best_node_cost, best_state, best_q in best_expansions:
+                delta_q = (best_q - node.state[3]).copy()
+                best_node = MultiSearchNode(
+                    node_idx, delta_q, best_state,
+                    explore_node=exploring,
+                    target_config_idx=target_config_idx)
+                
+                self.trees[start_idx].append(best_node)
+                knn_item = best_state[1].astype(np.float32) * self.q_mask
+                self.trees_kNNs[start_idx].add_items(knn_item, ids=[self.trees_kNNs_sizes[start_idx]])
+                self.trees_kNNs_sizes[start_idx] += 1
 
             # Try to expand bi_tree backwards
             if self.bidirectional:

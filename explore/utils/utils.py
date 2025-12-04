@@ -2,25 +2,139 @@ import cv2
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import make_interp_spline
 
 
-class ND_BSpline:
-    def __init__(self, start_time: float, start_pos: np.ndarray, degree: int=2):
-        self.start_time = start_time
-        self.start_pos = start_pos
-        self.degree = degree
+# class BSpline:
+#     degree = 2
+#     knots = np.zeros(1)
+#     ctrlPoints = np.zeros(1)
+#     B, Bdot, Bddot = np.zeros(1), np.zeros(1), np.zeros(1)
+#     JBtimes = np.zeros(1)
+    
+#     def __init__(self):
+#         pass
         
-    def compute(self, points: np.ndarray, times: np.ndarray, end_time: float):
-        points = np.array([self.start_pos, *points])
-        times = np.array([self.start_time, *times])
-        times += self.start_time
-        times[0] -= self.start_time
-        self.splines = [make_interp_spline(times, points[:, dim], k=self.degree) for dim in range(points.shape[1])]
+#     def set(self,
+#             degree: int,
+#             points: np.ndarray,
+#             times: np.ndarray,
+#             startVel: np.ndarray=None,
+#             endVel: np.ndarray=None):
+
+#         assert len(times.shape) == 1
+#         assert len(points.shape) == 2
+#         assert points.shape[0] == times.shape[0]
+
+#         self.setKnots(degree, times)
+#         self.setCtrlPoints(points, True, True, startVel, endVel)
         
-    def eval(self, t: float):
-        point = np.array([s(t) for s in self.splines])
-        return point
+#     def setKnots(self, degree: int, times: np.ndarray):
+#         self.degree = degree
+#         nCtrls = int(times.shape[0] + 2 * (degree * 0.5))
+#         nKnots = nCtrls + degree + 1
+#         self.knots = np.zeros(nKnots)
+
+#         for i in range(nKnots):
+#             if i <= degree:
+#                 self.knots[i] = times[0]
+#             elif i >= nCtrls:
+#                 self.knots[i] = times[-1]
+#             elif degree % 2:
+#                 self.knots[i] = times[i-degree]
+#             else:
+#                 self.knots[i] = 0.5 * ( times[i-degree-1] + times[i-degree] )
+                
+#     def setCtrlPoints(self,
+#                       points: np.ndarray,
+#                       addStartDuplicates: bool,
+#                       addEndDuplicates: bool,
+#                       setStartVel: np.ndarray,
+#                       setEndVel: np.ndarray):
+        
+#         self.ctrlPoints = points
+#         for i in range(self.degree/2):
+#             if addStartDuplicates: self.ctrlPoints.prepend(points[0])
+#             if addEndDuplicates: self.ctrlPoints.append(points[-1])
+
+#         assert self.ctrlPoints.shape[0] == self.knots.shape[0] - self.degree - 1
+
+#         if !!setStartVel and setStartVel.N: setDoubleKnotVel(-1, setStartVel)
+#         if !!setEndVel and setEndVel.N: setDoubleKnotVel(points.d0-1, setEndVel)
+    
+#     def overwriteSmooth(self, points: np.ndarray, times_rel: np.ndarray, time_cut: float):
+#         arr x_cut, xDot_cut;
+#         eval3(x_cut, xDot_cut, NoArr, time_cut)
+
+#         arr _points(points), _times(times_rel)
+#         _times.prepend(0.)
+#         _points.prepend(x_cut)
+#         self.set(self.degree, _points, _times + time_cut, xDot_cut)
+        
+#     def eval3(self,
+#               x: np.ndarray,
+#               xDot: np.ndarray,
+#               xDDot: np.ndarray,
+#               t: float,
+#               Jpoints: np.ndarray,
+#               Jtimes: np.ndarray):
+        
+#         n = ctrlPoints.d1
+#         if !!x: x.resize(n).setZero()
+#         if !!xDot: xDot.resize(n).setZero()
+#         if !!xDDot: xDDot.resize(n).setZero()
+#         if !!Jpoints: Jpoints.resize(n, ctrlPoints.d0, n).setZero()
+#         if !!Jtimes: Jtimes.resize(n, knots.N).setZero()
+        
+#         derivative = 0
+#         if !!xDot: derivative=1
+#         if !!xDDot: derivative=2
+
+#         # Handle out-of-interval cases
+#         if t < self.knots[0]:
+#             if !!x: x = ctrlPoints[0];
+#             if(!!Jpoints) for(uint i=0; i<n; i++) Jpoints(i, 0, i) = 1.;
+#             return
+        
+#         if t>=knots(-1):
+#             if(!!x) x = ctrlPoints[-1];
+#             if(!!Jpoints) for(uint i=0; i<n; i++) Jpoints(i, -1, i) = 1.;
+#             return
+
+#         # Grab range of relevant knots
+#         center: int = knots.rankInSorted(t, rai::lowerEqual<double>, true)
+#         center -= 1
+#         lo: int = center - degree
+#         if lo < 0: lo = 0
+#         up: int = lo + 2*degree
+#         if up > knots.N-1: up = knots.N-1
+#         lo: int = up - 2*degree
+#         if lo < 0: lo = 0
+
+#         # Compute B-spline coefficients on relevant knots
+#         BSpline core;
+#         core.degree = degree;
+#         core.knots.referToRange(knots, {lo, up+1});
+#         core.calcB(t, derivative, (!!Jtimes));
+
+#         # Multiply coefficients with control points
+#         arr Jtmp2;
+#         b, bd, bdd = 0.0, 0.0, 0.0
+#         for j in range(core.B.d0):
+#             b = core.B(j, degree)
+#             if derivative >= 1: bd = core.Bdot(j, degree)
+#             if derivative >= 2: bdd = core.Bddot(j, degree)
+#             if(lo+j>=ctrlPoints.d0):
+#                 assert np.abs(b) <= 1e-4
+#                 continue
+#             if !!x: for i in range(n): x[i] += b * ctrlPoints(lo+j,i)
+#             if !!xDot: for i in range(n): xDot[i] += bd * ctrlPoints(lo+j,i)
+#             if !!xDDot: for i in range(n): xDDot[i] += bdd * ctrlPoints(lo+j,i)
+#             if !!Jpoints:
+#                 for i in range(n): Jpoints(i, lo+j, i) = b
+#             if !!Jtimes:
+#                 Jtmp2.resize(n, knots.N).setZero()
+#                 Jtmp2.setMatrixBlock(ctrlPoints[lo+j] * ~core.JBtimes(j, degree, {}), 0, lo)
+#                 Jtimes += Jtmp2
 
 
 def randint_excluding(low: int, high: int, exclude: int):

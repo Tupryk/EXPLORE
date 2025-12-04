@@ -2,12 +2,12 @@ data_dir: data/fingerRamp_exp
 batch_size: 256
 epochs: 200
 data_tau_action: 0.1
-device: cuda
+device: mps
 trainer:
   lr: 0.0003
   weight_decay: 0.01
   warmup_fraction: 0.03
-  checkpoint_every: 100
+  checkpoint_every: 200
   sim_eval_count: 4
   output_dir: ${hydra:runtime.output_dir}
   use_ema: true
@@ -18,8 +18,8 @@ trainer:
     min_value: 0.0
     max_value: 0.9999
 policy:
-  horizon: 8
-  history: 4
+  horizon: 4
+  history: 2
   effective_horizon: 1
   denoising_steps: 64
   model_type: transformer
@@ -36,13 +36,13 @@ policy:
 env:
   time_scaling: 1.0
   stepsize: -1
-  max_steps: 32
+  max_steps: 16
   actions_noise_sigma: 0.001
   use_vel: false
   guiding: false
   guiding_prob: 1.0
   start_config_idx: -1
-  target_config_idx: -1
+  target_config_idx: 21
   goal_conditioning: true
   use_vision: false
   camera_filter: balls_mask
@@ -50,7 +50,7 @@ env:
   render_h: 320
   verbose: 1
   sim:
-    tau_sim: 0.005
+    tau_sim: 0.001
     tau_action: 0.5
     interpolate_actions: true
     joints_are_same_as_ctrl: true

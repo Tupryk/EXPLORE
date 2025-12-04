@@ -6,8 +6,11 @@ import matplotlib.pyplot as plt
 from explore.env.mujoco_sim import MjSim
 
 
-h5_file = "configs/stable/grasp_configs.h5"
-mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
+# h5_file = "configs/stable/grasp_configs.h5"
+# mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
+
+h5_file = "configs/stable/g1.h5"
+mujoco_xml = "configs/mujoco_/unitree_g1/g1_single.xml"
 
 # h5_file = "configs/stable/fingerBox.h5"
 # mujoco_xml = "configs/mujoco_/fingerBox.xml"
@@ -45,5 +48,5 @@ for i, sc in enumerate(stable_configs):
     # q[7] = 0
     # q[15] = 0
     sim.pushConfig(sc, q)
-    time.sleep(1)
-    sim.step(1, view=.5)
+    time.sleep(.1)
+    sim.step(.1, view=.1)
