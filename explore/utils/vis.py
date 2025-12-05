@@ -79,8 +79,9 @@ def play_path(path: list[dict], sim: MjSim,
         
         if reset_state:
             sim.setState(*prev_node)
-
-        q_target = node[3]
+        
+        # TODO: Make this nicer
+        q_target = node[4] if sim.use_spline_ref else node[3]
         f, s, c = sim.step(tau_action, q_target, view=camera)
         frames.extend(f)
         states.extend(s)

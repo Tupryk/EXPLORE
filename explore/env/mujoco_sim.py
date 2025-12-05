@@ -56,6 +56,8 @@ class MjSim:
             del frames[0]
         
         self.spline_ref = None
+        self.last_ctrl_target = None
+        self.ctrl_vel = np.zeros(self.ctrl_dim)
         if self.use_spline_ref:
             import robotic as ry
             self.spline_ref = ry.BSpline()
@@ -66,14 +68,13 @@ class MjSim:
         self.next_frame_time = 0.0
         self.data.qpos[:] = joint_state
         self.data.qvel[:] = np.zeros_like(self.data.qvel)
+        self.ctrl_vel = np.zeros(self.ctrl_dim)
         
         if ctrl_state is None:
             assert self.joints_are_same_as_ctrl or ignore_warn
             ctrl_state = joint_state[:self.ctrl_dim]
         
         self.data.ctrl[:] = ctrl_state
-        if self.use_spline_ref:
-            self.spline_ref.set(2, ctrl_state.reshape(1, -1), [0.0])
 
         mujoco.mj_forward(self.model, self.data)
 
@@ -86,12 +87,21 @@ class MjSim:
              view: str="",
              log_all: bool=False) -> tuple[list, list, list]:
         
+        self.last_ctrl_target = ctrl_target
         if self.use_spline_ref and ctrl_target is not None:
-            self.spline_ref.overwriteSmooth(
-                ctrl_target.reshape(1, -1),
-                np.array([2.*tau_action]),
-                self.data.time
+            import robotic as ry
+            self.spline_ref = ry.BSpline()
+            self.spline_ref.set(
+                2,
+                np.array([self.data.ctrl, ctrl_target]),
+                np.array([self.data.time, self.data.time + tau_action * 2.]),
+                self.ctrl_vel
             )
+            # self.spline_ref.overwriteSmooth(
+            #     ctrl_target.reshape(1, -1),
+            #     np.array([2.*tau_action]),
+            #     self.data.time
+            # )
             
         steps = math.ceil(tau_action/self.tau_sim)
         if self.joints_are_same_as_ctrl:
@@ -115,7 +125,7 @@ class MjSim:
                     self.data.ctrl[:] = prev_ctrl * (1 - perc) + ctrl_target * perc
                     
                 elif self.use_spline_ref:
-                    self.data.ctrl[:] = self.spline_ref.eval3(self.data.time)[0]
+                    self.data.ctrl[:], self.ctrl_vel, _ = self.spline_ref.eval3(self.data.time)
             
             mujoco.mj_step(self.model, self.data)
             
@@ -145,28 +155,25 @@ class MjSim:
             np.copy(self.data.qpos),
             np.copy(self.data.qvel),
             np.copy(self.data.ctrl),
-            np.copy(self.spline_ref.getKnots()),
-            np.copy(self.spline_ref.getCtrlPoints())
+            self.last_ctrl_target,
+            self.ctrl_vel
         )
         return state
 
     def setState(self, time: float, qpos: np.ndarray,
                  qvel: np.ndarray, ctrl: np.ndarray,
-                 knots: np.ndarray=None, ctrlPts: np.ndarray=None):
+                 last_ctrl_target: np.ndarray=None, ctrl_vel: np.ndarray=None):
+        
         self.data.time = time
         self.next_frame_time = time
         self.data.qpos[:] = qpos
         self.data.qvel[:] = qvel
         self.data.ctrl[:] = ctrl
+        if ctrl_vel is not None:
+            self.ctrl_vel = ctrl_vel
         mujoco.mj_forward(self.model, self.data)  # Investigate!!
         if self.viewer is not None:
             self.viewer.sync()
-
-        if knots is not None and ctrlPts is not None:
-            if knots.shape[0] == 6:
-                self.spline_ref.set(2, ctrl.reshape(1, -1), [0.0])
-            else:
-                self.spline_ref.set(2, ctrlPts, knots[2:-2])
         
     def getContacts(self) -> np.ndarray:
         contacts = []
