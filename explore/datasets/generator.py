@@ -115,6 +115,8 @@ class Search:
             print(f"Starting search across {self.config_count} configs!")
 
     def init_trees(self) -> tuple:
+        
+        # TODO: It does not make sense to have a list with all trees if we only use one at a time
 
         trees: list[list[MultiSearchNode]] = []
         trees_kNNs: list[hnswlib.Index] = []
@@ -127,7 +129,14 @@ class Search:
         action_mutliplier = self.sample_count if self.n_best_actions == -1 else self.n_best_actions
         max_knn_tree_size *= action_mutliplier
 
-        for i in range(self.config_count):
+        print("Initializing trees...")
+        
+        if self.verbose > 0:
+            pbar = trange(self.config_count, desc="Init trees", unit="epoch")
+        else:
+            pbar = range(self.max_nodes)
+            
+        for i in pbar:
             
             self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
             state = self.sim[0].getState()

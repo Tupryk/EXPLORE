@@ -20,6 +20,7 @@ data = np.loadtxt(txt_file, dtype=np.float64)
 new_data_pos = []
 new_data_ctrl = []
 for i, vec in enumerate(data):
+    if i >= 200: break
     # ### FRANKAS BOX ###
     # state_vec = np.zeros(25)
     
@@ -43,77 +44,67 @@ for i, vec in enumerate(data):
     ### UNITREE ###
     state_vec = np.zeros(36)
     ctrl_vec = np.zeros(29)
-    # Joint 1: l_left_hip_pitch_joint, type=3, qpos address=7, dof=hinge(1)
-    # Joint 2: l_left_hip_roll_joint, type=3, qpos address=8, dof=hinge(1)
-    # Joint 3: l_left_hip_yaw_joint, type=3, qpos address=9, dof=hinge(1)
     
-    # Joint 4: l_left_knee_joint, type=3, qpos address=10, dof=hinge(1)
-    
-    # Joint 5: l_left_ankle_pitch_joint, type=3, qpos address=11, dof=hinge(1)
-    # Joint 6: l_left_ankle_roll_joint, type=3, qpos address=12, dof=hinge(1)
-    
-    # Joint 7: l_right_hip_pitch_joint, type=3, qpos address=13, dof=hinge(1)
-    # Joint 8: l_right_hip_roll_joint, type=3, qpos address=14, dof=hinge(1)
-    # Joint 9: l_right_hip_yaw_joint, type=3, qpos address=15, dof=hinge(1)
-    
-    # Joint 10: l_right_knee_joint, type=3, qpos address=16, dof=hinge(1)
-    
-    # Joint 11: l_right_ankle_pitch_joint, type=3, qpos address=17, dof=hinge(1)
-    # Joint 12: l_right_ankle_roll_joint, type=3, qpos address=18, dof=hinge(1)
-    
-    # Joint 13: l_waist_yaw_joint, type=3, qpos address=19, dof=hinge(1)
-    # Joint 14: l_waist_roll_joint, type=3, qpos address=20, dof=hinge(1)
-    # Joint 15: l_waist_pitch_joint, type=3, qpos address=21, dof=hinge(1)
-    
-    # Joint 16: l_left_shoulder_pitch_joint, type=3, qpos address=22, dof=hinge(1)
-    # Joint 17: l_left_shoulder_roll_joint, type=3, qpos address=23, dof=hinge(1)
-    # Joint 18: l_left_shoulder_yaw_joint, type=3, qpos address=24, dof=hinge(1)
-    
-    # Joint 19: l_left_elbow_joint, type=3, qpos address=25, dof=hinge(1)
-    
-    # Joint 20: l_left_wrist_roll_joint, type=3, qpos address=26, dof=hinge(1)
-    # Joint 21: l_left_wrist_pitch_joint, type=3, qpos address=27, dof=hinge(1)
-    # Joint 22: l_left_wrist_yaw_joint, type=3, qpos address=28, dof=hinge(1)
-    
-    # Joint 23: l_right_shoulder_pitch_joint, type=3, qpos address=29, dof=hinge(1)
-    # Joint 24: l_right_shoulder_roll_joint, type=3, qpos address=30, dof=hinge(1)
-    # Joint 25: l_right_shoulder_yaw_joint, type=3, qpos address=31, dof=hinge(1)
-    
-    # Joint 26: l_right_elbow_joint, type=3, qpos address=32, dof=hinge(1)
-    
-    # Joint 27: l_right_wrist_roll_joint, type=3, qpos address=33, dof=hinge(1)
-    # Joint 28: l_right_wrist_pitch_joint, type=3, qpos address=34, dof=hinge(1)
-    # Joint 29: l_right_wrist_yaw_joint, type=3, qpos address=35, dof=hinge(1)
     state_vec[:7] = vec[:7]
-    # Waist
+    state_vec[2] += 0.69
+    
+    # 19 -  0 waist_yaw_joint
     state_vec[19] = vec[7]
+    #  7 -  1 left_hip_pitch_joint
     state_vec[7] = vec[8]
+    # 13 -  2 right_hip_pitch_joint
     state_vec[13] = vec[9]
+    # 20 -  3 waist_roll_joint
     state_vec[20] = vec[10]
+    #  8 -  4 left_hip_roll_joint
     state_vec[8] = vec[11]
+    # 14 -  5 right_hip_roll_joint
     state_vec[14] = vec[12]
+    # 21 -  6 waist_pitch_joint
     state_vec[21] = vec[13]
+    #  9 -  7 left_hip_yaw_joint
     state_vec[9] = vec[14]
+    # 15 -  8 right_hip_yaw_joint
     state_vec[15] = vec[15]
+    # 22 -  9 left_shoulder_pitch_joint
     state_vec[22] = vec[16]
+    # 29 -  0 right_shoulder_pitch_joint
     state_vec[29] = vec[17]
+    # 10 - 11 left_knee_joint
     state_vec[10] = vec[18]
+    # 16 - 12 right_knee_joint
     state_vec[16] = vec[19]
+    # 23 - 13 left_shoulder_roll_joint
     state_vec[23] = vec[20]
+    # 30 - 14 right_shoulder_roll_joint
     state_vec[30] = vec[21]
+    # 11 - 15 left_ankle_pitch_joint
     state_vec[11] = vec[22]
+    # 17 - 16 right_ankle_pitch_joint
     state_vec[17] = vec[23]
+    # 24 - 17 left_shoulder_yaw_joint
     state_vec[24] = vec[24]
+    # 31 - 18 right_shoulder_yaw_joint
     state_vec[31] = vec[25]
+    # 12 - 19 left_ankle_roll_joint
     state_vec[12] = vec[26]
+    # 18 - 20 right_ankle_roll_joint
     state_vec[18] = vec[27]
+    # 25 - 21 left_elbow_joint
     state_vec[25] = vec[28]
+    # 32 - 22 right_elbow_joint
     state_vec[32] = vec[29]
+    # 26 - 23 left_wrist_roll_joint
     state_vec[26] = vec[30]
+    # 33 - 24 right_wrist_roll_joint
     state_vec[33] = vec[31]
+    # 27 - 25 left_wrist_pitch_joint
     state_vec[27] = vec[32]
+    # 34 - 26 right_wrist_pitch_joint
     state_vec[34] = vec[33]
+    # 28 - 27 left_wrist_yaw_joint
     state_vec[28] = vec[34]
+    # 35 - 28 right_wrist_yaw_joint
     state_vec[35] = vec[35]
     
     ctrl_vec[12] = vec[7]
@@ -148,7 +139,7 @@ for i, vec in enumerate(data):
     
     new_data_pos.append(state_vec)
     new_data_ctrl.append(ctrl_vec)
-
+    
 data_pos = np.array(new_data_pos)
 data_ctrl = np.array(new_data_ctrl)
 

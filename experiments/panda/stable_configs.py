@@ -41,6 +41,8 @@ sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
 # for i in sampled_configs:
 for i, sc in enumerate(stable_configs):
     print(i)
+    if i != 8:
+        continue
     # sim.pushConfig(sc)
     # print(sc)
     # print(stable_configs_ctrl[i])
@@ -48,5 +50,5 @@ for i, sc in enumerate(stable_configs):
     # q[7] = 0
     # q[15] = 0
     sim.pushConfig(sc, q)
-    time.sleep(.1)
+    time.sleep(10.)
     sim.step(.1, view=.1)

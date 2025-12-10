@@ -26,9 +26,6 @@
       <geom type="box" size="5.0 5.0 0.025" rgba="0.8 0.8 0.8 1"/>
     </body>
 
-    <body name="l_g1_base" pos="0.0 0.0 1.5">
-      <freejoint name="floating_base_joint"/>
-      <attach model="g1_model" body="pelvis" prefix="l_"/>
-    </body>
+    <attach model="g1_model" body="pelvis" prefix="l_"/>
   </worldbody>
 </mujoco>
