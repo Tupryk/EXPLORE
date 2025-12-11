@@ -51,38 +51,50 @@
     <body name="obj" pos="0.0 0.0 0.3">
       <freejoint />
 
-      <!-- Box half size -->
-      <!-- hx = hy = hz = 0.1 -->
+      <!-- Collision + mass go here -->
+      <geom type="box"
+            size="0.1 0.1 0.1"
+            rgba="0 0 0 0"
+            mass="0.2"/>
+
+      <!-- Visual faces only (no mass, no collisions) -->
 
       <!-- +X face -->
-      <geom type="box" pos="0.1 0 0"
+      <geom type="box" pos="0.0998 0 0"
             size="0.001 0.1 0.1"
-            rgba="1 0 0 1"/>
+            rgba="1 0 0 1"
+            contype="0" conaffinity="0" density="0"/>
 
       <!-- -X face -->
-      <geom type="box" pos="-0.1 0 0"
+      <geom type="box" pos="-0.0998 0 0"
             size="0.001 0.1 0.1"
-            rgba="0 1 0 1"/>
+            rgba="0 1 0 1"
+            contype="0" conaffinity="0" density="0"/>
 
       <!-- +Y face -->
-      <geom type="box" pos="0 0.1 0"
+      <geom type="box" pos="0 0.0998 0"
             size="0.1 0.001 0.1"
-            rgba="0 0 1 1"/>
+            rgba="0 0 1 1"
+            contype="0" conaffinity="0" density="0"/>
 
       <!-- -Y face -->
-      <geom type="box" pos="0 -0.1 0"
+      <geom type="box" pos="0 -0.0998 0"
             size="0.1 0.001 0.1"
-            rgba="1 1 0 1"/>
+            rgba="1 1 0 1"
+            contype="0" conaffinity="0" density="0"/>
 
       <!-- +Z face -->
-      <geom type="box" pos="0 0 0.1"
+      <geom type="box" pos="0 0 0.0998"
             size="0.1 0.1 0.001"
-            rgba="1 0 1 1"/>
+            rgba="1 0 1 1"
+            contype="0" conaffinity="0" density="0"/>
 
       <!-- -Z face -->
-      <geom type="box" pos="0 0 -0.1"
+      <geom type="box" pos="0 0 -0.0998"
             size="0.1 0.1 0.001"
-            rgba="0 1 1 1"/>
+            rgba="0 1 1 1"
+            contype="0" conaffinity="0" density="0"/>
+
   </body>
 
   </worldbody>
