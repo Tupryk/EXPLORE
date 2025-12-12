@@ -72,6 +72,7 @@ class Search:
         self.bidirectional = cfg.bidirectional  # Performance seems very dependend on initial seed. Needs further investigation...
         self.knnK = cfg.knnK
         self.n_best_actions = cfg.n_best_actions
+        self.regularization_weight = cfg.regularization_weight
 
         if self.bidirectional:
             self.bi_stepsize = cfg.bi_stepsize
@@ -102,6 +103,9 @@ class Search:
             self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
         elif self.sampling_strategy == "cma":
             self.action_sampler = lambda o, t: self.cma_sample_ctrls(o, t)
+        elif self.sampling_strategy == "cem":
+            self.cem_steps = cfg.cem_steps
+            self.action_sampler = lambda o, t: self.cem_sample_ctrls(o, t)
         else:
             raise Exception(f"Sampling strategy '{self.sampling_strategy}' not implemented yet!")
         
@@ -154,10 +158,10 @@ class Search:
         return trees, trees_kNNs, trees_kNNs_sizes
     
     def gauss_sample_ctrl(self, parent_node: MultiSearchNode, sample_count: int=1,
-                          std_perc: float=0.2) -> np.ndarray:
-        # Maybe try sampling over spline waypoints? (technically right now we have a spline with two waypoints)
-        # TODO: Consider issue with infinetly growing delta when using warm start
-        mean = parent_node.delta_q if self.warm_start else np.zeros_like(parent_node.delta_q)
+                          std_perc: float=0.2, mean: np.ndarray=None) -> np.ndarray:
+
+        if mean is None:
+            mean = parent_node.delta_q if self.warm_start else np.zeros_like(parent_node.delta_q)
         if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
             std_devs = self.stepsize
         else:
@@ -225,6 +229,23 @@ class Search:
             best_results = all_results
 
         return best_results
+    
+    def cem_sample_ctrls(
+            self,
+            parent_node: MultiSearchNode,
+            target: np.ndarray
+        ) -> list[tuple[float, np.ndarray, np.ndarray]]:
+        
+        mean = np.zeros_like(parent_node.delta_q)
+        for _ in range(self.cem_steps):
+            
+            sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count, mean=mean)
+
+            results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)            
+            best_result = sorted(results, key=lambda x: x[0])[0]  # TODO: make faster maybe
+            mean = best_result[2] - parent_node.state[3]
+
+        return [best_result]
     
     def backward_random_sample_ctrls(self, to_node: MultiSearchNode, from_target: np.ndarray
                                      ) -> tuple[float, np.ndarray, np.ndarray]:
@@ -325,6 +346,9 @@ class Search:
             cost2target = np.abs(e).max()
         else:
             cost2target = e.T @ e
+        
+        reg_e = ctrl - origin[3].T
+        cost2target += self.regularization_weight *  (reg_e.T @ reg_e)
         
         return cost2target, state, ctrl
     
