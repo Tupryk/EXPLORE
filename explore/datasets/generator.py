@@ -6,6 +6,7 @@ import pickle
 import hnswlib
 import numpy as np
 from tqdm import trange
+import matplotlib.pyplot as plt
 from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -40,6 +41,7 @@ class Search:
         if isinstance(self.stepsize, ListConfig):
             self.stepsize = np.array(self.stepsize)
         self.target_prob = cfg.target_prob
+        self.k_nearest_targets = cfg.k_nearest_targets
         
         self.min_cost = cfg.min_cost
         self.output_dir = cfg.output_dir
@@ -114,6 +116,16 @@ class Search:
                 self.backward_action_sampler = lambda o, t: self.backward_random_sample_ctrls(o, t)
             else:
                 raise Exception(f"Sampling strategy '{self.sampling_strategy}' not implemented for backward search yet!")
+        
+        self.kNN_targets = None
+        if self.k_nearest_targets != -1:
+            
+            self.kNN_targets = hnswlib.Index(space='l2', dim=self.configs.shape[1])
+            self.kNN_targets.init_index(max_elements=self.config_count, ef_construction=200, M=16)
+            
+            for i in range(self.config_count):
+                new_state = self.configs[i]
+                self.kNN_targets.add_items(new_state.astype(np.float32), ids=[i])
             
         if self.verbose:
             print(f"Starting search across {self.config_count} configs!")
@@ -135,10 +147,10 @@ class Search:
 
         print("Initializing trees...")
         
-        if self.verbose > 0:
-            pbar = trange(self.config_count, desc="Init trees", unit="epoch")
+        if self.verbose > 1:
+            pbar = trange(self.config_count, desc="Init trees", unit="tree")
         else:
-            pbar = range(self.max_nodes)
+            pbar = range(self.config_count)
             
         for i in pbar:
             
@@ -196,7 +208,7 @@ class Search:
             target: np.ndarray
         ) -> list[tuple[float, np.ndarray, np.ndarray]]:
 
-        pop_size = 20
+        pop_size = 200
         initial_guess = parent_node.state[3]
 
         es = cma.CMAEvolutionStrategy(
@@ -227,7 +239,7 @@ class Search:
             best_results = sorted(all_results, key=lambda x: x[0])[:self.n_best_actions]
         else:
             best_results = all_results
-
+        
         return best_results
     
     def cem_sample_ctrls(
@@ -236,12 +248,15 @@ class Search:
             target: np.ndarray
         ) -> list[tuple[float, np.ndarray, np.ndarray]]:
         
+        best_result = None
         mean = np.zeros_like(parent_node.delta_q)
         for _ in range(self.cem_steps):
             
             sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count, mean=mean)
+            if best_result is not None:
+                sampled_ctrls = np.vstack((best_result[2], sampled_ctrls))
 
-            results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)            
+            results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)
             best_result = sorted(results, key=lambda x: x[0])[0]  # TODO: make faster maybe
             mean = best_result[2] - parent_node.state[3]
 
@@ -330,6 +345,20 @@ class Search:
                 res = self.eval_ctrl(ctrl, origin, target, max_method=self.cost_max_method)
                 results.append(res)
         
+        if self.verbose > 3:
+            results_plot = []
+            min_results = results[0][0]
+            results_plot.append(min_results)
+            for res in results:
+                new_res = res[0]
+                if results_plot[-1] > new_res:
+                    results_plot.append(new_res)
+                else:
+                    results_plot.append(results_plot[-1])
+            
+            plt.plot(results_plot)
+            plt.show()
+        
         return results
     
     def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
@@ -395,7 +424,7 @@ class Search:
             os.makedirs(bi_folder_path, exist_ok=True)
             
         if self.verbose > 0:
-            pbar = trange(self.max_nodes, desc="Physics RRT Search", unit="epoch")
+            pbar = trange(self.max_nodes, desc="Physics RRT Search", unit="nodes")
         else:
             pbar = range(self.max_nodes)
             
@@ -415,17 +444,34 @@ class Search:
             # Sample random sim state
             exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
             
-            if exploring or self.end_idx == -1:
-                sim_sample, target_config_idx = self.sample_state(start_idx)
-            else:
-                target_config_idx = self.end_idx
-                sim_sample = self.configs[target_config_idx]
+            if self.k_nearest_targets == -1:
+                
+                if exploring or self.end_idx == -1:
+                    sim_sample, target_config_idx = self.sample_state(start_idx)
+                else:
+                    target_config_idx = self.end_idx
+                    sim_sample = self.configs[target_config_idx]
+                
+                # Pick closest node
+                k = min(self.knnK, self.trees_kNNs_sizes[start_idx])
+                node_idx, _ = self.trees_kNNs[start_idx].knn_query(sim_sample * self.q_mask, k=k)
+                node_idx = np.random.choice(node_idx[0])
+                node: MultiSearchNode = self.trees[start_idx][node_idx]
             
-            # Pick closest node
-            k = min(self.knnK, self.trees_kNNs_sizes[start_idx])
-            node_idx, _ = self.trees_kNNs[start_idx].knn_query(sim_sample * self.q_mask, k=k)
-            node_idx = np.random.choice(node_idx[0])
-            node: MultiSearchNode = self.trees[start_idx][node_idx]
+            else:
+                
+                tree_size = len(self.trees[start_idx])
+                sample_size = 32 if tree_size > 32 else tree_size
+                
+                node_idx = np.random.randint(sample_size)
+                node_idx = int(tree_size - sample_size + node_idx)
+                
+                node: MultiSearchNode = self.trees[start_idx][node_idx]
+                node_state = node.state[1].astype(np.float32) * self.q_mask
+                
+                target_config_idx, _ = self.kNN_targets.knn_query(node_state, k=self.k_nearest_targets)
+                target_config_idx = np.random.choice(target_config_idx[0])
+                sim_sample = self.configs[target_config_idx]
 
             # Expand node
             best_expansions = self.action_sampler(node, sim_sample)

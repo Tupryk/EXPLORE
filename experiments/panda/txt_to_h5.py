@@ -13,14 +13,26 @@ txt_file = "data/joint_states_unitree.txt"
 h5_file = "configs/stable/g1.h5"
 
 # SAME_THRESH = 0.07
-SAME_THRESH = 0.05
+SAME_THRESH = 0.3
+FAR_THRESH = 0.8
+q_mask = np.array([
+    0., 0., 2.5, 0., 0., 0., 0.,
+    1., 1., 1.,  # hip
+    .75, .25, .25,  # knee, ankle, ankle
+    1., 1., 1.,  # hip
+    .5, .25, .25,  # knee, ankle, ankle
+    1.25, 1.25, 1.25,  # waist
+    .75, .75, .75,  # shoulder
+    .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+    .75, .75, .75,  # shoulder
+    .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+])
 
 data = np.loadtxt(txt_file, dtype=np.float64)
 
 new_data_pos = []
 new_data_ctrl = []
 for i, vec in enumerate(data):
-    if i >= 200: break
     # ### FRANKAS BOX ###
     # state_vec = np.zeros(25)
     
@@ -45,7 +57,7 @@ for i, vec in enumerate(data):
     state_vec = np.zeros(36)
     ctrl_vec = np.zeros(29)
     
-    state_vec[:7] = vec[:7]
+    state_vec[2:7] = vec[2:7]
     state_vec[2] += 0.69
     
     # 19 -  0 waist_yaw_joint
@@ -149,8 +161,9 @@ while i < data_pos.shape[0]:
     for j in range(data_pos.shape[0]):
         if i == j: keep.append(i)
         
-        e = data_pos[i] - data_pos[j]
-        if e.T @ e > SAME_THRESH:
+        e = (data_pos[i] - data_pos[j]) * q_mask
+        cost = np.abs(e).max()
+        if cost > SAME_THRESH and cost < FAR_THRESH:
             keep.append(j)
 
     data_pos = data_pos[keep]
@@ -164,7 +177,7 @@ for i in range(data_pos.shape[0]):
         if i == j: continue
         
         e = data_pos[i] - data_pos[j]
-        costs[i, j] = e.T @ e
+        costs[i, j] = np.abs(e).max()
 
 masked = costs.copy()
 np.fill_diagonal(masked, np.inf)
