@@ -13,26 +13,41 @@ txt_file = "data/joint_states_unitree.txt"
 h5_file = "configs/stable/g1.h5"
 
 # SAME_THRESH = 0.07
-SAME_THRESH = 0.3
-FAR_THRESH = 0.8
+SAME_THRESH = 0.01
+# FAR_THRESH = 0.8
+FAR_THRESH = np.inf
+MAX_CONFIGS = 100
 q_mask = np.array([
-    0., 0., 2.5, 0., 0., 0., 0.,
-    1., 1., 1.,  # hip
-    .75, .25, .25,  # knee, ankle, ankle
-    1., 1., 1.,  # hip
-    .5, .25, .25,  # knee, ankle, ankle
-    1.25, 1.25, 1.25,  # waist
-    .75, .75, .75,  # shoulder
-    .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
-    .75, .75, .75,  # shoulder
-    .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+    1., 1., 1., .1, .1, .1, .1,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
 ])
+# q_mask = np.array([
+#     0., 0., 2.5, 0., 0., 0., 0.,
+#     1., 1., 1.,  # hip
+#     .75, .25, .25,  # knee, ankle, ankle
+#     1., 1., 1.,  # hip
+#     .5, .25, .25,  # knee, ankle, ankle
+#     1.25, 1.25, 1.25,  # waist
+#     .75, .75, .75,  # shoulder
+#     .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+#     .75, .75, .75,  # shoulder
+#     .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+# ])
 
 data = np.loadtxt(txt_file, dtype=np.float64)
 
 new_data_pos = []
 new_data_ctrl = []
 for i, vec in enumerate(data):
+    if i >= MAX_CONFIGS: break
     # ### FRANKAS BOX ###
     # state_vec = np.zeros(25)
     

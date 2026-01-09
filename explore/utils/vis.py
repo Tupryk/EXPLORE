@@ -35,10 +35,7 @@ def play_path(path: list[dict], sim: MjSim,
               playback_time: float=1., tau_action: float=.1, save_intro_as: str="",
               camera: str="", save_as: str="path.gif", reset_state: bool=False) -> list[np.ndarray]:
     
-    if isinstance(path[0], dict):
-        play_path = [node["state"] for node in path]
-    else:
-        play_path = path.copy()
+    play_path = path.copy()
     
     print(f"Playing path with length {len(play_path)}")
     sim.setupRenderer(camera=camera)
@@ -49,7 +46,7 @@ def play_path(path: list[dict], sim: MjSim,
         im_start = sim.renderImg()
         sim.pushConfig(target_state, ignore_warn=True)
         im_end = sim.renderImg()
-        sim.pushConfig(play_path[-1][1], ignore_warn=True)
+        sim.pushConfig(play_path[-1]["state"][1], ignore_warn=True)
         im_reached = sim.renderImg()
         
         fig, axes = plt.subplots(1, 3, figsize=(30, 20))
@@ -72,20 +69,30 @@ def play_path(path: list[dict], sim: MjSim,
     frames = []
     states = []
 
-    sim.setState(*play_path[0])
-
     prev_node = play_path[0]
+    sim.setState(*prev_node["state"])
+
     for node in play_path[1:]:
         
         if reset_state:
-            sim.setState(*prev_node)
+            sim.setState(*prev_node["state"])
         
         # TODO: Make this nicer
-        q_target = node[4] if sim.use_spline_ref else node[3]
-        f, s, c = sim.step(tau_action, q_target, view=camera)
-        frames.extend(f)
-        states.extend(s)
+        if "q_sequence" not in node.keys():
+            q_target = node["state"][4] if sim.use_spline_ref else node["state"][3]
+            f, s, c = sim.step(tau_action, q_target, view=camera)
+            frames.extend(f)
+            states.extend(s)
+        else:
+            assert not sim.use_spline_ref
+            for q in node["q_sequence"]:
+                f, s, c = sim.step(tau_action, q, view=camera)
+                frames.extend(f)
+                states.extend(s)
+        
         prev_node = node
+
+    # frames.extend([np.zeros_like(f) for _ in range(24)])
 
     if sim.viewer != None:
         time.sleep(3)

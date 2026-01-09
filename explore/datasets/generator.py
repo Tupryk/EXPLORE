@@ -19,15 +19,17 @@ class MultiSearchNode:
                  parent: int,
                  delta_q: np.ndarray,
                  state: tuple,
+                 q_sequence: np.ndarray,
                  path: list=None,
                  explore_node: bool=False,
                  target_config_idx: int=-1):
         self.parent = parent
-        self.delta_q = delta_q
+        self.delta_q = delta_q  # TODO: Remove this
         self.state = state
         self.path = path  # Motion
         self.explore_node = explore_node
         self.target_config_idx = target_config_idx
+        self.q_sequence = q_sequence
 
 class Search:
 
@@ -51,7 +53,8 @@ class Search:
         self.interpolate_actions = cfg.sim.interpolate_actions
         self.joints_are_same_as_ctrl = cfg.sim.joints_are_same_as_ctrl
         self.mujoco_xml = cfg.sim.mujoco_xml
-
+        
+        self.horizon = cfg.horizon
         self.sample_count = cfg.sample_count
         self.cost_max_method = cfg.cost_max_method
         self.sample_uniform = cfg.sample_uniform
@@ -60,6 +63,9 @@ class Search:
         self.q_mask = np.array(cfg.q_mask)
         if not self.q_mask.shape[0]:
             self.q_mask = np.ones_like(self.configs[0])
+            
+        assert (self.warm_start and self.horizon == 1) or not self.warm_start
+        assert (cfg.sim.use_spline_ref and self.horizon == 1) or not cfg.sim.use_spline_ref
         
         # Does not always provide faster execution! Depends on weird factors like tau_sim
         # Does not work for the bi-tree for now
@@ -170,7 +176,7 @@ class Search:
         return trees, trees_kNNs, trees_kNNs_sizes
     
     def gauss_sample_ctrl(self, parent_node: MultiSearchNode, sample_count: int=1,
-                          std_perc: float=0.2, mean: np.ndarray=None) -> np.ndarray:
+                          std_perc: float=0.1, mean: np.ndarray=None) -> np.ndarray:
 
         if mean is None:
             mean = parent_node.delta_q if self.warm_start else np.zeros_like(parent_node.delta_q)
@@ -178,7 +184,8 @@ class Search:
             std_devs = self.stepsize
         else:
             std_devs = np.abs(self.ctrl_ranges[:, 0] - self.ctrl_ranges[:, 1]) * std_perc
-        noise = np.random.randn(sample_count * self.ctrl_dim).reshape(sample_count, -1)
+        noise = np.random.randn(sample_count * self.horizon * self.ctrl_dim)
+        noise = noise.reshape(sample_count, self.horizon, self.ctrl_dim)
         delta = noise * std_devs + mean
         
         sample = delta + parent_node.state[3]
@@ -209,7 +216,7 @@ class Search:
         ) -> list[tuple[float, np.ndarray, np.ndarray]]:
 
         pop_size = 200
-        initial_guess = parent_node.state[3]
+        initial_guess = np.full(self.horizon, parent_node.state[3])
 
         es = cma.CMAEvolutionStrategy(
             initial_guess, 0.5,
@@ -225,7 +232,8 @@ class Search:
         while not es.stop():
             candidates = es.ask()
 
-            results = self.eval_multiple_ctrls(candidates, parent_node.state, target)
+            results = self.eval_multiple_ctrls(
+                candidates.reshape(-1, self.horizon, self.ctrl_dim), parent_node.state, target)
             fitness_values = [r[0] for r in results]
 
             all_results.extend(results)
@@ -248,17 +256,18 @@ class Search:
             target: np.ndarray
         ) -> list[tuple[float, np.ndarray, np.ndarray]]:
         
+        q_offset = np.tile(parent_node.state[3], self.horizon).reshape(self.horizon, self.ctrl_dim)
         best_result = None
         mean = np.zeros_like(parent_node.delta_q)
         for _ in range(self.cem_steps):
             
             sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count, mean=mean)
             if best_result is not None:
-                sampled_ctrls = np.vstack((best_result[2], sampled_ctrls))
+                sampled_ctrls = np.concatenate((best_result[2][None], sampled_ctrls), axis=0)
 
             results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)
             best_result = sorted(results, key=lambda x: x[0])[0]  # TODO: make faster maybe
-            mean = best_result[2] - parent_node.state[3]
+            mean = best_result[2] - q_offset
 
         return [best_result]
     
@@ -367,7 +376,9 @@ class Search:
         
         self.sim[sim_idx].setState(*origin)
         
-        self.sim[sim_idx].step(self.tau_action, ctrl)
+        for c in ctrl:
+            self.sim[sim_idx].step(self.tau_action, c)
+        
         state = self.sim[sim_idx].getState()
         
         e = (target - state[1]) * self.q_mask
@@ -376,7 +387,7 @@ class Search:
         else:
             cost2target = e.T @ e
         
-        reg_e = ctrl - origin[3].T
+        reg_e = state[3] - origin[3].T
         cost2target += self.regularization_weight *  (reg_e.T @ reg_e)
         
         return cost2target, state, ctrl
@@ -387,6 +398,7 @@ class Search:
             new_node = {
                 "parent": node.parent,
                 "delta_q": node.delta_q,
+                "q_sequence": node.q_sequence,
                 "state": node.state,
                 "path": node.path,
                 "explore_node": node.explore_node,
@@ -431,6 +443,11 @@ class Search:
         nodes_per_tree = self.max_nodes // self.config_count
         
         start_time = time.time()
+        
+        assert (
+            (self.start_idx != -1 and self.knnK <= self.max_nodes * 0.25) or
+            (self.start_idx == -1 and self.knnK <= nodes_per_tree * 0.25)
+        )
         
         for i in pbar:
             
@@ -480,7 +497,8 @@ class Search:
                 best_node = MultiSearchNode(
                     node_idx, delta_q, best_state,
                     explore_node=exploring,
-                    target_config_idx=target_config_idx)
+                    target_config_idx=target_config_idx,
+                    q_sequence=best_q)
                 
                 self.trees[start_idx].append(best_node)
                 knn_item = best_state[1].astype(np.float32) * self.q_mask
