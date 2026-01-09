@@ -1,0 +1,94 @@
+<mujoco model="ry_convert">
+  <asset />
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.1 0.1 0.1" />
+    <map znear="0.01" />
+    <global offwidth="1200" offheight="800" />
+  </visual>
+  <default>
+    <default class="ryjoint">
+      <position forcerange="-150 150" kp="1000" kv="10" ctrlrange="-10 10" />
+    </default>
+    <default class="geom_fric">
+      <geom friction=".8 0.1 0.1" />
+    </default>
+  </default>
+  <actuator>
+    <position name="l_joint1" joint="l_joint1" class="ryjoint" />
+    <position name="l_joint2" joint="l_joint2" class="ryjoint" />
+    <position name="l_fing" joint="l_fing" class="ryjoint" />
+    <position name="r_joint1" joint="r_joint1" class="ryjoint" />
+    <position name="r_joint2" joint="r_joint2" class="ryjoint" />
+    <position name="r_fing" joint="r_fing" class="ryjoint" />
+  </actuator>
+  <worldbody>
+    <camera name="fixed_cam" pos="-1.104 1.275 0.847" xyaxes="-0.728 -0.686 0.000 0.225 -0.238 0.945"/>
+    
+    <body name="l_base" pos="0.0 0.0 0.5">
+      <body name="l_fake">
+        <body name="l_joint1">
+          <joint name="l_joint1" damping="0.1" type="slide" axis="1 0 0" />
+          <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
+          <body name="l_joint2">
+            <joint name="l_joint2" damping="0.1" type="slide" axis="0 1 0" />
+            <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
+            <body name="l_fing">
+              <joint name="l_fing" damping="0.1" type="slide" axis="0 0 1" />
+              <geom type="sphere" size="0.05" rgba="0.5 1.0 1.0 1" mass="0.1" class="geom_fric" />
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="r_base" pos="0.0 0.0 0.5">
+      <body name="r_fake">
+        <body name="r_joint1">
+          <joint name="r_joint1" damping="0.1" type="slide" axis="1 0 0" />
+          <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
+          <body name="r_joint2">
+            <joint name="r_joint2" damping="0.1" type="slide" axis="0 1 0" />
+            <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
+            <body name="r_fing">
+              <joint name="r_fing" damping="0.1" type="slide" axis="0 0 1" />
+              <geom type="sphere" size="0.05" rgba="0.5 1.0 1.0 1" mass="0.1" class="geom_fric" />
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="table" pos="0.0 0.0 0.1">
+      <geom type="box" size="0.5 0.5 0.05" rgba="0.6 0.6 0.6 1.0" class="geom_fric" />
+      <body name="wall" pos="0.45 0.0 0.3">
+        <geom type="box" size="0.05 0.5 0.25" rgba="0.6 0.6 0.6 1.0" class="geom_fric" />
+      </body>
+      <body name="box" pos="-0.05 -0.35 0.25">
+        <geom type="box" size="0.45 0.15 0.2" rgba="0.6 0.6 0.6 1.0" class="geom_fric" />
+      </body>
+    </body>
+    <body name="obj_base" />
+    <body name="obj" pos="0.0 0.0 0.3">
+      <freejoint />
+      <geom type="box" size="0.05 0.05 0.05" rgba="1.0 0.5 0.0 1" mass="0.2" class="geom_fric" />
+      <body name="side1" pos="0.05 0.0 0.0">
+        <geom type="box" size="0.0005 0.05 0.05" rgba="1.0 0.5 0.5 1" class="geom_fric" />
+      </body>
+      <body name="side2" pos="-0.05 0.0 0.0">
+        <geom type="box" size="0.0005 0.05 0.05" rgba="0.8 0.3 0.3 1" class="geom_fric" />
+      </body>
+      <body name="side3" pos="0.0 0.05 0.0">
+        <geom type="box" size="0.05 0.0005 0.05" rgba="0.5 1.0 0.5 1" class="geom_fric" />
+      </body>
+      <body name="side4" pos="0.0 -0.05 0.0">
+        <geom type="box" size="0.05 0.0005 0.05" rgba="0.3 0.8 0.3 1" class="geom_fric" />
+      </body>
+      <body name="side5" pos="0.0 0.0 0.05">
+        <geom type="box" size="0.05 0.05 0.0005" rgba="0.5 0.5 1.0 1" class="geom_fric" />
+      </body>
+      <body name="side6" pos="0.0 0.0 -0.05">
+        <geom type="box" size="0.05 0.05 0.0005" rgba="0.3 0.3 0.8 1" class="geom_fric" />
+      </body>
+    </body>
+    <body name="camera_init" pos="-0.285441 1.5997 0.7643" quat="0.05155251630358149 -0.06594522085530172 0.7850692482796453 -0.6137261940920781" />
+    <camera name="cam0" pos="-0.992 1.956 1.209" xyaxes="-0.886 -0.463 -0.000 0.167 -0.320 0.933"/>
+  </worldbody>
+</mujoco>

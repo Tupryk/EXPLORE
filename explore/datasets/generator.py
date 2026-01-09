@@ -35,8 +35,15 @@ class Search:
 
     def __init__(self, configs: np.ndarray, configs_ctrl: np.ndarray, cfg: DictConfig):
         
-        self.configs = configs
-        self.configs_ctrl = configs_ctrl
+        assert len(configs) == len(configs_ctrl)
+        self.max_configs = cfg.max_configs
+
+        if self.max_configs != -1 and len(configs) > self.max_configs:
+            self.configs = configs[:self.max_configs]
+            self.configs_ctrl = configs_ctrl[:self.max_configs]
+        else:
+            self.configs = configs
+            self.configs_ctrl = configs_ctrl
 
         self.max_nodes = int(cfg.max_nodes)
         self.stepsize = cfg.stepsize
