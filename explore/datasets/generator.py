@@ -81,6 +81,8 @@ class Search:
         self.max_workers = 5
         self.sim_count = 10 if self.threading else 1
         self.verbose = cfg.verbose
+        if self.threading:
+            self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
         
         self.start_idx = cfg.start_idx
         self.end_idx = cfg.end_idx
@@ -270,10 +272,10 @@ class Search:
             
             sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count, mean=mean)
             if best_result is not None:
-                sampled_ctrls = np.concatenate((best_result[2][None], sampled_ctrls), axis=0)
+                sampled_ctrls[0] = best_result[2]
 
             results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)
-            best_result = sorted(results, key=lambda x: x[0])[0]  # TODO: make faster maybe
+            best_result = min(results)
             mean = best_result[2] - q_offset
 
         return [best_result]
@@ -335,6 +337,14 @@ class Search:
 
         return best_cost, best_start_state
     
+    def eval_multiple_ctrls_seq(self, ctrls: np.ndarray, origin: tuple,
+                                target: tuple, sim_idx: int=0) -> list[tuple[float, np.ndarray, np.ndarray]]:
+        results = []
+        for ctrl in ctrls:
+            res = self.eval_ctrl(ctrl, origin, target, sim_idx=sim_idx, max_method=self.cost_max_method)
+            results.append(res)
+        return results
+    
     def eval_multiple_ctrls(self, ctrls: np.ndarray, origin: tuple,
                             target: tuple) -> list[tuple[float, np.ndarray, np.ndarray]]:
         results = []
@@ -342,24 +352,25 @@ class Search:
         if self.threading:
             sim_count = len(self.sim)
             sample_batch_count = len(ctrls) // sim_count
-            
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                for i in range(sample_batch_count):
-                    futures = [
-                        executor.submit(
-                            self.eval_ctrl,
-                            ctrls[i*sim_count+sim_idx],
-                            origin, target,
-                            sim_idx, self.cost_max_method
-                        )
-                        for sim_idx in range(sim_count)
-                    ]
-                    for future in as_completed(futures):
-                        results.append(future.result())
+        
+            futures = [
+                self.executor.submit(
+                    self.eval_multiple_ctrls_seq,
+                    ctrls[
+                        sim_idx * sample_batch_count
+                        :
+                        (sim_idx + 1) * sample_batch_count
+                    ],
+                    origin, target,
+                    sim_idx
+                )
+                for sim_idx in range(sim_count)
+            ]
+            for future in as_completed(futures):
+                results.extend(future.result())
         else:
-            for ctrl in ctrls:
-                res = self.eval_ctrl(ctrl, origin, target, max_method=self.cost_max_method)
-                results.append(res)
+            self.eval_multiple_ctrls_seq(ctrls, origin, target)
+            
         
         if self.verbose > 3:
             results_plot = []
