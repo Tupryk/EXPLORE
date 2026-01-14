@@ -141,10 +141,13 @@ class Search:
             self.trees_closest_nodes_idxs.append(np.full((self.config_count, self.knnK), -1))
             self.trees_closest_nodes_costs.append(np.full((self.config_count, self.knnK), np.nan))
             
-            self.trees_closest_nodes_idxs[i][:, 0] = 0
             for ci in range(self.config_count):
                 cost = self.compute_cost(self.configs[i], self.configs[ci])
                 self.trees_closest_nodes_costs[i][ci, 0] = cost
+                if cost <= self.target_min_dist:
+                    self.trees_closest_nodes_idxs[i][ci, 0] = 0
+                else:
+                    self.trees_closest_nodes_idxs[i][ci, 0] = -1
 
         return trees
     
