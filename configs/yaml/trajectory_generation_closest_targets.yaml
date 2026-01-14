@@ -1,0 +1,55 @@
+RRT:
+  verbose: 3
+  max_nodes: 1000
+  min_cost: 0.1
+  horizon: 1
+  max_configs: 256
+  stepsize: [
+    .075, .05, .075,  # hip
+    .1, .1, .1,  # knee, ankle, ankle
+    .075, .05, .075,  # hip
+    .1, .1, .1,  # knee, ankle, ankle
+    .075, .05, .05,  # waist
+    .75, .75, .75,  # shoulder
+    .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
+    .05, .05, .05,  # shoulder
+    .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
+  ]
+  path_diff_thresh: 0.05
+  target_min_dist: .6
+  target_prob: .1
+  sample_uniform: false
+  warm_start: false
+  threading: true  # Depending on the hardware this may lead to faster computations.
+  start_idx: 1
+  end_idx: -1
+  bidirectional: false
+  cost_max_method: true
+  n_best_actions: 1  # Only for random sampling strategy
+  sample_count: 1000
+  sampling_strategy: cem
+  cem_steps: 3
+  regularization_weight: .05
+  output_dir: ${hydra:runtime.output_dir}
+  q_mask: [
+    0., 0., 2.5, 1., 1., 1., 1.,
+    1., 1., 1.,  # hip
+    .75, .25, .25,  # knee, ankle, ankle
+    1., 1., 1.,  # hip
+    .5, .25, .25,  # knee, ankle, ankle
+    1.25, 1.25, 1.25,  # waist
+    .75, .75, .75,  # shoulder
+    .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+    .75, .75, .75,  # shoulder
+    .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+  ]
+  knnK: 16
+  sim:
+    tau_sim: 0.005
+    tau_action: 0.2
+    interpolate_actions: false
+    joints_are_same_as_ctrl: false
+    use_spline_ref: false
+    mujoco_xml: configs/mujoco_/unitree_g1/g1_single.xml
+    camera: fixed_cam
+configs_path: configs/stable/g1.h5
