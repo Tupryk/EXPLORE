@@ -165,7 +165,7 @@ class Search:
         delta = noise * std_devs + mean
         
         sample = delta + parent_node.state[3]
-        sample = np.clip(sample, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])  # Might be slow...
+        sample = np.clip(sample, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])
         return sample
             
     def random_sample_ctrls(
@@ -341,6 +341,22 @@ class Search:
         data_path = os.path.join(folder_path, f"tree_{idx}.pkl")
         with open(data_path, "wb") as f:
             pickle.dump(dict_tree, f)
+        
+        stats_path = os.path.join(folder_path, f"tree_stats_{idx}.txt")
+        with open(stats_path, "w") as f:
+            costs = self.trees_closest_nodes_costs[idx][:, 0]
+
+            if 0 <= idx < len(costs):
+                costs = costs[np.arange(len(costs)) != idx]
+
+            mean_cost = costs.mean()
+            min_cost = costs.min()
+
+            f.write(f"{mean_cost}, {min_cost}")
+            if self.end_idx != -1:
+                f.write(f", {self.trees_closest_nodes_costs[idx][self.end_idx, 0]}\n")
+            else:
+                f.write("\n")
 
     def sample_state(self, start_idx: int = -1) -> np.ndarray:
         """
@@ -473,20 +489,20 @@ class Search:
                             self.trees_closest_nodes_idxs[start_idx][ci][k] = len(self.trees[start_idx]) - 1
                             break
                 
-                if self.verbose > 1:
-                    costs = self.trees_closest_nodes_costs[start_idx][:, 0]
+            if self.verbose > 1:
+                costs = self.trees_closest_nodes_costs[start_idx][:, 0]
 
-                    if 0 <= start_idx < len(costs):
-                        costs = costs[np.arange(len(costs)) != start_idx]
+                if 0 <= start_idx < len(costs):
+                    costs = costs[np.arange(len(costs)) != start_idx]
 
-                    mean_cost = costs.mean()
-                    min_cost = costs.min()
+                mean_cost = costs.mean()
+                min_cost = costs.min()
 
-                    print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost}", end="")
-                    if self.end_idx != -1:
-                        print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_idx, 0]}")
-                    else:
-                        print()
+                print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost}", end="")
+                if self.end_idx != -1:
+                    print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_idx, 0]}")
+                else:
+                    print()
 
             # Store information when appropriate
             if (((self.start_idx == -1) and (i % nodes_per_tree == nodes_per_tree-1)) or
@@ -512,4 +528,4 @@ class Search:
 
         time_data_path = os.path.join(self.output_dir, f"time_taken.txt")
         with open(time_data_path, "w") as f:
-            f.write(f"{total_time}")
+            f.write(f"{total_time}\n")
