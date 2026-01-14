@@ -431,7 +431,7 @@ class Search:
             # Sample random sim state
             exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
             
-            if exploring or self.end_idx == -1:
+            if exploring or self.end_idx == -1 or len(self.trees[start_idx]) == 1:
                 sim_sample, target_config_idx = self.sample_state(start_idx)
             else:
                 target_config_idx = self.end_idx
@@ -440,6 +440,7 @@ class Search:
             # Pick closest node
             node_ids = self.trees_closest_nodes_idxs[start_idx][target_config_idx]
             node_id = np.random.choice(node_ids[node_ids != -1])
+            assert node_id != -1
             node: MultiSearchNode = self.trees[start_idx][node_id]
 
             # Expand node
@@ -477,7 +478,11 @@ class Search:
                     mean_cost = costs.mean()
                     min_cost = costs.min()
 
-                    print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost}")
+                    print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost}", end="")
+                    if self.end_idx != -1:
+                        print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_idx, 0]}")
+                    else:
+                        print()
 
             # Store information when appropriate
             if (((self.start_idx == -1) and (i % nodes_per_tree == nodes_per_tree-1)) or
