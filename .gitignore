@@ -3,6 +3,7 @@ __pycache__
 data/
 checkpoints/
 outputs/
+multirun/
 z.*
 outcmaes/
 MUJOCO_LOG.TXT
