@@ -406,7 +406,7 @@ class Search:
             cost2target = e.T @ e
         
         reg_e = state[3] - origin[3].T
-        cost2target += self.regularization_weight *  (reg_e.T @ reg_e)
+        cost2target += self.regularization_weight * (reg_e.T @ reg_e)
         
         return cost2target, state, ctrl
     

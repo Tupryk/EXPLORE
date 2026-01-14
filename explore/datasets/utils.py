@@ -45,8 +45,8 @@ def cost_computation(node1: dict, node2: dict,
     if q_mask.shape[0]:
         e *= q_mask
     
-    # node_cost = e.T @ e
-    cost = np.abs(e).max()
+    cost = e.T @ e
+    # cost = np.abs(e).max()
     
     return cost
 

@@ -138,11 +138,13 @@ class Search:
             root = MultiSearchNode(-1, np.zeros_like(self.configs_ctrl[0]), state, 0.)
             trees.append([root])
             
-            self.trees_closest_nodes_idxs.append(np.full((self.config_count, self.knnK), 0))
-            self.trees_closest_nodes_costs.append(np.full((self.config_count, self.knnK), 1.0))
+            self.trees_closest_nodes_idxs.append(np.full((self.config_count, self.knnK), -1))
+            self.trees_closest_nodes_costs.append(np.full((self.config_count, self.knnK), np.nan))
+            
+            self.trees_closest_nodes_idxs[i][:, 0] = 0
             for ci in range(self.config_count):
                 cost = self.compute_cost(self.configs[i], self.configs[ci])
-                self.trees_closest_nodes_costs[i][ci] *= cost
+                self.trees_closest_nodes_costs[i][ci, 0] = cost
 
         return trees
     
@@ -315,7 +317,7 @@ class Search:
         cost2target = self.compute_cost(target, state[1])
         
         reg_e = state[3] - origin[3].T
-        cost2target += self.regularization_weight *  (reg_e.T @ reg_e)
+        cost2target += self.regularization_weight * (reg_e.T @ reg_e)
         
         return cost2target, state, ctrl
     
@@ -434,7 +436,7 @@ class Search:
             
             # Pick closest node
             node_ids = self.trees_closest_nodes_idxs[start_idx][target_config_idx]
-            node_id = np.random.choice(node_ids)
+            node_id = np.random.choice(node_ids[node_ids != -1])
             node: MultiSearchNode = self.trees[start_idx][node_id]
 
             # Expand node
@@ -467,11 +469,12 @@ class Search:
                     costs = self.trees_closest_nodes_costs[start_idx][:, 0]
 
                     if 0 <= start_idx < len(costs):
-                        min_cost = costs[np.arange(len(costs)) != start_idx].min()
-                    else:
-                        min_cost = costs.min()
+                        costs = costs[np.arange(len(costs)) != start_idx]
 
-                    print(f"Lowest Cost: {min_cost}")
+                    mean_cost = costs.mean()
+                    min_cost = costs.min()
+
+                    print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost}")
 
             # Store information when appropriate
             if (((self.start_idx == -1) and (i % nodes_per_tree == nodes_per_tree-1)) or
