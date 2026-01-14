@@ -431,15 +431,19 @@ class Search:
             # Sample random sim state
             exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
             
-            if exploring or self.end_idx == -1 or len(self.trees[start_idx]) == 1:
-                sim_sample, target_config_idx = self.sample_state(start_idx)
-            else:
+            if not exploring and self.end_idx != -1:
                 target_config_idx = self.end_idx
                 sim_sample = self.configs[target_config_idx]
+            else:
+                sim_sample, target_config_idx = self.sample_state(start_idx)
             
             # Pick closest node
             node_ids = self.trees_closest_nodes_idxs[start_idx][target_config_idx]
-            node_id = np.random.choice(node_ids[node_ids != -1])
+            valid_ids = node_ids[node_ids != -1]
+            if len(valid_ids):
+                node_id = np.random.choice(valid_ids)
+            else:
+                node_id = 0
             assert node_id != -1
             node: MultiSearchNode = self.trees[start_idx][node_id]
 
