@@ -478,7 +478,7 @@ class Search:
                 self.store_tree(start_idx, folder_path, self.trees)
                 
                 # Free memory
-                self.trees, self.trees_kNNs, self.trees_kNNs_sizes = self.init_trees()
+                self.trees = self.init_trees()
 
             if self.verbose > 2 and (i+1) % 1000 == 0:
                 process = psutil.Process(os.getpid())
