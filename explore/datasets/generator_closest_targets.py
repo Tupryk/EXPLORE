@@ -365,9 +365,13 @@ class Search:
 
         # Print percentages (debug/info)
         if self.verbose > 1:
-            pct_below_target = np.mean(below_target) * 100
-            pct_below_min = np.mean(above_min) * 100
-            print(f"Below target_min_dist: {pct_below_target:.2f}% | Below min_cost: {pct_below_min:.2f}%")
+            valid_costs = costs[valid_indices]
+            pct_below_target = np.mean(valid_costs < self.target_min_dist) * 100
+            pct_below_min = np.mean(valid_costs < self.min_cost) * 100
+            print(
+                f"Below target_min_dist: {pct_below_target:.2f}% | "
+                f"Below min_cost: {pct_below_min:.2f}%"
+            )
 
         if len(preferred_indices) > 0:
             target_config_idx = np.random.choice(preferred_indices)
