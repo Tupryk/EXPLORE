@@ -2,7 +2,7 @@ import h5py
 import hydra
 from omegaconf import DictConfig
 
-from explore.datasets.generator_closest_targets import Search
+from explore.datasets.generator_closest_targets_gpu import Search
 
 
 @hydra.main(version_base="1.3",

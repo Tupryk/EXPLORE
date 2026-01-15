@@ -2,7 +2,7 @@ RRT:
   verbose: 1
   max_nodes: 5000
   min_cost: 0.1
-  horizon: 20
+  horizon: 1
   max_configs: 256
   # stepsize: [
   #   1.0821, 0.69814, 1.10304, 0.5934134, 0.279254, 0.10472, 1.0821,
@@ -61,14 +61,14 @@ RRT:
   sample_uniform: false
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: 1
-  end_idx: 8
+  start_idx: -1
+  end_idx: -1
   bidirectional: false
-  cost_max_method: true
+  cost_max_method: false
   n_best_actions: 1  # Only for random sampling strategy
-  sample_count: 1000
-  sampling_strategy: rs
-  cem_steps: 3
+  sample_count: 500
+  sampling_strategy: cem
+  cem_steps: 4
   regularization_weight: .1
   output_dir: ${hydra:runtime.output_dir}
   q_mask: [
@@ -86,7 +86,7 @@ RRT:
   knnK: 128
   sim:
     tau_sim: 0.005
-    tau_action: 0.05
+    tau_action: 0.2
     interpolate_actions: false
     joints_are_same_as_ctrl: false
     use_spline_ref: false

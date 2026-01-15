@@ -84,9 +84,8 @@ def play_path(path: list[dict], sim: MjSim,
             frames.extend(f)
             states.extend(s)
         else:
-            assert not sim.use_spline_ref
             for q in node["q_sequence"]:
-                f, s, c = sim.step(tau_action, q, view=camera)
+                f, s, c = sim.step(sim.tau_sim, q, view=camera)
                 frames.extend(f)
                 states.extend(s)
         

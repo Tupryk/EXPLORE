@@ -70,7 +70,6 @@ class Search:
             self.q_mask = np.ones_like(self.configs[0])
             
         assert (self.warm_start and self.horizon == 1) or not self.warm_start
-        assert (cfg.sim.use_spline_ref and self.horizon == 1) or not cfg.sim.use_spline_ref
         
         # Does not always provide faster execution! Depends on weird factors like tau_sim
         self.threading = cfg.threading
@@ -358,7 +357,7 @@ class Search:
             else:
                 f.write("\n")
 
-    def sample_state(self, start_idx: int = -1) -> np.ndarray:
+    def sample_state(self, start_idx: int = -1) -> tuple[np.ndarray, int]:
         """
         Sampling rules:
         1. Prefer values < self.target_min_dist and > self.min_cost
@@ -412,7 +411,7 @@ class Search:
         sim_sample = self.configs[target_config_idx]
         return sim_sample, target_config_idx
 
-    def run(self) -> tuple[list[MultiSearchNode], float]:
+    def run(self):
         
         self.trees = self.init_trees()
         

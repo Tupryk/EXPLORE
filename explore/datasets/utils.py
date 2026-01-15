@@ -38,12 +38,9 @@ class MinMaxNormalizer(Normalizer):
         return (x + 1) * 0.5 * self.range + self.mins
 
 
-def cost_computation(node1: dict, node2: dict,
-                     q_mask: np.ndarray=np.array([])) -> float:
+def cost_computation(node1: dict, node2: dict, q_mask) -> float:
     
-    e = (node1["state"][1] - node2["state"][1])
-    if q_mask.shape[0]:
-        e *= q_mask
+    e = (node1["state"][1] - node2["state"][1]) * q_mask
     
     cost = e.T @ e
     # cost = np.abs(e).max()

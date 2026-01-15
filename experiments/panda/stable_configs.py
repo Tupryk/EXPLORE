@@ -9,8 +9,8 @@ from explore.env.mujoco_sim import MjSim
 # h5_file = "configs/stable/grasp_configs.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
 
-# h5_file = "configs/stable/g1.h5"
-# mujoco_xml = "configs/mujoco_/unitree_g1/g1_single.xml"
+h5_file = "configs/stable/g1.h5"
+mujoco_xml = "configs/mujoco_/unitree_g1/g1_single.xml"
 
 # h5_file = "configs/stable/fingerBox.h5"
 # mujoco_xml = "configs/mujoco_/fingerBox.xml"
@@ -21,11 +21,11 @@ from explore.env.mujoco_sim import MjSim
 # h5_file = "configs/stable/new_rnd_twoFingers.h5"
 # mujoco_xml = "configs/mujoco_/twoFingers.xml"
 
-h5_file = "configs/stable/twoFingersCube.h5"
-mujoco_xml = "configs/mujoco_/twoFingersCube.xml"
+# h5_file = "configs/stable/twoFingersCube.h5"
+# mujoco_xml = "configs/mujoco_/twoFingersCube.xml"
 
 file = h5py.File(h5_file, 'r')
-stable_configs = file["q"]
+stable_configs = file["qpos"]
 stable_configs_ctrl = file["ctrl"]
 
 # fig = plt.figure()

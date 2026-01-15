@@ -438,7 +438,7 @@ class Search:
             sim_sample = self.configs[target_config_idx]
         return sim_sample, target_config_idx
 
-    def run(self) -> tuple[list[MultiSearchNode], float]:
+    def run(self):
         
         self.trees, self.trees_kNNs, self.trees_kNNs_sizes = self.init_trees()
         if self.bidirectional:

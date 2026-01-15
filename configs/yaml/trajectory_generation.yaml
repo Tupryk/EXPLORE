@@ -1,37 +1,56 @@
 RRT:
   verbose: 3
-  max_nodes: 5000
-  min_cost: 0.02
-  horizon: 1
-  max_configs: 100
-  stepsize: 0.05
+  max_nodes: 500000
+  min_cost: 0.06
+  max_configs: -1
+  stepsize: [
+    .075, .05, .075,  # hip
+    .1, .1, .1,  # knee, ankle, ankle
+    .075, .05, .075,  # hip
+    .1, .1, .1,  # knee, ankle, ankle
+    .075, .05, .05,  # waist
+    .75, .75, .75,  # shoulder
+    .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
+    .05, .05, .05,  # shoulder
+    .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
+  ]
   path_diff_thresh: 0.05
-  k_nearest_targets: -1
-  target_prob: .1
+  target_min_dist: 100.
+  target_prob: .15
   sample_uniform: false
-  warm_start: false
-  threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: 17
+  start_idx: 8
   end_idx: -1
-  bidirectional: false
   cost_max_method: false
-  n_best_actions: 1  # Only for random sampling strategy
-  sample_count: 500
-  sampling_strategy: rs
-  cem_steps: 3
-  regularization_weight: .0
   output_dir: ${hydra:runtime.output_dir}
   q_mask: [
-    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 4.0, 4.0, 4.0,
-    0.1, 0.1, 0.1, 0.1
+    2., 2., 2., .25, .25, .25, .25,
+    .5, .5, .5,  # hip
+    .4, .125, .125,  # knee, ankle, ankle
+    .5, .5, .5,  # hip
+    .25, .125, .125,  # knee, ankle, ankle
+    .7, .7, .7,  # waist
+    .4, .4, .4,  # shoulder
+    .25, .125, .125, .125,  # elbow, wrist, wrist, wrist
+    .4, .4, .4,  # shoulder
+    .25, .125, .125, .125,  # elbow, wrist, wrist, wrist
   ]
-  knnK: 16
+  knnK: 32
   sim:
-    tau_sim: 0.005
-    tau_action: 0.25
-    interpolate_actions: true
-    joints_are_same_as_ctrl: true
+    tau_sim: 0.01
+    tau_action: 0.1
+    interpolate_actions: false
+    joints_are_same_as_ctrl: false
     use_spline_ref: false
-    mujoco_xml: configs/mujoco_/twoFingersCube.xml
+    mujoco_xml: configs/mujoco_/g1/scene.xml
     camera: fixed_cam
-configs_path: configs/stable/twoFingersCube.h5
+configs_path: configs/stable/g1.h5
+
+# hydra:
+#   sweeper:
+#     params:
+#       RRT.horizon: 1, 2, 4
+#       RRT.max_configs: 128, -1
+#       RRT.sim.use_spline_ref: true, false
+#       RRT.regularization_weight: .0, .1
+#       RRT.sampling_strategy: cem, rs
+    

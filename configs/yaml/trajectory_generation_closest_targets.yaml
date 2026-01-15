@@ -3,7 +3,7 @@ RRT:
   max_nodes: 1000
   min_cost: 0.1
   horizon: 1
-  max_configs: 256
+  max_configs: -1
   stepsize: [
     .075, .05, .075,  # hip
     .1, .1, .1,  # knee, ankle, ankle
@@ -16,7 +16,7 @@ RRT:
     .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
   ]
   path_diff_thresh: 0.05
-  target_min_dist: .6
+  target_min_dist: .5
   target_prob: .1
   sample_uniform: false
   warm_start: false
@@ -25,14 +25,14 @@ RRT:
   end_idx: -1
   bidirectional: false
   cost_max_method: true
-  n_best_actions: 1  # Only for random sampling strategy
   sample_count: 1000
   sampling_strategy: cem
-  cem_steps: 3
+  n_best_actions: 1  # Only for random sampling strategy
+  cem_steps: 3  # Only for CEM
   regularization_weight: .05
   output_dir: ${hydra:runtime.output_dir}
   q_mask: [
-    0., 0., 2.5, 1., 1., 1., 1.,
+    2., 2., 4., 1., 1., 1., 1.,
     1., 1., 1.,  # hip
     .75, .25, .25,  # knee, ankle, ankle
     1., 1., 1.,  # hip
@@ -53,3 +53,39 @@ RRT:
     mujoco_xml: configs/mujoco_/unitree_g1/g1_single.xml
     camera: fixed_cam
 configs_path: configs/stable/g1.h5
+
+## FingerRamp
+# RRT:
+#   verbose: 3
+#   max_nodes: 65000
+#   min_cost: 0.02
+#   horizon: 1
+#   max_configs: 256
+#   stepsize: 0.05
+#   path_diff_thresh: 0.01
+#   target_min_dist: .1
+#   target_prob: .1
+#   sample_uniform: false
+#   warm_start: false
+#   threading: true  # Depending on the hardware this may lead to faster computations.
+#   start_idx: -1
+#   end_idx: -1
+#   bidirectional: false
+#   cost_max_method: true
+#   sample_count: 100
+#   sampling_strategy: rs
+#   n_best_actions: 1  # Only for random sampling strategy
+#   cem_steps: 3  # Only for CEM
+#   regularization_weight: .0
+#   output_dir: ${hydra:runtime.output_dir}
+#   q_mask: [1., 1., 1., 1., 1., 1., 0., 0., 0., 0.]
+#   knnK: 16
+#   sim:
+#     tau_sim: 0.005
+#     tau_action: 0.5
+#     interpolate_actions: true
+#     joints_are_same_as_ctrl: true
+#     use_spline_ref: false
+#     mujoco_xml: configs/mujoco_/fingerRamp.xml
+#     camera: fixed_cam
+# configs_path: configs/stable/fingerRamp_onRamp.h5

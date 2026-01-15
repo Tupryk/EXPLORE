@@ -13,10 +13,10 @@ txt_file = "data/joint_states_unitree.txt"
 h5_file = "configs/stable/g1.h5"
 
 # SAME_THRESH = 0.07
-SAME_THRESH = 0.01
+SAME_THRESH = 0.0
 # FAR_THRESH = 0.8
 FAR_THRESH = np.inf
-MAX_CONFIGS = 100
+MAX_CONFIGS = 10000
 q_mask = np.array([
     1., 1., 1., .1, .1, .1, .1,
     0.0, 0.0, 0.0,
@@ -72,8 +72,8 @@ for i, vec in enumerate(data):
     state_vec = np.zeros(36)
     ctrl_vec = np.zeros(29)
     
-    state_vec[2:7] = vec[2:7]
-    state_vec[2] += 0.69
+    state_vec[:7] = vec[:7]
+    state_vec[2] += 0.665
     
     # 19 -  0 waist_yaw_joint
     state_vec[19] = vec[7]
