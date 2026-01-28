@@ -38,18 +38,20 @@ class MinMaxNormalizer(Normalizer):
         return (x + 1) * 0.5 * self.range + self.mins
 
 
-def cost_computation(node1: dict, node2: dict, q_mask) -> float:
+def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=False) -> float:
     
     e = (node1["state"][1] - node2["state"][1]) * q_mask
     
-    cost = e.T @ e
-    # cost = np.abs(e).max()
+    if cost_max_method:
+        cost = np.abs(e).max()
+    else:
+        cost = e.T @ e
     
     return cost
 
 def load_trees(tree_dataset: str, cutoff: int=-1, verbose: int=0
                ) -> tuple[list[list[dict]], int, int]:
-    tree_count = len(os.listdir(tree_dataset))
+    tree_count = len(os.listdir(tree_dataset)) // 2
     
     if verbose:
         print(f"Tree Count: {tree_count}")
@@ -89,7 +91,7 @@ def build_path(tree: list[dict], node_idx: int,
     return path
 
 def generate_adj_map( trees: list[list[dict]], q_mask: np.ndarray=np.array([]),
-    check_cached: str="", verbose: int=1) -> tuple[list[list[float]], list[list[int]]]:
+    check_cached: str="", cost_max_method: bool=False, verbose: int=1) -> tuple[list[list[float]], list[list[int]]]:
     
     if check_cached:
         cached_file_path = os.path.join(check_cached, "adj_map.pkl")
@@ -113,7 +115,7 @@ def generate_adj_map( trees: list[list[dict]], q_mask: np.ndarray=np.array([]),
         
         for n, node in enumerate(trees[i]):
             for j in range(tree_count):
-                node_cost = cost_computation(trees[j][0], node, q_mask)
+                node_cost = cost_computation(trees[j][0], node, q_mask, cost_max_method)
                 if node_cost < tree_min_costs[j]:
                     tree_min_costs[j] = node_cost
                     tree_top_nodes[j] = n

@@ -84,6 +84,8 @@ class Search:
         self.end_idx = cfg.end_idx
         self.n_best_actions = cfg.n_best_actions
         self.regularization_weight = cfg.regularization_weight
+
+        self.disable_nodes = cfg.disable_nodes
         
         self.knnK = cfg.knnK
 
@@ -472,13 +474,14 @@ class Search:
                     target_config_idx=target_config_idx,
                     q_sequence=best_q)
                 
-                self.trees[start_idx].append(best_node)
                 
+                expanded = False
                 for ci in range(self.config_count):
                     new_cost = self.compute_cost(best_state[1], self.configs[ci])
                     for k in range(self.knnK):
                         stored_cost = self.trees_closest_nodes_costs[start_idx][ci][k]
-                        if stored_cost >= new_cost:
+                        if new_cost < self.target_min_dist and stored_cost >= new_cost:
+                            expanded = True
                             
                             # Shift values
                             self.trees_closest_nodes_costs[start_idx][ci, k+1:] = self.trees_closest_nodes_costs[start_idx][ci, k:-1]
@@ -487,6 +490,33 @@ class Search:
                             self.trees_closest_nodes_costs[start_idx][ci][k] = new_cost
                             self.trees_closest_nodes_idxs[start_idx][ci][k] = len(self.trees[start_idx]) - 1
                             break
+
+                if not expanded:
+                    if self.verbose > 2:
+                        print("Tree did not expand! Killing parent >:(")
+                    
+                    for ci in range(self.config_count):
+                        for k in range(self.knnK):
+                            
+                            if self.trees_closest_nodes_idxs[start_idx][ci, k] == node_id:
+
+                                self.trees_closest_nodes_costs[start_idx][ci, k:-2] = self.trees_closest_nodes_costs[start_idx][ci, k+1:-1]
+                                self.trees_closest_nodes_idxs[start_idx][ci, k:-2] = self.trees_closest_nodes_idxs[start_idx][ci, k+1:-1]
+                                
+                                self.trees_closest_nodes_costs[start_idx][ci, -1] = np.nan
+                                self.trees_closest_nodes_idxs[start_idx][ci, -1] = -1
+
+
+                                break
+                            
+                            elif self.trees_closest_nodes_idxs[start_idx][ci, k] == -1:
+                                break
+                        
+                        if np.isnan(self.trees_closest_nodes_costs[start_idx][ci, 0]):
+                            self.trees_closest_nodes_costs[start_idx][ci, 0] = self.compute_cost(self.trees[start_idx][0].state[1], self.configs[ci])
+
+                else:
+                    self.trees[start_idx].append(best_node)
                 
             if self.verbose > 1:
                 costs = self.trees_closest_nodes_costs[start_idx][:, 0]

@@ -78,16 +78,16 @@ def play_path(path: list[dict], sim: MjSim,
             sim.setState(*prev_node["state"])
         
         # TODO: Make this nicer
-        if "q_sequence" not in node.keys():
-            q_target = node["state"][4] if sim.use_spline_ref else node["state"][3]
-            f, s, c = sim.step(tau_action, q_target, view=camera)
-            frames.extend(f)
-            states.extend(s)
-        else:
-            for q in node["q_sequence"]:
-                f, s, c = sim.step(sim.tau_sim, q, view=camera)
-                frames.extend(f)
-                states.extend(s)
+        # if "q_sequence" not in node.keys():
+        q_target = node["state"][4] if sim.use_spline_ref else node["state"][3]
+        f, s, c = sim.step(tau_action, q_target, view=camera)
+        frames.extend(f)
+        states.extend(s)
+        # else:
+        #     for q in node["q_sequence"]:
+        #         f, s, c = sim.step(sim.tau_sim, q, view=camera)
+        #         frames.extend(f)
+        #         states.extend(s)
         
         prev_node = node
 
