@@ -57,7 +57,7 @@
 
 RRT:
   verbose: 3
-  max_nodes: 2000
+  max_nodes: 3500
   min_cost: 0.1
   horizon: 1
   max_configs: -1
@@ -75,7 +75,7 @@ RRT:
   path_diff_thresh: 0.05
   target_min_dist: .75
   target_prob: .1
-  disable_nodes: true
+  disable_node_max_strikes: 3
   sample_uniform: false
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
@@ -86,7 +86,7 @@ RRT:
   sample_count: 500
   sampling_strategy: cem
   n_best_actions: 1  # Only for random sampling strategy
-  cem_steps: 5  # Only for CEM
+  cem_steps: 10  # Only for CEM
   regularization_weight: .0
   output_dir: ${hydra:runtime.output_dir}
   q_mask: [
@@ -101,9 +101,9 @@ RRT:
     .75, .75, .75,  # shoulder
     .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
   ]
-  knnK: 16
+  knnK: 8
   sim:
-    tau_sim: 0.005
+    tau_sim: 0.001
     tau_action: 0.2
     interpolate_actions: false
     joints_are_same_as_ctrl: false
