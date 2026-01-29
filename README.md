@@ -10,8 +10,8 @@ pip install -e .
 python scripts/1_generate_data.py
 ```
 
-![alt text](https://github.com/Tupryk/EXPLORE/blob/main/readme_images/manip0.gif?raw=true)
-![alt text](https://github.com/Tupryk/EXPLORE/blob/main/readme_images/manip1.gif?raw=true)
-![alt text](https://github.com/Tupryk/EXPLORE/blob/main/readme_images/manip2.gif?raw=true)
-![alt text](https://github.com/Tupryk/EXPLORE/blob/main/readme_images/manip3.gif?raw=true)
-![alt text](https://github.com/Tupryk/EXPLORE/blob/main/readme_images/manip4.gif?raw=true)
+![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip0.gif)
+![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip1.gif)
+![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip2.gif)
+![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip3.gif)
+![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip4.gif)
