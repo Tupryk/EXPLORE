@@ -16,3 +16,5 @@ python scripts/1_generate_data.py
 ![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip3.gif)
 ![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip4.gif)
 ![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip5.gif)
+![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip6.gif)
+![alt text](https://raw.githubusercontent.com/Tupryk/EXPLORE/refs/heads/master/readme_images/manip7.gif)
