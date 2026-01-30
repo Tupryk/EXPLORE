@@ -57,8 +57,8 @@
 
 RRT:
   verbose: 3
-  max_nodes: 3500
-  min_cost: 0.1
+  max_nodes: 6500
+  min_cost: 0.05
   horizon: 1
   max_configs: -1
   stepsize: [
@@ -73,9 +73,9 @@ RRT:
     .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
   ]
   path_diff_thresh: 0.05
-  target_min_dist: 1.
+  target_min_dist: 3.
   target_prob: .1
-  disable_node_max_strikes: 1
+  disable_node_max_strikes: 5
   sample_uniform: false
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
@@ -83,14 +83,14 @@ RRT:
   end_idx: -1
   bidirectional: false
   cost_max_method: true
-  sample_count: 500
-  sampling_strategy: cem
-  n_best_actions: 1  # Only for random sampling strategy
-  cem_steps: 10  # Only for CEM
+  sample_count: 2500
+  sampling_strategy: rs
+  n_best_actions: 1000  # Only for random sampling strategy
+  cem_steps: 5  # Only for CEM
   regularization_weight: .0
   output_dir: ${hydra:runtime.output_dir}
   q_mask: [
-    1., 1., 1., .75, .75, .75, .75,
+    4., 4., 4., .25, .25, .25, .25,
     1., 1., 1.,  # hip
     .75, .25, .25,  # knee, ankle, ankle
     1., 1., 1.,  # hip
@@ -100,14 +100,101 @@ RRT:
     .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
     .75, .75, .75,  # shoulder
     .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+    # .01, .01, .01,  # hip
+    # .01, .01, .01,  # knee, ankle, ankle
+    # .01, .01, .01,  # hip
+    # .01, .01, .01,  # knee, ankle, ankle
+    # .01, .01, .01,  # waist
+    # .01, .01, .01,  # shoulder
+    # .01, .01, .01, .01,  # elbow, wrist, wrist, wrist
+    # .01, .01, .01,  # shoulder
+    # .01, .01, .01, .01,  # elbow, wrist, wrist, wrist
   ]
-  knnK: 4
+  knnK: 16
   sim:
     tau_sim: 0.005
     tau_action: 0.2
-    interpolate_actions: true
-    joints_are_same_as_ctrl: true
+    interpolate_actions: false
+    joints_are_same_as_ctrl: false
     use_spline_ref: false
     mujoco_xml: configs/mujoco_/unitree_g1/g1_single.xml
     camera: fixed_cam
 configs_path: configs/stable/g1.h5
+
+# RRT:
+#   verbose: 3
+#   # max_nodes: 535000
+#   max_nodes: 2500
+#   min_cost: 0.4
+#   horizon: 1
+#   max_configs: -1
+#   stepsize:
+#   - 0.15
+#   - 0.15
+#   - 0.2
+#   - 0.25
+#   - 0.35
+#   - 0.3
+#   - 0.5
+#   - 125.0
+#   - 0.15
+#   - 0.15
+#   - 0.2
+#   - 0.25
+#   - 0.35
+#   - 0.3
+#   - 0.5
+#   - 125.0
+#   path_diff_thresh: 0.05
+#   target_min_dist: 10.
+#   target_prob: .1
+#   disable_node_max_strikes: 5
+#   sample_uniform: false
+#   warm_start: false
+#   threading: true  # Depending on the hardware this may lead to faster computations.
+#   start_idx: 1
+#   end_idx: -1
+#   bidirectional: false
+#   cost_max_method: true
+#   sample_count: 2500
+#   sampling_strategy: rs
+#   n_best_actions: 16  # Only for random sampling strategy
+#   cem_steps: 10  # Only for CEM
+#   regularization_weight: .0
+#   output_dir: ${hydra:runtime.output_dir}
+#   q_mask:
+#   - 1.0
+#   - 0.9
+#   - 0.8
+#   - 0.7
+#   - 0.6
+#   - 0.5
+#   - 0.4
+#   - 0.1
+#   - 0.1
+#   - 1.0
+#   - 0.9
+#   - 0.8
+#   - 0.7
+#   - 0.6
+#   - 0.5
+#   - 0.4
+#   - 0.1
+#   - 0.1
+#   - 10.0
+#   - 10.0
+#   - 10.0
+#   - 0.1
+#   - 0.1
+#   - 0.1
+#   - 0.1
+#   knnK: 16
+#   sim:
+#     tau_sim: 0.005
+#     tau_action: 0.25
+#     interpolate_actions: false
+#     joints_are_same_as_ctrl: false
+#     use_spline_ref: false
+#     mujoco_xml: configs/mujoco_/franka_emika_panda/pandas_table.xml
+#     camera: fixed_cam
+# configs_path: configs/stable/grasp_configs.h5

@@ -380,7 +380,7 @@ class Search:
         below_target = costs < self.target_min_dist
         above_min = costs > self.min_cost
 
-        preferred_mask = below_target & above_min
+        preferred_mask = below_target # & above_min
         preferred_indices = valid_indices[preferred_mask[valid_indices]]
 
         # Print percentages (debug/info)
@@ -463,23 +463,18 @@ class Search:
             node: MultiSearchNode = self.trees[start_idx][node_id]
 
             # Expand node
+            expanded = False
             best_expansions = self.action_sampler(node, sim_sample)
             for best_node_cost, best_state, best_q in best_expansions:
-                delta_q = (best_q - node.state[3]).copy()
-                best_node = MultiSearchNode(
-                    node_id, delta_q, best_state,
-                    explore_node=exploring,
-                    target_config_idx=target_config_idx,
-                    q_sequence=best_q)
                 
-                
-                expanded = False
+                store_node = False
                 for ci in range(self.config_count):
                     new_cost = self.compute_cost(best_state[1], self.configs[ci])
                     for k in range(self.knnK):
                         stored_cost = self.trees_closest_nodes_costs[start_idx][ci][k]
                         if new_cost < self.target_min_dist and stored_cost >= new_cost:
-                            expanded = k == 0 or expanded
+                            expanded = True
+                            store_node = True
                             
                             # Shift values
                             self.trees_closest_nodes_costs[start_idx][ci, k+1:] = self.trees_closest_nodes_costs[start_idx][ci, k:-1]
@@ -488,44 +483,50 @@ class Search:
                             self.trees_closest_nodes_costs[start_idx][ci][k] = new_cost
                             self.trees_closest_nodes_idxs[start_idx][ci][k] = len(self.trees[start_idx]) - 1
                             break
-
-                if not expanded:
-
-                    self.trees[start_idx][node_id].failed_expansion_count += 1
-                    
-                    if (
-                        self.disable_node_max_strikes != -1 and
-                        self.trees[start_idx][node_id].failed_expansion_count >= self.disable_node_max_strikes
-                        ):
-
-                        if self.verbose > 2:
-                            print(f"Node {node_id} attempt at expansion failed {self.disable_node_max_strikes} times! Killing it >:(")
-                        
-                        for ci in range(self.config_count):
-                            for k in range(self.knnK):
-                                
-                                if self.trees_closest_nodes_idxs[start_idx][ci, k] == node_id:
-
-                                    self.trees_closest_nodes_costs[start_idx][ci, k:-2] = self.trees_closest_nodes_costs[start_idx][ci, k+1:-1]
-                                    self.trees_closest_nodes_idxs[start_idx][ci, k:-2] = self.trees_closest_nodes_idxs[start_idx][ci, k+1:-1]
-                                    
-                                    self.trees_closest_nodes_costs[start_idx][ci, -1] = np.nan
-                                    self.trees_closest_nodes_idxs[start_idx][ci, -1] = -1
-
-                                    break
-                                
-                                elif self.trees_closest_nodes_idxs[start_idx][ci, k] == -1:
-                                    break
-                            
-                            if np.isnan(self.trees_closest_nodes_costs[start_idx][ci, 0]):
-                                self.trees_closest_nodes_costs[start_idx][ci, 0] = self.compute_cost(self.trees[start_idx][0].state[1], self.configs[ci])
-                                self.trees_closest_nodes_idxs[start_idx][ci, 0] = 0
-
-                    elif self.verbose > 2:
-                        print(f"Node {node_id} did not expand the tree and got a strike (total strikes for this node: {self.trees[start_idx][node_id].failed_expansion_count}/{self.disable_node_max_strikes}).")
-
-                else:
+                
+                if store_node:
+                    delta_q = (best_q - node.state[3]).copy()
+                    best_node = MultiSearchNode(
+                        node_id, delta_q, best_state,
+                        explore_node=exploring,
+                        target_config_idx=target_config_idx,
+                        q_sequence=best_q)
                     self.trees[start_idx].append(best_node)
+
+            if not expanded:
+
+                self.trees[start_idx][node_id].failed_expansion_count += 1
+                
+                if (
+                    self.disable_node_max_strikes != -1 and
+                    self.trees[start_idx][node_id].failed_expansion_count >= self.disable_node_max_strikes
+                    ):
+
+                    if self.verbose > 2:
+                        print(f"Node {node_id} attempt at expansion failed {self.disable_node_max_strikes} times! Killing it >:(")
+                    
+                    for ci in range(self.config_count):
+                        for k in range(self.knnK):
+                            
+                            if self.trees_closest_nodes_idxs[start_idx][ci, k] == node_id:
+
+                                self.trees_closest_nodes_costs[start_idx][ci, k:-2] = self.trees_closest_nodes_costs[start_idx][ci, k+1:-1]
+                                self.trees_closest_nodes_idxs[start_idx][ci, k:-2] = self.trees_closest_nodes_idxs[start_idx][ci, k+1:-1]
+                                
+                                self.trees_closest_nodes_costs[start_idx][ci, -1] = np.nan
+                                self.trees_closest_nodes_idxs[start_idx][ci, -1] = -1
+
+                                break
+                            
+                            elif self.trees_closest_nodes_idxs[start_idx][ci, k] == -1:
+                                break
+                        
+                        if np.isnan(self.trees_closest_nodes_costs[start_idx][ci, 0]):
+                            self.trees_closest_nodes_costs[start_idx][ci, 0] = self.compute_cost(self.trees[start_idx][0].state[1], self.configs[ci])
+                            self.trees_closest_nodes_idxs[start_idx][ci, 0] = 0
+
+                elif self.verbose > 2:
+                    print(f"Node {node_id} did not expand the tree and got a strike (total strikes for this node: {self.trees[start_idx][node_id].failed_expansion_count}/{self.disable_node_max_strikes}).")
                 
             if self.verbose > 1:
                 costs = self.trees_closest_nodes_costs[start_idx][:, 0]
