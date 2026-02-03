@@ -51,7 +51,7 @@ def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=Fal
 
 def load_trees(tree_dataset: str, cutoff: int=-1, verbose: int=0
                ) -> tuple[list[list[dict]], int, int]:
-    tree_count = len(os.listdir(tree_dataset)) // 2
+    tree_count = len([n for n in os.listdir(tree_dataset) if ".pkl" in n])
     
     if verbose:
         print(f"Tree Count: {tree_count}")

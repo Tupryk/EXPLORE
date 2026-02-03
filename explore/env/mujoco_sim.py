@@ -105,10 +105,10 @@ class MjSim:
             
         steps = math.ceil(tau_action/self.tau_sim)
         if self.joints_are_same_as_ctrl:
-            prev_ctrl = self.data.qpos[:self.data.ctrl.shape[0]]
+            prev_ctrl = np.copy(self.data.qpos[:self.data.ctrl.shape[0]])
         else:
             # This prev ctrl is not quite right, as you would have to take the qpos for a proper interpolation
-            prev_ctrl = self.data.ctrl[:]
+            prev_ctrl = np.copy(self.data.ctrl)
 
         frames = []
         states = []
@@ -148,7 +148,7 @@ class MjSim:
                 ctrls.append(np.copy(self.data.ctrl))
         
         return frames, states, ctrls
-
+        
     def getState(self):
         state = (
             self.data.time,

@@ -1,9 +1,9 @@
 import os
 
-def find_and_print_tree_stats(root_dir):
+def find_and_print_tree_stats(root_dir: str, start_idx: int=1):
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        if "tree_stats_8.txt" in filenames:
-            file_path = os.path.join(dirpath, "tree_stats_8.txt")
+        if f"tree_stats_{start_idx}.txt" in filenames:
+            file_path = os.path.join(dirpath, f"tree_stats_{start_idx}.txt")
             print(f"\nFound: {file_path}")
             print("-" * 80)
 
