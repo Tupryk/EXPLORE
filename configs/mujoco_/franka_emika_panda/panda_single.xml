@@ -22,7 +22,7 @@
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
     <body name="table" pos="0.0 0.0 0.55">
-      <geom type="box" size="0.62 0.62 0.05" rgba="0.8 0.8 0.8 1"/>
+      <geom type="box" size="0.7 0.7 0.05" rgba="0.8 0.8 0.8 1"/>
     </body>
 
     <body name="l_panda_base" pos="0.0 -0.3 0.6" quat="0.7071 0.0 0.0 0.7071">
