@@ -9,8 +9,11 @@ from explore.env.mujoco_sim import MjSim
 # h5_file = "configs/stable/grasp_configs.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
 
-h5_file = "configs/stable/g1.h5"
-mujoco_xml = "configs/mujoco_/unitree_g1/g1_single.xml"
+h5_file = "configs/stable/pandaHook.h5"
+mujoco_xml = "configs/mujoco_/franka_emika_panda/panda_single.xml"
+
+# h5_file = "configs/stable/g1.h5"
+# mujoco_xml = "configs/mujoco_/unitree_g1/g1_single.xml"
 
 # h5_file = "configs/stable/fingerBox.h5"
 # mujoco_xml = "configs/mujoco_/fingerBox.xml"
@@ -44,8 +47,8 @@ sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
 # for i, sc in enumerate(sampled_configs):
 for i, sc in enumerate(stable_configs):
     print(i)
-    # if i != 8:
-    #     continue
+    # if i != 87:
+        # continue
     # sim.pushConfig(sc)
     # print(sc)
     # print(stable_configs_ctrl[i])
@@ -54,5 +57,6 @@ for i, sc in enumerate(stable_configs):
     # q[15] = 0
     sim.pushConfig(sc, q)
     time.sleep(1.)
+    # time.sleep(10.)
     sim.step(.1, view=.1)
     print("sum: ", sum([float(i) for i in sim.getContacts()]))

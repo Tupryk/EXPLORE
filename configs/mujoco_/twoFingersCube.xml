@@ -23,6 +23,7 @@
   </actuator>
   <worldbody>
     <camera name="fixed_cam" pos="-1.104 1.275 0.847" xyaxes="-0.728 -0.686 0.000 0.225 -0.238 0.945"/>
+    <light pos="0 10 10.5" dir="0 -1 -1" directional="true" />
     
     <body name="l_base" pos="0.0 0.0 0.5">
       <body name="l_fake">

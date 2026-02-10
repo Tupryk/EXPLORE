@@ -503,7 +503,7 @@ class Search:
                     ):
 
                     if self.verbose > 2:
-                        print(f"Node {node_id} attempt at expansion failed {self.disable_node_max_strikes} times! Killing it >:(")
+                        print(f"Node #{node_id} attempt at expansion failed {self.disable_node_max_strikes} time(s)! Killing it >:(")
                     
                     for ci in range(self.config_count):
                         for k in range(self.knnK):
@@ -526,7 +526,7 @@ class Search:
                             self.trees_closest_nodes_idxs[start_idx][ci, 0] = 0
 
                 elif self.verbose > 2:
-                    print(f"Node {node_id} did not expand the tree and got a strike (total strikes for this node: {self.trees[start_idx][node_id].failed_expansion_count}/{self.disable_node_max_strikes}).")
+                    print(f"Node #{node_id} did not expand the tree and got a strike (total strikes for this node: {self.trees[start_idx][node_id].failed_expansion_count}/{self.disable_node_max_strikes}).")
                 
             if self.verbose > 1:
                 costs = self.trees_closest_nodes_costs[start_idx][:, 0]
