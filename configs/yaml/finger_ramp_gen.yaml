@@ -4,7 +4,7 @@ RRT:
   min_cost: 0.02
   horizon: 1
   max_configs: -1
-  stepsize: 0.1
+  stepsize: 0.08
   path_diff_thresh: 0.05
   target_min_dist: 1000.
   target_prob: .0
@@ -36,7 +36,7 @@ RRT:
   knnK: 16
   sim:
     tau_sim: 0.005
-    tau_action: 0.25
+    tau_action: 0.4
     interpolate_actions: true
     joints_are_same_as_ctrl: true
     use_spline_ref: false
