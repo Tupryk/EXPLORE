@@ -1,7 +1,7 @@
 RRT:
   verbose: 3
   max_nodes: 65000
-  min_cost: 0.02
+  min_cost: 0.001
   horizon: 1
   max_configs: -1
   stepsize: 0.08
