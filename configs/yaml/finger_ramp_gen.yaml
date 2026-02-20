@@ -1,6 +1,6 @@
 RRT:
   verbose: 3
-  max_nodes: 65000
+  max_nodes: 2500
   min_cost: 0.001
   horizon: 1
   max_configs: -1
@@ -12,8 +12,8 @@ RRT:
   sample_uniform: false
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: -1
-  end_idx: -1
+  start_idx: 1
+  end_idx: 2
   bidirectional: false
   cost_max_method: false
   sample_count: 100

@@ -10,9 +10,17 @@ import jax.numpy as jnp
 from tqdm import trange
 from hydrax.algs import MPPI
 from omegaconf import DictConfig, ListConfig
-
+print(jax.devices())  # should show CudaDevice, not CpuDevice
 from explore.env.tasks import StaGE_task
 
+# 1. Disable the Command Buffer/CUDA Graph feature that is crashing
+os.environ["XLA_FLAGS"] = "--xla_gpu_enable_command_buffer=" 
+
+# 2. Prevent JAX from gobbling up 75% of your GPU immediately
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+
+# 3. Enable 64-bit to stop that 'overflow' warning once and for all
+os.environ["JAX_ENABLE_X64"] = "True"
 
 class MultiSearchNode:
     def __init__(self,
@@ -79,16 +87,39 @@ class Search:
         self.mj_model.opt.o_solimp = [0.9, 0.95, 0.001, 0.5, 2]
         self.mj_model.opt.enableflags = mujoco.mjtEnableBit.mjENBL_OVERRIDE
 
+        # self.controller = MPPI(
+        #     self.task,
+        #     num_samples=128,
+        #     noise_level=0.05,
+        #     temperature=0.01,
+        #     num_randomizations=1,
+        #     plan_horizon=.5,
+        #     spline_type="zero",
+        #     num_knots=64,
+        # )
+
         self.controller = MPPI(
             self.task,
             num_samples=128,
-            noise_level=0.3,
-            temperature=0.1,
-            num_randomizations=4,
-            plan_horizon=0.6,
+            noise_level=0.05,
+            temperature=0.01,
+            num_randomizations=1,
+            plan_horizon=.5,
             spline_type="zero",
-            num_knots=4,
+            num_knots=16,
         )
+
+        # self.controller = empepei(
+        # self.task,
+        # num_samples=256,       # More samples = better "mean" action
+        # noise_level=0.05,      # Much lower noise for precision
+        # temperature=0.01,     # Lower temperature makes it follow the 'best' path strictly
+        # num_randomizations=1, 
+        # plan_horizon=0.5,      # Shorten the horizon so it focuses on not dropping the ball NOW
+        # spline_type="cubic",   # Smooth movements
+        # num_knots=12,           # More control points for a shorter horizon
+        # )
+
 
         self.ctrl_dim = self.mj_data.ctrl.shape[0]
         self.ctrl_ranges = self.mj_model.actuator_ctrlrange
@@ -128,7 +159,6 @@ class Search:
         print("Jitting the controller...")
         st = time.time()
         self.policy_params, rollouts = self.jit_optimize(self.mjx_data, self.policy_params)
-        self.policy_params, rollouts = self.jit_optimize(self.mjx_data, self.policy_params)
 
         tq = jnp.arange(0, self.sim_steps_per_replan) * self.mj_model.opt.timestep
         tk = self.policy_params.tk
@@ -136,6 +166,44 @@ class Search:
         _ = self.jit_interp_func(tq, tk, knots)
         _ = self.jit_interp_func(tq, tk, knots)
         print(f"Time to jit: {time.time() - st:.3f} seconds")
+
+    def run_mppi_baseline(self, start_idx: int, end_idx: int, duration: float = 10.0):
+        #self.jit_simulator()
+        
+        # Set start state
+        self.mj_data.qpos[:] = self.configs[start_idx]
+        self.mj_data.qvel[:] = 0
+        self.mj_data.ctrl[:] = self.configs_ctrl[start_idx]
+        self.controller.task.target_state = self.configs[end_idx]
+        self.mj_data.qpos[:] = self.configs[start_idx]
+
+        self.mj_data.time = 0.0  # <-- add this
+        
+        # Reset policy params fresh
+        self.policy_params = self.controller.init_params(initial_knots=None)
+        
+        full_traj = []
+        n_steps = int(duration / (self.sim_steps_per_replan * self.mj_model.opt.timestep))
+        print(self.mj_model.opt.timestep, self.sim_steps_per_replan, n_steps)
+
+        reached_goal = False
+        for step in range(n_steps):
+            end_state, traj = self.extend_node()  # replan + execute 0.1s
+            full_traj.extend(traj)
+            
+            cost = self.compute_cost(self.mj_data.qpos, self.configs[end_idx])
+            print(f"Step {step}, cost to goal: {cost:.4f}")
+            
+            if cost > 1000:
+                print("Cost exploded, stopping early.")
+                break
+
+            if cost < self.min_cost:
+                print("Reached goal!")
+                reached_goal = True
+                break
+        
+        return full_traj, reached_goal
 
     def extend_node(self):
 
