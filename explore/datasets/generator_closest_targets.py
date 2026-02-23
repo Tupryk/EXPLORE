@@ -66,7 +66,7 @@ class Search:
         
         self.horizon = cfg.horizon
         self.sample_count = cfg.sample_count
-        self.cost_method = "sefo" # "se" for squared error, "max" for max error, sefo for se with derivates
+        self.cost_method = cfg.cost_method # "se" for squared error, "max" for max error, sefo for se with derivates
         self.sample_uniform = cfg.sample_uniform
         self.warm_start = cfg.warm_start
         self.sampling_strategy = cfg.sampling_strategy
@@ -306,20 +306,22 @@ class Search:
         if self.cost_method == "max":
             cost = np.abs(e).max()
         elif self.cost_method == "sefo" and vel_state2 is not None:
-            e_linear = e[:9]
-            v_linear = vel_state2[:9]
+
+            e_linear = e[:-4]
+            v_linear = vel_state2[:-3]
             
 
             delta_theta = np.zeros(3)
             mujoco.mju_subQuat(delta_theta, state2[-4:], state1[-4:])
             
             E_total = np.concatenate([e_linear, delta_theta])
+
             E_total *= self.q_mask
 
-            V_total = np.concatenate([v_linear, vel_state2[9:12]]) 
+            V_total = np.concatenate([v_linear, vel_state2[-3:]]) 
             V_total *= self.q_mask
             
-            v_max = 20
+            v_max = 1
             alpha = (1 - 1e-3) / v_max
             
             dist = np.linalg.norm(E_total)
@@ -327,7 +329,7 @@ class Search:
             
             cost = (dist - alpha * alignment)**2
         else:
-            e_linear = e[:9]
+            e_linear = e[:-4]
             
             delta_theta = np.zeros(3)
             mujoco.mju_subQuat(delta_theta, state2[-4:], state1[-4:])
@@ -336,7 +338,7 @@ class Search:
             
             E_total *= self.q_mask
             
-
+            #print("norms:", np.linalg.norm(E_total[:9])**2, "quat:", np.linalg.norm(E_total[-3])**2)
             cost = np.linalg.norm(E_total)**2
         return cost
     

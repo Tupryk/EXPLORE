@@ -1,3 +1,9 @@
+hydra:
+  sweeper:
+    params:
+      RRT.start_idx: 1,2,3,4,5,6,7,8,9,10
+      knnK: 1
+
 RRT:
   verbose: 3
   max_nodes: 2500
@@ -15,7 +21,7 @@ RRT:
   start_idx: 1
   end_idx: -1
   bidirectional: false
-  cost_method: sefo
+  cost_method: se
   sample_count: 100
   sampling_strategy: rs
   n_best_actions: 16  # Only for random sampling strategy
@@ -32,8 +38,7 @@ RRT:
   - 0
   - 0
   - 0
-  - 0
-  knnK: 16
+  knnK: 1
   sim:
     tau_sim: 0.005
     tau_action: 0.4

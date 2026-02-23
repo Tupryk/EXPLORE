@@ -3,7 +3,7 @@ import torch
 import pickle
 import numpy as np
 from tqdm import tqdm
-
+import mujoco
 
 class Normalizer:
     def __init__(self, data: torch.Tensor):
@@ -40,13 +40,22 @@ class MinMaxNormalizer(Normalizer):
 
 def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=False) -> float:
     
-    e = (node1["state"][1] - node2["state"][1]) * q_mask
-    
+    e = (node1["state"][1] - node2["state"][1])  #* self.q_mask
+  
+
     if cost_max_method:
         cost = np.abs(e).max()
     else:
-        cost = e.T @ e
-    
+        e_linear = e[:-4]
+
+        delta_theta = np.zeros(3)
+        mujoco.mju_subQuat(delta_theta, node1["state"][1][-4:], node2["state"][1][-4:])
+        
+        E_total = np.concatenate([e_linear, delta_theta])
+        
+        E_total *= q_mask
+        cost = np.linalg.norm(E_total)**2
+
     return cost
 
 def load_trees(tree_dataset: str, cutoff: int=-1, verbose: int=0
