@@ -2,7 +2,7 @@ hydra:
   sweeper:
     params:
       RRT.start_idx: 1,2,3,4,5,6,7,8,9,10
-      knnK: 1
+      RRT.n_best_actions: 64
 
 RRT:
   verbose: 3
@@ -38,7 +38,7 @@ RRT:
   - 0
   - 0
   - 0
-  knnK: 1
+  knnK: 16
   sim:
     tau_sim: 0.005
     tau_action: 0.4

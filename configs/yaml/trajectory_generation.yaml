@@ -236,8 +236,7 @@ hydra:
   sweeper:
     params:
       RRT.start_idx: 1,2,3,4,5,6,7,8,9,10
-      RRT.cost_method: sefo
-
+      RRT.knnK: 1
       # RRT.max_configs: 10, 50, 100, 250, 500, 1000 #, 2500, 5000 , 10_000
 
 RRT:
@@ -257,7 +256,7 @@ RRT:
   start_idx: 1
   end_idx: -1
   bidirectional: false
-  cost_method: sefo
+  cost_method: se
   sample_count: 500
   sampling_strategy: rs
   n_best_actions: 16  # Only for random sampling strategy

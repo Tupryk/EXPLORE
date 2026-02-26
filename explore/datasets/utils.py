@@ -4,6 +4,8 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 import mujoco
+from itertools import combinations
+from scipy.spatial.distance import directed_hausdorff
 
 class Normalizer:
     def __init__(self, data: torch.Tensor):
@@ -329,3 +331,106 @@ def get_diverse_paths(
     print(f"Total config pairs found: {found_pairs_count} of {max_config_pairs}")
     print(f"Total paths found: {final_paths_count}")
     return final_paths, final_paths_start_end_indices
+
+
+
+
+
+
+def hausdorff_distance(A: np.ndarray, B: np.ndarray) -> float:
+    """
+    Compute symmetric Hausdorff distance between two point sets.
+    
+    A: (N, d)
+    B: (M, d)
+    """
+    d_ab = directed_hausdorff(A, B)[0]
+    d_ba = directed_hausdorff(B, A)[0]
+    return max(d_ab, d_ba)
+
+
+def average_hausdorff_distance(state_paths):
+    """
+    Compute the average pairwise Hausdorff distance
+    across a list of paths.
+    
+    state_paths: list of arrays of shape (Ni, 6)
+    """
+    if len(state_paths) < 2:
+        return 0.0
+
+    distances = []
+    
+    for A, B in combinations(state_paths, 2):
+        d = hausdorff_distance(A, B)
+        distances.append(d)
+
+    return float(np.mean(distances))
+
+def compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
+    path_counts = []
+    end_nodes = []
+
+    for i in tqdm(range(tree_count)):
+
+        tree_path_count = [0 for _ in range(tree_count)]
+        tree_end_nodes = [[] for _ in range(tree_count)]
+        
+        for n, node in enumerate(trees[i]):
+            for j in range(tree_count):
+                node_cost = cost_computation(trees[j][0], node, q_mask, cost_max_method)
+                if i != j and node_cost < ERROR_THRESH:
+                    tree_path_count[j] += 1
+                    tree_end_nodes[j].append(n)
+        
+        path_counts.append(tree_path_count)
+        end_nodes.append(tree_end_nodes)
+
+    path_counts = np.array(path_counts)
+
+    costs = np.full((tree_count, tree_count), np.inf)
+
+    for si in tqdm(range(tree_count)):
+        for ei in range(tree_count):
+            
+            if path_counts[si][ei] == 0:
+                continue
+
+            # Load paths
+            paths = []
+            for end_node in end_nodes[si][ei]:
+                fp = build_path(trees[si], end_node)
+                paths.append(fp)
+                
+            path_count = len(paths)
+            
+            state_paths = []
+            for j in range(path_count):
+                tmp_path = []
+                for node in paths[j]:
+                    tmp_path.append(node["state"][1][:6])
+                state_paths.append(np.array(tmp_path))
+
+            avg_hd = average_hausdorff_distance(state_paths)
+            print(f"AVG hausdorff for paths between config {si} and {ei}: ",  average_hausdorff_distance(state_paths))
+            costs[si, ei] = avg_hd
+            print(path_count)
+    print(100*"----------")
+
+
+    hausdorff_score = []
+    for i in costs:
+        for j in i:
+            if j != np.inf and j!=0:
+                hausdorff_score.append(j)
+
+    print(np.mean(np.array(hausdorff_score)))
+
+    return np.mean(np.array(hausdorff_score))
+
+    # AdjMap(
+    #     costs,
+    #     min_value=0.0,
+    #     max_value=np.nanmax(costs[np.isfinite(costs)]),
+    #     save_as=""
+    # )
