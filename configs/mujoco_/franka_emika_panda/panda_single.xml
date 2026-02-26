@@ -31,7 +31,7 @@
     
     <body name="obj" pos="0.0 0.3 0.7">
       <freejoint />
-      <geom type="box" size="0.03 0.03 0.03" rgba="0.1 1 0.5 1" mass="0.08"/>
+      <geom type="box" size="0.02 0.02 0.02" rgba="0.1 1 0.5 1" mass="0.08"/>
     </body>
 
     <body name="hook" pos="0.0 0.3 0.7">
