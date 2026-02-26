@@ -3,6 +3,7 @@ import cma
 import time
 import psutil
 import pickle
+import hnswlib
 import numpy as np
 from tqdm import trange
 import matplotlib.pyplot as plt
@@ -65,7 +66,6 @@ class Search:
         self.horizon = cfg.horizon
         self.sample_count = cfg.sample_count
         self.cost_max_method = cfg.cost_max_method
-        self.sample_uniform = cfg.sample_uniform
         self.warm_start = cfg.warm_start
         self.sampling_strategy = cfg.sampling_strategy
         self.q_mask = np.array(cfg.q_mask)
@@ -74,6 +74,11 @@ class Search:
             
         assert (self.warm_start and self.horizon == 1) or not self.warm_start
         
+        self.sample_uniform_prob = cfg.sample_uniform_prob
+        if self.sample_uniform_prob:
+            self.mins_uniform_sample = np.array(cfg.mins_uniform_sample)
+            self.maxs_uniform_sample = np.array(cfg.maxs_uniform_sample)
+
         # Does not always provide faster execution! Depends on weird factors like tau_sim
         self.threading = cfg.threading
         # Five Workers and ten simulators seem to be optimal
@@ -84,18 +89,23 @@ class Search:
             self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
         
         self.start_ids = cfg.start_idx
+        self.end_ids = cfg.end_idx
         if not isinstance(self.start_ids, ListConfig):
             if self.start_ids == -1:
                 self.start_ids = list(range(self.config_count))
             else:
                 self.start_ids = [self.start_ids]
-        self.end_idx = cfg.end_idx
-        self.n_best_actions = cfg.n_best_actions
-        self.regularization_weight = cfg.regularization_weight
-
-        self.disable_node_max_strikes = cfg.disable_node_max_strikes
+        if not isinstance(self.end_ids, ListConfig):
+            if self.end_ids == -1:
+                self.end_ids = []
+            else:
+                self.end_ids = [self.end_ids]
+        self.end_ids = np.array(self.end_ids)
         
+        self.disable_node_max_strikes = cfg.disable_node_max_strikes
+        self.n_best_actions = cfg.n_best_actions
         self.knnK = cfg.knnK
+        self.regularization_weight = cfg.regularization_weight
 
         self.sim = [
             MjSim(
@@ -358,8 +368,8 @@ class Search:
             min_cost = costs.min()
 
             f.write(f"{mean_cost}, {min_cost}")
-            if self.end_idx != -1:
-                f.write(f", {self.trees_closest_nodes_costs[idx][self.end_idx, 0]}\n")
+            if len(self.end_ids) == 1:
+                f.write(f", {self.trees_closest_nodes_costs[idx][self.end_ids[0], 0]}\n")
             else:
                 f.write("\n")
 
@@ -430,30 +440,50 @@ class Search:
         
         for start_idx in self.start_ids:
 
+            if self.sample_uniform_prob:
+                max_elems = self.n_best_actions * self.max_nodes_per_tree
+                kNN_tree = hnswlib.Index(space="l2", dim=self.state_dim)
+                kNN_tree.init_index(max_elements=max_elems, ef_construction=200, M=16)
+                kNN_tree.add_items(self.configs[start_idx], ids=[0])
+                kNN_tree_size = 1
+
             if self.verbose > 0:
-                pbar = trange(self.max_nodes_per_tree, desc=f"Tree {start_idx}/{self.config_count}", unit="nodes")
+                pbar = trange(self.max_nodes_per_tree, desc=f"Tree {start_idx+1}/{len(self.start_ids)}", unit="nodes")
             else:
                 pbar = range(self.max_nodes_per_tree)
             
             for _ in pbar:
 
                 # Sample random sim state
-                exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
+                exploring = not (np.random.uniform() < self.target_prob) or not len(self.end_ids)
                 
-                if not exploring and self.end_idx != -1:
-                    target_config_idx = self.end_idx
+                if not exploring:
+                    target_config_idx = np.random.choice(self.end_ids)
                     sim_sample = self.configs[target_config_idx]
+                
                 else:
                     sim_sample, target_config_idx = self.sample_state(start_idx)
                 
                 # Pick closest node
-                node_ids = self.trees_closest_nodes_idxs[start_idx][target_config_idx]
-                valid_ids = node_ids[node_ids != -1]
-                if len(valid_ids):
-                    node_id = np.random.choice(valid_ids)
+                if self.sample_uniform_prob and exploring and (np.random.uniform() <  self.sample_uniform_prob):
+
+                    target_config_idx = -1
+                    
+                    sim_sample = np.random.uniform(low=self.mins_uniform_sample, high=self.maxs_uniform_sample)
+
+                    k = min(self.knnK, kNN_tree_size)
+                    node_id, _ = kNN_tree.knn_query(sim_sample * self.q_mask, k=k)
+                    node_id = np.random.choice(node_id[0])
+
                 else:
-                    node_id = 0
-                assert node_id != -1
+                    node_ids = self.trees_closest_nodes_idxs[start_idx][target_config_idx]
+                    valid_ids = node_ids[node_ids != -1]
+                    if len(valid_ids):
+                        node_id = np.random.choice(valid_ids)
+                    else:
+                        node_id = 0
+                    assert node_id != -1
+
                 node: MultiSearchNode = self.trees[start_idx][node_id]
 
                 # Expand node
@@ -486,6 +516,10 @@ class Search:
                             target_config_idx=target_config_idx,
                             q_sequence=best_q)
                         self.trees[start_idx].append(best_node)
+                        
+                        if self.sample_uniform_prob:
+                            kNN_tree.add_items(best_state[1] * self.q_mask, ids=[kNN_tree_size])
+                            kNN_tree_size += 1
 
                 if not expanded:
 
@@ -532,14 +566,14 @@ class Search:
                     min_cost = costs.min()
 
                     print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost}", end="")
-                    if self.end_idx != -1:
-                        print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_idx, 0]}")
+                    if len(self.end_ids) == 1:
+                        print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
                     else:
                         print()
 
             # Store information when appropriate
             if self.verbose > 3:
-                print(f"Storing tree {start_idx} at i {i}")
+                print(f"Storing tree {start_idx}")
             
             self.store_tree(start_idx, folder_path, self.trees)
             
