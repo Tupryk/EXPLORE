@@ -367,6 +367,38 @@ def average_hausdorff_distance(state_paths):
 
     return float(np.mean(distances))
 
+
+def compute_coverage_number_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx=1):
+    path_counts = []
+    end_nodes = []
+
+    for i in tqdm(range(tree_count)):
+
+        tree_path_count = [0 for _ in range(tree_count)]
+        tree_end_nodes = [[] for _ in range(tree_count)]
+        
+        for n, node in enumerate(trees[i]):
+            for j in range(tree_count):
+                node_cost = cost_computation(trees[j][0], node, q_mask, cost_max_method)
+                if i != j and node_cost < ERROR_THRESH:
+                    tree_path_count[j] += 1
+                    tree_end_nodes[j].append(n)
+        
+        path_counts.append(tree_path_count)
+        end_nodes.append(tree_end_nodes)
+
+    path_counts = np.array(path_counts)
+    path_counts_row = path_counts[start_idx]
+    coverage = np.count_nonzero(path_counts_row)/(len(path_counts_row)-1)
+    n_paths = sum(path_counts[start_idx])
+
+    print("path counts:", path_counts_row)
+    print("coverage", coverage)
+    print("sum", n_paths)
+    
+    return coverage, n_paths
+
+
 def compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
     path_counts = []
     end_nodes = []
@@ -412,10 +444,9 @@ def compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
                 state_paths.append(np.array(tmp_path))
 
             avg_hd = average_hausdorff_distance(state_paths)
-            print(f"AVG hausdorff for paths between config {si} and {ei}: ",  average_hausdorff_distance(state_paths))
+            #print(f"AVG hausdorff for paths between config {si} and {ei}: ",  average_hausdorff_distance(state_paths))
             costs[si, ei] = avg_hd
-            print(path_count)
-    print(100*"----------")
+            #print(path_count)
 
 
     hausdorff_score = []
