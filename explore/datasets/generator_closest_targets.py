@@ -350,7 +350,7 @@ class Search:
             alignment = np.inner(V_total, E_total)
             
             cost = (dist - alpha * alignment)**2
-        else:
+        elif self.cost_method == "se":
             e_linear = e[:-4]
             
             #print("SIGN:", np.inner(state2[-4:], state1[-4:]))
@@ -363,6 +363,8 @@ class Search:
             
             #print("norms:", np.linalg.norm(E_total[:9])**2, "quat:", np.linalg.norm(E_total[-3])**2)
             cost = np.linalg.norm(E_total)**2
+        else:
+            raise Exception("Cost method '{}' not implemented yet!")
         return cost
     
     def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
