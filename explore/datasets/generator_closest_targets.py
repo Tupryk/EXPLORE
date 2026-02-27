@@ -438,7 +438,7 @@ class Search:
         
         start_time = time.time()
         
-        for start_idx in self.start_ids:
+        for i, start_idx in enumerate(self.start_ids):
 
             if self.sample_uniform_prob:
                 max_elems = self.n_best_actions * self.max_nodes_per_tree
@@ -448,7 +448,7 @@ class Search:
                 kNN_tree_size = 1
 
             if self.verbose > 0:
-                pbar = trange(self.max_nodes_per_tree, desc=f"Tree {start_idx+1}/{len(self.start_ids)}", unit="nodes")
+                pbar = trange(self.max_nodes_per_tree, desc=f"Tree {i+1}/{len(self.start_ids)}", unit="nodes")
             else:
                 pbar = range(self.max_nodes_per_tree)
             
