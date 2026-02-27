@@ -5,7 +5,8 @@ import numpy as np
 from tqdm import tqdm
 import mujoco
 from itertools import combinations
-from scipy.spatial.distance import directed_hausdorff
+from scipy.spatial.distance import directed_hausdorff, pdist, squareform
+from scipy.special import digamma, gamma
 
 class Normalizer:
     def __init__(self, data: torch.Tensor):
@@ -334,7 +335,8 @@ def get_diverse_paths(
 
 
 
-
+def remove_rotation(state):
+    return state[..., :6] # for finger ramp
 
 
 def hausdorff_distance(A: np.ndarray, B: np.ndarray) -> float:
@@ -440,7 +442,7 @@ def compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
             for j in range(path_count):
                 tmp_path = []
                 for node in paths[j]:
-                    tmp_path.append(node["state"][1][:6])
+                    tmp_path.append(remove_rotation(node["state"][1]))
                 state_paths.append(np.array(tmp_path))
 
             avg_hd = average_hausdorff_distance(state_paths)
@@ -465,6 +467,60 @@ def compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
 
     return np.mean(np.array(hausdorff_score)), np.mean(np.array(hausdorff_score_implicit_coverage))
 
+def compute_entropy(states, k=5):
+    n, d = states.shape
+    k = min(k, n-1)  # Ensure k is less than n
+    k_nearest_dist = squareform(pdist(states)).partition(k+1)[:, k]
+    c_d = (gamma(d/2 + 1) * np.pi**(d/2)) / gamma(k)
+    entropy = digamma(n) - digamma(k) + np.log(c_d) + (d/n) * np.sum(np.log(2 * k_nearest_dist + 1e-10))
+    return entropy
+
+def compute_path_entropy(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
+    path_counts = []
+    end_nodes = []
+
+    for i in tqdm(range(tree_count)):
+
+        tree_path_count = [0 for _ in range(tree_count)]
+        tree_end_nodes = [[] for _ in range(tree_count)]
+        
+        for n, node in enumerate(trees[i]):
+            for j in range(tree_count):
+                node_cost = cost_computation(trees[j][0], node, q_mask, cost_max_method)
+                if i != j and node_cost < ERROR_THRESH:
+                    tree_path_count[j] += 1
+                    tree_end_nodes[j].append(n)
+        
+        path_counts.append(tree_path_count)
+        end_nodes.append(tree_end_nodes)
+
+    path_counts = np.array(path_counts)
+
+    costs = np.full((tree_count, tree_count), np.inf)
+
+    states = []
+    
+    for si in tqdm(range(tree_count)):
+        for ei in range(tree_count):
+            
+            if path_counts[si][ei] == 0:
+                continue
+
+            # Load paths
+            paths = []
+            for end_node in end_nodes[si][ei]:
+                fp = build_path(trees[si], end_node)
+                paths.append(fp)
+                
+            path_count = len(paths)
+            
+            for j in range(path_count):
+                tmp_path = []
+                for node in paths[j]:
+                    states.append(remove_rotation(node["state"][1]))
+
+    states = np.array(states)
+    return compute_entropy(states)
     # AdjMap(
     #     costs,
     #     min_value=0.0,
