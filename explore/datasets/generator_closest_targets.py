@@ -627,7 +627,7 @@ class Search:
                         print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
                     else:
                         print()
-                print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost} vs: {self.v_0} {self.v_1} {self.v_2}",end="")
+
                 if len(self.end_ids)==1:
                     print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
                 else:
