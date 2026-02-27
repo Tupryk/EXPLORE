@@ -2,31 +2,30 @@ hydra:
   sweeper:
     params:
       RRT.start_idx: 1,2,3,4,5,6,7,8,9,10
-      RRT.n_best_actions: 64
 
 RRT:
-  verbose: 3
-  max_nodes: 2500
+  verbose: 1
+  max_nodes_per_tree: 2500
   min_cost: 0.001
   horizon: 1
-  max_configs: -1
+  max_configs: 100
   stepsize: 0.08
   path_diff_thresh: 0.05
-  target_min_dist: 1000.
-  target_prob: .0
+  target_min_dist: 1000.0
+  target_prob: 0.2
   disable_node_max_strikes: 1
-  sample_uniform: false
+  sample_uniform_prob: 0.0
   warm_start: false
-  threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: 1
+  threading: true
+  start_idx: -1
   end_idx: -1
   bidirectional: false
   cost_method: se
   sample_count: 100
   sampling_strategy: rs
-  n_best_actions: 16  # Only for random sampling strategy
-  cem_steps: 10  # Only for CEM
-  regularization_weight: .0
+  n_best_actions: 16
+  cem_steps: 10
+  regularization_weight: 0.0
   output_dir: ${hydra:runtime.output_dir}
   q_mask:
   - 1

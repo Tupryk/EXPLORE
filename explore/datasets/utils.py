@@ -39,6 +39,11 @@ class MinMaxNormalizer(Normalizer):
     def de_normalize(self, x: torch.Tensor) -> torch.Tensor:
         return (x + 1) * 0.5 * self.range + self.mins
 
+def signum(q1, q2):
+    if np.inner(q1, q2)>=0:
+        return 1
+    else:
+        return -1
 
 def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=False) -> float:
     
@@ -48,15 +53,14 @@ def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=Fal
     if cost_max_method:
         cost = np.abs(e).max()
     else:
-        e_linear = e[:-4]
+        e_linear = e[:-4]        
+        e_rotation = node1["state"][1][-4:] - signum(node1["state"][1][-4:] , node2["state"][1][-4:]) * node2["state"][1][-4:]
 
-        delta_theta = np.zeros(3)
-        mujoco.mju_subQuat(delta_theta, node1["state"][1][-4:], node2["state"][1][-4:])
-        
-        E_total = np.concatenate([e_linear, delta_theta])
-        
+        E_total = np.concatenate([e_linear, e_rotation])
         E_total *= q_mask
+        
         cost = np.linalg.norm(E_total)**2
+
 
     return cost
 

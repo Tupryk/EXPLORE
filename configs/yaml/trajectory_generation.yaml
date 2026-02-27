@@ -236,12 +236,11 @@ hydra:
   sweeper:
     params:
       RRT.start_idx: 1,2,3,4,5,6,7,8,9,10
-      RRT.n_best_actions: 64
       # RRT.max_configs: 10, 50, 100, 250, 500, 1000 #, 2500, 5000 , 10_000
 
 RRT:
   verbose: 3
-  max_nodes: 2500
+  max_nodes_per_tree: 2500
   min_cost: 0.05
   horizon: 1
   max_configs: 100
@@ -250,10 +249,11 @@ RRT:
   target_min_dist: 10.
   target_prob: .2
   disable_node_max_strikes: 1
-  sample_uniform: false
+  sample_uniform_prob: 0
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: 1
+  start_idx: [1,2,3,4,5,6,7,8,9,10]
+
   end_idx: -1
   bidirectional: false
   cost_method: se
@@ -276,6 +276,8 @@ RRT:
   - .25
   - .25
   - .25
+  - .25
+
   knnK: 16
   sim:
     tau_sim: 0.005

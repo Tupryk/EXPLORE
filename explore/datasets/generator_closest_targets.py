@@ -13,6 +13,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from explore.env.mujoco_sim import MjSim
 import mujoco
 
+def signum(q1, q2):
+    if np.inner(q1, q2)>=0:
+        return 1
+    else:
+        return -1
+
 class MultiSearchNode:
     def __init__(self,
                  parent: int,
@@ -52,7 +58,6 @@ class Search:
         self.v_1 = 0
         self.v_2 = 0
 
-        self.max_nodes = int(cfg.max_nodes)
         self.stepsize = cfg.stepsize
         if isinstance(self.stepsize, ListConfig):
             self.stepsize = np.array(self.stepsize)
@@ -71,7 +76,6 @@ class Search:
         self.horizon = cfg.horizon
         self.sample_count = cfg.sample_count
         self.cost_method = cfg.cost_method # "se" for squared error, "max" for max error, sefo for se with derivates
-        self.sample_uniform = cfg.sample_uniform
         self.warm_start = cfg.warm_start
         self.sampling_strategy = cfg.sampling_strategy
         self.q_mask = np.array(cfg.q_mask)
@@ -349,10 +353,11 @@ class Search:
         else:
             e_linear = e[:-4]
             
-            delta_theta = np.zeros(3)
-            mujoco.mju_subQuat(delta_theta, state2[-4:], state1[-4:])
-            
-            E_total = np.concatenate([e_linear, delta_theta])
+            #print("SIGN:", np.inner(state2[-4:], state1[-4:]))
+
+            e_rotation = np.array([0,0,0,0])# state1[-4:] - signum(state1[-4:], state2[-4:]) * state2[-4:]
+
+            E_total = np.concatenate([e_linear, e_rotation])
             
             E_total *= self.q_mask
             
@@ -621,8 +626,8 @@ class Search:
                     else:
                         print()
                 print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost} vs: {self.v_0} {self.v_1} {self.v_2}",end="")
-                if self.end_idx != -1:
-                    print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_idx, 0]}")
+                if len(self.end_ids)==1:
+                    print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
                 else:
                     print()
 
