@@ -1,0 +1,76 @@
+RRT:
+  verbose: 3
+  max_nodes_per_tree: 10000
+  min_cost: 0.2
+  horizon: 1
+  max_configs: -1
+  stepsize:
+  - 0.3
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.7
+  - 0.6
+  - 1.0
+  - 125.0
+  - 0.3
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.7
+  - 0.6
+  - 1.0
+  - 125.0
+  path_diff_thresh: 0.1
+  target_min_dist: 1000.
+  target_prob: .2
+  disable_node_max_strikes: 1
+  sample_uniform_prob: 0.0
+  warm_start: false
+  threading: true  # Depending on the hardware this may lead to faster computations.
+  start_idx: -1
+  end_idx: -1
+  bidirectional: false
+  cost_max_method: false
+  sample_count: 1000
+  sampling_strategy: rs
+  n_best_actions: 16  # Only for random sampling strategy
+  cem_steps: 10  # Only for CEM
+  regularization_weight: .0
+  output_dir: ${hydra:runtime.output_dir}
+  q_mask:
+  - 1.0
+  - 0.9
+  - 0.8
+  - 0.7
+  - 0.6
+  - 0.5
+  - 0.4
+  - 0.1
+  - 0.1
+  - 1.0
+  - 0.9
+  - 0.8
+  - 0.7
+  - 0.6
+  - 0.5
+  - 0.4
+  - 0.1
+  - 0.1
+  - 10
+  - 10
+  - 10
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  knnK: 16
+  sim:
+    tau_sim: 0.005
+    tau_action: 0.5
+    interpolate_actions: true
+    joints_are_same_as_ctrl: false
+    use_spline_ref: false
+    mujoco_xml: configs/mujoco_/franka_emika_panda/pandas_table.xml
+    camera: fixed_cam
+configs_path: configs/stable/grasp_configs.h5

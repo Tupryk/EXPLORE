@@ -11,7 +11,13 @@ from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from explore.env.mujoco_sim import MjSim
+import mujoco
 
+def signum(q1, q2):
+    if np.inner(q1, q2)>=0:
+        return 1
+    else:
+        return -1
 
 class MultiSearchNode:
     def __init__(self,
@@ -48,6 +54,10 @@ class Search:
         self.config_count = self.configs.shape[0]
 
         self.max_nodes_per_tree = int(cfg.max_nodes_per_tree)
+        self.v_0 = 0
+        self.v_1 = 0
+        self.v_2 = 0
+
         self.stepsize = cfg.stepsize
         if isinstance(self.stepsize, ListConfig):
             self.stepsize = np.array(self.stepsize)
@@ -65,7 +75,7 @@ class Search:
         
         self.horizon = cfg.horizon
         self.sample_count = cfg.sample_count
-        self.cost_max_method = cfg.cost_max_method
+        self.cost_method = cfg.cost_method # "se" for squared error, "max" for max error, sefo for se with derivates
         self.warm_start = cfg.warm_start
         self.sampling_strategy = cfg.sampling_strategy
         self.q_mask = np.array(cfg.q_mask)
@@ -313,12 +323,46 @@ class Search:
         
         return results
     
-    def compute_cost(self, state1: np.ndarray, state2: np.ndarray) -> float:
-        e = (state1 - state2) * self.q_mask
-        if self.cost_max_method:
+    def compute_cost(self, state1: np.ndarray, state2: np.ndarray, vel_state2: np.ndarray = None) -> float:
+        e = (state1 - state2) #* self.q_mask
+        if self.cost_method == "max":
             cost = np.abs(e).max()
+        elif self.cost_method == "sefo" and vel_state2 is not None:
+
+            e_linear = e[:-4]
+            v_linear = vel_state2[:-3]
+            
+
+            delta_theta = np.zeros(3)
+            mujoco.mju_subQuat(delta_theta, state2[-4:], state1[-4:])
+            
+            E_total = np.concatenate([e_linear, delta_theta])
+
+            E_total *= self.q_mask
+
+            V_total = np.concatenate([v_linear, vel_state2[-3:]]) 
+            V_total *= self.q_mask
+            
+            v_max = 1
+            alpha = (1 - 1e-3) / v_max
+            
+            dist = np.linalg.norm(E_total)
+            alignment = np.inner(V_total, E_total)
+            
+            cost = (dist - alpha * alignment)**2
         else:
-            cost = e.T @ e
+            e_linear = e[:-4]
+            
+            #print("SIGN:", np.inner(state2[-4:], state1[-4:]))
+
+            e_rotation = np.array([0,0,0,0])# state1[-4:] - signum(state1[-4:], state2[-4:]) * state2[-4:]
+
+            E_total = np.concatenate([e_linear, e_rotation])
+            
+            E_total *= self.q_mask
+            
+            #print("norms:", np.linalg.norm(E_total[:9])**2, "quat:", np.linalg.norm(E_total[-3])**2)
+            cost = np.linalg.norm(E_total)**2
         return cost
     
     def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
@@ -332,7 +376,18 @@ class Search:
         
         state = self.sim[sim_idx].getState()
         
-        cost2target = self.compute_cost(target, state[1])
+        v0 = np.linalg.norm(state[2][:3])
+        v1 = np.linalg.norm(state[2][3:6])
+        v2 = np.linalg.norm(state[2][6:9])
+
+        if v0 > self.v_0:
+            self.v_0 = v0
+        if v1 > self.v_1:
+            self.v_1 = v1
+        if v2 > self.v_2:
+            self.v_2 = v2
+
+        cost2target = self.compute_cost(target, state[1], state[2])
         
         reg_e = state[3] - origin[3].T
         cost2target += self.regularization_weight * (reg_e.T @ reg_e)
@@ -570,6 +625,11 @@ class Search:
                         print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
                     else:
                         print()
+                print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost} vs: {self.v_0} {self.v_1} {self.v_2}",end="")
+                if len(self.end_ids)==1:
+                    print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
+                else:
+                    print()
 
             # Store information when appropriate
             if self.verbose > 3:
@@ -591,6 +651,7 @@ class Search:
         if self.verbose > 1:
             print(f"Total time taken: {total_time:.2f} seconds")
 
+        print("v0:", self.v_0, "v1:", self.v_1, "v2:", self.v_2)
         time_data_path = os.path.join(self.output_dir, f"time_taken.txt")
         with open(time_data_path, "w") as f:
             f.write(f"{total_time}\n")
