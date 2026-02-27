@@ -450,14 +450,20 @@ def compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
 
 
     hausdorff_score = []
+    hausdorff_score_implicit_coverage = []
+
     for i in costs:
         for j in i:
             if j != np.inf and j!=0:
                 hausdorff_score.append(j)
+                hausdorff_score_implicit_coverage.append(j)
+            elif j != np.inf:
+                hausdorff_score_implicit_coverage.append(j)
+
 
     print(np.mean(np.array(hausdorff_score)))
 
-    return np.mean(np.array(hausdorff_score))
+    return np.mean(np.array(hausdorff_score)), np.mean(np.array(hausdorff_score_implicit_coverage))
 
     # AdjMap(
     #     costs,

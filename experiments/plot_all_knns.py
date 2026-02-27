@@ -4,10 +4,11 @@ import numpy as np
 from tqdm import tqdm
 from omegaconf import OmegaConf
 import matplotlib.pyplot as plt
+import json 
 
-from explore.datasets.utils import cost_computation, load_trees
+from explore.datasets.utils import cost_computation, load_trees, compute_hausdorff, compute_coverage_number_paths
 
-root_folder = "multirun/2026-02-23"
+root_folder = "multirun/2026-02-24"
 
 img_idx = 0
 
@@ -23,6 +24,10 @@ for item in os.listdir(root_folder):
 
         all_mean_costs = []
         all_found_paths = []
+        all_hausdorffs = []
+        all_hd_implicit = []
+        all_coverage = []
+        all_n_paths = []
 
         for folder_name in range(ds_c):
             
@@ -109,6 +114,13 @@ for item in os.listdir(root_folder):
 
             plt.tight_layout()
             #plt.show()
+            hd, hd_implicit =  compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH)
+            coverage, n_paths = compute_coverage_number_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx = si)
+            all_coverage.append(coverage)
+            all_n_paths.append(n_paths)
+            print("Hausdorff:", hd)
+            all_hausdorffs.append(hd)
+            all_hd_implicit.append(hd_implicit)
 
         # --- Calculate means and standard deviations ---
         min_len = min(len(x) for x in all_mean_costs)
@@ -149,14 +161,39 @@ for item in os.listdir(root_folder):
         axes[1].tick_params(axis='y', which='both', right=True, labelright=True)
 
 
-        axes[0].set_ylim(0, 3)   # or hard-code numbers
+        axes[0].set_ylim(0, .3)   # or hard-code numbers
 
-        max_possible_paths = 15
+        max_possible_paths = 25
         axes[1].set_ylim(0, max_possible_paths)
 
+        # 1. Prepare the data dictionary
+        results_data = {
+            "n_best_actions": cfg.RRT.n_best_actions,
+            "cost_method": cfg.RRT.cost_method,
+            "avg_final_successes": float(avg_paths[-1]),
+            "best_experiment_folder": best_folder_name,
+            "best_found_paths_count": int(best_found_paths_count),
+            "avg_hausdorff": float(np.mean(all_hausdorffs)),
+            "avg_hausdorff_implicit": float(np.mean(all_hd_implicit)),
+            "avg_coverage": float(np.mean(all_coverage)),
+            "total_found_paths": int(sum(all_n_paths))
+        }
+
+        save_path_base = f"/home/denis/Desktop/fingerRamp/knnK/{cfg.RRT.knnK}"
+        # 2. Save as .json
+        with open(f"{save_path_base}.json", "w") as f:
+            json.dump(results_data, f, indent=4)
+
+
         plt.tight_layout()
-        plt.savefig(f"/home/denis/Desktop/fingersBox/{img_idx}_{cfg.RRT.knnK}.png")
+        plt.savefig(f"{save_path_base}.png")
         plt.close(fig)
+
         i+=1
+
         print(f"Global Average Final Successes for cost {cfg.RRT.cost_method}: {avg_paths[-1]:.2f}")
         print(f"Best Experiment Folder: {best_folder_name} ({best_found_paths_count} paths)")
+        print(f"Global Average Hausdorff: {np.mean(np.array(all_hausdorffs))}")
+        print(f"Global Average Coverage: {np.mean(np.array(all_coverage))}")
+        print(f"Global Found paths: {sum(all_n_paths)}")
+        print(f"Found paths: {len(all_found_paths)}")
