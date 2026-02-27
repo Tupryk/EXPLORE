@@ -1,25 +1,25 @@
 RRT:
-  verbose: 3
+  verbose: 1
   max_nodes_per_tree: 10000
   min_cost: 0.2
   horizon: 1
   max_configs: -1
   stepsize:
+  - 0.15
+  - 0.15
+  - 0.2
+  - 0.25
+  - 0.35
   - 0.3
-  - 0.3
-  - 0.4
   - 0.5
-  - 0.7
-  - 0.6
-  - 1.0
   - 125.0
+  - 0.15
+  - 0.15
+  - 0.2
+  - 0.25
+  - 0.35
   - 0.3
-  - 0.3
-  - 0.4
   - 0.5
-  - 0.7
-  - 0.6
-  - 1.0
   - 125.0
   path_diff_thresh: 0.1
   target_min_dist: 1000.
@@ -31,7 +31,7 @@ RRT:
   start_idx: -1
   end_idx: -1
   bidirectional: false
-  cost_max_method: false
+  cost_method: se
   sample_count: 1000
   sampling_strategy: rs
   n_best_actions: 16  # Only for random sampling strategy
@@ -67,10 +67,15 @@ RRT:
   knnK: 16
   sim:
     tau_sim: 0.005
-    tau_action: 0.5
+    tau_action: 0.25
     interpolate_actions: true
     joints_are_same_as_ctrl: false
     use_spline_ref: false
     mujoco_xml: configs/mujoco_/franka_emika_panda/pandas_table.xml
     camera: fixed_cam
-configs_path: configs/stable/grasp_configs.h5
+configs_path: configs/stable/pandasTableConfigs.h5
+
+hydra:
+  sweeper:
+    params:
+      RRT.start_idx: 1,2,3,4,5,6,7,8,9,10
