@@ -235,8 +235,7 @@
 hydra:
   sweeper:
     params:
-      RRT.start_idx: 1,2,3,4,5,6,7,8,9,10
-      # RRT.max_configs: 10, 50, 100, 250, 500, 1000 #, 2500, 5000 , 10_000
+      RRT.n_best_actions: 1, 2, 4, 8, 16, 32, 64
 
 RRT:
   verbose: 3
@@ -252,11 +251,12 @@ RRT:
   sample_uniform_prob: 0
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: [1,2,3,4,5,6,7,8,9,10]
+  start_idx: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
   end_idx: -1
   bidirectional: false
   cost_method: se
+  knnK: None
   sample_count: 500
   sampling_strategy: rs
   n_best_actions: 16  # Only for random sampling strategy
@@ -278,7 +278,6 @@ RRT:
   - .25
   - .25
 
-  knnK: 16
   sim:
     tau_sim: 0.005
     tau_action: 0.25
