@@ -46,22 +46,23 @@ def signum(q1, q2):
     else:
         return -1
 
-def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=False) -> float:
+def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=False, scene_quat_indices: list=[]) -> float:
     
-    e = (node1["state"][1] - node2["state"][1])  #* self.q_mask
-  
+    state1 = node1["state"][1]
+    state2 = node2["state"][1]
+
+    e = (state1 - state2)
+    
+    for i in scene_quat_indices:
+        i0 = i + 4
+        e[i:i0] = state1[i:i0] - signum(state1[i:i0], state2[i:i0]) * state2[i:i0]
+
+    e *= q_mask
 
     if cost_max_method:
         cost = np.abs(e).max()
     else:
-        e_linear = e[:-4]        
-        e_rotation = node1["state"][1][-4:] - signum(node1["state"][1][-4:] , node2["state"][1][-4:]) * node2["state"][1][-4:]
-
-        E_total = np.concatenate([e_linear, e_rotation])
-        E_total *= q_mask
-        
-        cost = np.linalg.norm(E_total)**2
-
+        cost = e.T @ e
 
     return cost
 

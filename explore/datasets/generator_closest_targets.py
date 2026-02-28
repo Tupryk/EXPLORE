@@ -3,6 +3,7 @@ import cma
 import time
 import psutil
 import pickle
+import mujoco
 import hnswlib
 import numpy as np
 from tqdm import trange
@@ -11,7 +12,7 @@ from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from explore.env.mujoco_sim import MjSim
-import mujoco
+from explore.utils.mj import get_model_quaternions
 
 def signum(q1, q2):
     if np.inner(q1, q2)>=0:
@@ -126,13 +127,7 @@ class Search:
         ]
         assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
         
-        self.scene_quat_indices = []
-        for j in range(self.sim[0].model.njnt):
-            joint_type = self.sim[0].model.jnt_type[j]
-            qpos_adr = self.sim[0].model.jnt_qposadr[j]
-
-            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
-                self.scene_quat_indices.append(int(qpos_adr+3))
+        self.scene_quat_indices = get_model_quaternions(self.sim[0].model)
 
         if self.verbose > 2:
             print("Quaternions in scene: ", self.scene_quat_indices)

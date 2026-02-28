@@ -14,3 +14,17 @@ def explain_qpos(model: mujoco.MjModel):
         
         print("Ctrl ranges: ", model.actuator_ctrlrange)
         print("Ctrl ranges magnitude: ", model.actuator_ctrlrange[:, 1] - model.actuator_ctrlrange[:, 0])
+
+def get_model_quaternions(model: mujoco.MjModel):
+
+    scene_quat_indices = []
+    
+    for j in range(model.njnt):
+        joint_type = model.jnt_type[j]
+        qpos_adr = model.jnt_qposadr[j]
+
+        if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+            scene_quat_indices.append(int(qpos_adr+3))
+
+    return scene_quat_indices
+        
