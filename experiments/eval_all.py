@@ -2,17 +2,19 @@ import os
 import datetime
 import numpy as np
 from tqdm import tqdm
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, ListConfig
 import matplotlib.pyplot as plt
 import json 
+from pathlib import Path
+
 
 from explore.datasets.utils import cost_computation, load_trees, compute_hausdorff, compute_coverage_number_paths, compute_path_entropy
 
-COMPUTE_HAUSDORFF = True
+COMPUTE_HAUSDORFF = False
 COMPUTE_ENTROPY = False
-COMPUTE_COVERAGE = False
+COMPUTE_COVERAGE = True
 
-root_folder = "multirun/2026-02-28"
+root_folder = "outputs/2026-02-28"
 
 img_idx = 0
 
@@ -34,20 +36,54 @@ for item in os.listdir(root_folder):
         all_coverage = []
         all_n_paths = []
 
-        
+        is_multi_run = not Path(dataset_paths+"/.hydra").is_dir()
 
-        for folder_name in range(1):#range(ds_c): TODO
+        for folder_name in range(ds_c): #TODO
 
+            if not is_multi_run:
+                folder_name = "."
+                
             dataset = f"{dataset_paths}/{folder_name}"
             print(dataset)
             config_path = os.path.join(dataset, ".hydra/config.yaml")
             cfg = OmegaConf.load(config_path)
             start_ids = cfg.RRT.start_idx
-            if type(cfg.RRT.start_idx) is not list:
-                start_ids = list(cfg.RRT.start_idx)
+            if type(cfg.RRT.start_idx) is not ListConfig:
+                start_ids = [cfg.RRT.start_idx]
 
-            for idx in start_ids:
+            ENV = None
+            ABLATION_TYPE = None
 
+            if "fingerRamp" in cfg.RRT.sim.mujoco_xml:
+                ENV = "fingerRamp"
+            elif "twoFingers" in cfg.RRT.sim.mujoco_xml:
+                ENV = "fingersBox"
+            elif "panda_single" in cfg.RRT.sim.mujoco_xml:
+                ENV = "pandaHook"
+            elif "pandas_table" in cfg.RRT.sim.mujoco_xml:
+                ENV = "pandasBox"
+
+            if is_multi_run:
+                #TODO
+                config_path_multi = os.path.join(dataset, "multirun.yaml")
+                cfg_multi = OmegaConf.load(config_path_multi)            
+                if cfg_multi.hydra.sweeper.params.get("n_best_actions", None) is not None:
+                    ABLATION_TYPE = "n_best_actions"
+                elif cfg_multi.hydra.sweeper.params.get("knnK", None) is not None:
+                    ABLATION_TYPE = "knnK"
+                else:
+                    raise RuntimeError
+            else:
+                if cfg.RRT.disable_node_max_strikes == 1:
+                    ABLATION_TYPE = "baseline"
+                elif cfg.RRT.disable_node_max_strikes == -1:
+                    ABLATION_TYPE = "disable_node"
+                else:
+                    raise RuntimeError
+  
+            i = 0
+
+            for idx in start_ids[:3]:
                 knnK = cfg.RRT.knnK
 
                 ERROR_THRESH = cfg.RRT.min_cost
@@ -147,6 +183,7 @@ for item in os.listdir(root_folder):
                 all_hd_implicit.append(hd_implicit)
                 all_entropies.append(entropy)
 
+            
 
             # --- Calculate means and standard deviations ---
             min_len = min(len(x) for x in all_mean_costs)
@@ -188,10 +225,10 @@ for item in os.listdir(root_folder):
 
 
 
-            if "twoFingersCube" in cfg.RRT.sim.mujoco_xml:
-                axes[0].set_ylim(0, 3)
-                axes[1].set_ylim(0, 20)
-            elif "fingerRamp" in cfg.RRT.sim.mujoco_xml:
+            if ENV == "fingersBox":
+                axes[0].set_ylim(0, 2)
+                axes[1].set_ylim(0, 30)
+            elif ENV == "fingerRamp":
                 axes[0].set_ylim(0, .3)
                 axes[1].set_ylim(0, 25)
 
@@ -210,7 +247,9 @@ for item in os.listdir(root_folder):
                 "total_found_paths": int(sum(all_n_paths))
             }
 
-            save_path_base = f"/home/denis/Desktop/fingersBox/knnK/{cfg.RRT.knnK}"
+            #save_path_base = f"/home/denis/Desktop/fingersBox/knnK/{cfg.RRT.knnK}"
+            save_path_base = f"/home/denis/Desktop/{ENV}/{ABLATION_TYPE}/{i}"
+
             # 2. Save as .json
             with open(f"{save_path_base}.json", "w") as f:
                 json.dump(results_data, f, indent=4)
@@ -220,12 +259,16 @@ for item in os.listdir(root_folder):
             plt.savefig(f"{save_path_base}.png")
             plt.close(fig)
 
+
             i+=1
 
+            print(f"Fig and json saved in{save_path_base}")
             print(f"Global Average Final Successes for cost {cfg.RRT.cost_method}: {avg_paths[-1]:.2f}")
             print(f"Best Experiment Folder: {best_folder_name} ({best_found_paths_count} paths)")
             print(f"Global Average Hausdorff: {np.mean(np.array(all_hausdorffs))}")
             print(f"Global Average Coverage: {np.mean(np.array(all_coverage))}")
             print(f"Global Found paths: {sum(all_n_paths)}")
             print(f"Found paths: {len(all_found_paths)}")
-            print(f"knnK:", cfg.RRT.knnK)
+
+            if not is_multi_run:
+                break

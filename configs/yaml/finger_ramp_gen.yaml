@@ -17,7 +17,7 @@ RRT:
   sample_uniform_prob: 0.0
   warm_start: false
   threading: true
-  start_idx: -1
+  start_idx: [1,2,3,4,5,6,7,8,9,10]
   end_idx: -1
   bidirectional: false
   cost_method: se
@@ -34,6 +34,7 @@ RRT:
   - 1
   - 1
   - 1
+  - 0
   - 0
   - 0
   - 0
