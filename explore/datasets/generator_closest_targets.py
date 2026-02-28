@@ -126,6 +126,17 @@ class Search:
         ]
         assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
         
+        self.scene_quat_indices = []
+        for j in range(self.sim[0].model.njnt):
+            joint_type = self.sim[0].model.jnt_type[j]
+            qpos_adr = self.sim[0].model.jnt_qposadr[j]
+
+            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+                self.scene_quat_indices.append(int(qpos_adr+3))
+
+        if self.verbose > 2:
+            print("Quaternions in scene: ", self.scene_quat_indices)
+
         self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
         self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
         self.state_dim = self.sim[0].data.qpos.shape[0]
@@ -324,11 +335,23 @@ class Search:
         return results
     
     def compute_cost(self, state1: np.ndarray, state2: np.ndarray, vel_state2: np.ndarray = None) -> float:
-        e = (state1 - state2) #* self.q_mask
+        
+        e = (state1 - state2)
+        for i in self.scene_quat_indices:
+            i0 = i + 4
+            e[i:i0] = state1[i:i0] - signum(state1[i:i0], state2[i:i0]) * state2[i:i0]
+        
+        e *= self.q_mask
+        
         if self.cost_method == "max":
             cost = np.abs(e).max()
+        
+        elif self.cost_method == "se":
+            cost = e.T @ e
+
         elif self.cost_method == "sefo" and vel_state2 is not None:
 
+            raise Exception("Sefo is currently out of service, we apologise for any inconvenience.")
             e_linear = e[:-4]
             v_linear = vel_state2[:-3]
             
@@ -350,21 +373,10 @@ class Search:
             alignment = np.inner(V_total, E_total)
             
             cost = (dist - alpha * alignment)**2
-        elif self.cost_method == "se":
-            e_linear = e[:-4]
-            
-            #print("SIGN:", np.inner(state2[-4:], state1[-4:]))
-
-            e_rotation = np.array([0,0,0,0])# state1[-4:] - signum(state1[-4:], state2[-4:]) * state2[-4:]
-
-            E_total = np.concatenate([e_linear, e_rotation])
-            
-            E_total *= self.q_mask
-            
-            #print("norms:", np.linalg.norm(E_total[:9])**2, "quat:", np.linalg.norm(E_total[-3])**2)
-            cost = np.linalg.norm(E_total)**2
+        
         else:
             raise Exception("Cost method '{}' not implemented yet!")
+        
         return cost
     
     def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
@@ -627,7 +639,7 @@ class Search:
                         print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
                     else:
                         print()
-                print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost} vs: {self.v_0} {self.v_1} {self.v_2}",end="")
+
                 if len(self.end_ids)==1:
                     print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
                 else:
