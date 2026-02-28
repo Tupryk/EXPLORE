@@ -6,9 +6,13 @@ from omegaconf import OmegaConf
 import matplotlib.pyplot as plt
 import json 
 
-from explore.datasets.utils import cost_computation, load_trees, compute_hausdorff, compute_coverage_number_paths
+from explore.datasets.utils import cost_computation, load_trees, compute_hausdorff, compute_coverage_number_paths, compute_path_entropy
 
-root_folder = "multirun/2026-02-24"
+COMPUTE_HAUSDORFF = False
+COMPUTE_ENTROPY = False
+COMPUTE_COVERAGE = False
+
+root_folder = "multirun/2026-02-27"
 
 img_idx = 0
 
@@ -26,10 +30,11 @@ for item in os.listdir(root_folder):
         all_found_paths = []
         all_hausdorffs = []
         all_hd_implicit = []
+        all_entropies = []
         all_coverage = []
         all_n_paths = []
 
-        for folder_name in range(ds_c):
+        for folder_name in range(2): #range(ds_c):
             
             dataset = f"{dataset_paths}/{folder_name}"
 
@@ -114,13 +119,28 @@ for item in os.listdir(root_folder):
 
             plt.tight_layout()
             #plt.show()
-            hd, hd_implicit =  compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH)
-            coverage, n_paths = compute_coverage_number_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx = si)
+            if COMPUTE_HAUSDORFF:
+                hd, hd_implicit =  compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH)
+            else: 
+                hd, hd_implicit = 0, 0
+            
+            if COMPUTE_COVERAGE:
+                coverage, n_paths = compute_coverage_number_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx = si)
+            else:
+                coverage, n_paths = 0, 0
+
+            if COMPUTE_ENTROPY:
+                entropy = compute_path_entropy(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH)
+            else:
+                entropy = 0
             all_coverage.append(coverage)
             all_n_paths.append(n_paths)
             print("Hausdorff:", hd)
+            print(f"knnK:", cfg.RRT.knnK)
             all_hausdorffs.append(hd)
             all_hd_implicit.append(hd_implicit)
+            all_entropies.append(entropy)
+
 
         # --- Calculate means and standard deviations ---
         min_len = min(len(x) for x in all_mean_costs)
@@ -161,14 +181,18 @@ for item in os.listdir(root_folder):
         axes[1].tick_params(axis='y', which='both', right=True, labelright=True)
 
 
-        axes[0].set_ylim(0, .3)   # or hard-code numbers
 
-        max_possible_paths = 25
-        axes[1].set_ylim(0, max_possible_paths)
+        if "twoFingersCube" in cfg.RRT.sim.mujoco_xml:
+            axes[0].set_ylim(0, 3)
+            axes[1].set_ylim(0, 20)
+        elif "fingerRamp" in cfg.RRT.sim.mujoco_xml:
+            axes[0].set_ylim(0, .3)
+            axes[1].set_ylim(0, 25)
 
         # 1. Prepare the data dictionary
         results_data = {
             "n_best_actions": cfg.RRT.n_best_actions,
+            "knnK": cfg.RRT.knnK,
             "cost_method": cfg.RRT.cost_method,
             "avg_final_successes": float(avg_paths[-1]),
             "best_experiment_folder": best_folder_name,
@@ -176,10 +200,11 @@ for item in os.listdir(root_folder):
             "avg_hausdorff": float(np.mean(all_hausdorffs)),
             "avg_hausdorff_implicit": float(np.mean(all_hd_implicit)),
             "avg_coverage": float(np.mean(all_coverage)),
+            "avg_entropy": float(np.mean(all_entropies)),
             "total_found_paths": int(sum(all_n_paths))
         }
 
-        save_path_base = f"/home/denis/Desktop/fingerRamp/knnK/{cfg.RRT.knnK}"
+        save_path_base = f"/home/denisshcherba/Desktop/fingersBox/knnK/{cfg.RRT.knnK}"
         # 2. Save as .json
         with open(f"{save_path_base}.json", "w") as f:
             json.dump(results_data, f, indent=4)
@@ -197,3 +222,4 @@ for item in os.listdir(root_folder):
         print(f"Global Average Coverage: {np.mean(np.array(all_coverage))}")
         print(f"Global Found paths: {sum(all_n_paths)}")
         print(f"Found paths: {len(all_found_paths)}")
+        print(f"knnK:", cfg.RRT.knnK)

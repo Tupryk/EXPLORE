@@ -474,7 +474,10 @@ def compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
 def compute_entropy(states, k=5):
     n, d = states.shape
     k = min(k, n-1)  # Ensure k is less than n
-    k_nearest_dist = squareform(pdist(states)).partition(k+1)[:, k]
+
+    dist_matrix = squareform(pdist(states))
+    k_nearest_dist = np.partition(dist_matrix, k + 1, axis=1)[:, k]
+
     c_d = (gamma(d/2 + 1) * np.pi**(d/2)) / gamma(k)
     entropy = digamma(n) - digamma(k) + np.log(c_d) + (d/n) * np.sum(np.log(2 * k_nearest_dist + 1e-10))
     return entropy
