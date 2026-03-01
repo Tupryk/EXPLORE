@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import json 
 from pathlib import Path
 
-from explore.datasets.utils import cost_computation, load_trees, compute_hausdorff, compute_coverage_number_paths, compute_path_entropy, compute_paths
+from explore.datasets.utils import cost_computation, load_trees, compute_hausdorff, compute_coverage_number_paths, compute_path_entropy
 
 COMPUTE_HAUSDORFF = False
 COMPUTE_ENTROPY = False
@@ -119,14 +119,12 @@ for item in os.listdir(root_folder):
                     best_folder_name = dataset
 
                 # Metrics
-
-                if COMPUTE_HAUSDORFF or COMPUTE_COVERAGE or COMPUTE_ENTROPY:
-                    path_counts, end_nodes = compute_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH)
-                hd, hd_imp = (compute_hausdorff(path_counts) 
+                
+                hd, hd_imp = (compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH) 
                               if COMPUTE_HAUSDORFF else (0, 0))
-                cov, n_p = (compute_coverage_number_paths(path_counts, start_idx=idx) 
+                cov, n_p = (compute_coverage_number_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx=idx) 
                             if COMPUTE_COVERAGE else (0, 0))
-                ent = compute_path_entropy(path_counts, end_notes, ERROR_THRESH) if COMPUTE_ENTROPY else 0
+                ent = compute_path_entropy(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH) if COMPUTE_ENTROPY else 0
 
                 all_hausdorffs.append(hd)
                 all_hd_implicit.append(hd_imp)
