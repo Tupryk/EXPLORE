@@ -7,185 +7,137 @@ import matplotlib.pyplot as plt
 import json 
 from pathlib import Path
 
-
-from explore.datasets.utils import cost_computation, load_trees, compute_hausdorff, compute_coverage_number_paths, compute_path_entropy
+from explore.datasets.utils import cost_computation, load_trees, compute_hausdorff, compute_coverage_number_paths, compute_path_entropy, compute_paths
 
 COMPUTE_HAUSDORFF = False
 COMPUTE_ENTROPY = False
 COMPUTE_COVERAGE = True
 
-root_folder = "outputs/2026-02-28"
-
-img_idx = 0
+root_folder = "outputs/PandasBoxResults"
 
 for item in os.listdir(root_folder):
     full_path = os.path.join(root_folder, item)
     if os.path.isdir(full_path):
         dataset_paths = os.path.join(root_folder, item)
+        
+        # Detect if it's a multirun or a single run
+        is_multi_run = not Path(dataset_paths + "/.hydra").is_dir()
+        
+        sub_items = os.listdir(dataset_paths)
+        folders = [f for f in sub_items if f.isdigit()]
+        ds_c = len(folders) if is_multi_run else 1
 
-        ds_c = len(os.listdir(dataset_paths))-1
+        # loop over folders (0, 1, 2, 3 ...) in multirun
+        for folder_idx in range(ds_c):
+            all_mean_costs = []
+            all_found_paths = []
+            all_hausdorffs = []
+            all_hd_implicit = []
+            all_entropies = []
+            all_coverage = []
+            all_n_paths = []
+            
+            best_found_paths_count = 0
+            best_folder_name = ""
+            final_cfg = None # To save metadata for the final JSON
 
-        best_found_paths_count = 0
-        best_folder_name = ""
-
-        all_mean_costs = []
-        all_found_paths = []
-        all_hausdorffs = []
-        all_hd_implicit = []
-        all_entropies = []
-        all_coverage = []
-        all_n_paths = []
-
-        is_multi_run = not Path(dataset_paths+"/.hydra").is_dir()
-
-        for folder_name in range(ds_c): #TODO
-
-            if not is_multi_run:
-                folder_name = "."
-                
+            folder_name = str(folder_idx) if is_multi_run else "."
             dataset = f"{dataset_paths}/{folder_name}"
-            print(dataset)
+            
+            if not os.path.isdir(dataset):
+                continue
+
+            print(f"Processing folder: {dataset}")
             config_path = os.path.join(dataset, ".hydra/config.yaml")
             cfg = OmegaConf.load(config_path)
+            final_cfg = cfg # Keep the last one for shared params
+            
             start_ids = cfg.RRT.start_idx
-            if type(cfg.RRT.start_idx) is not ListConfig:
-                start_ids = [cfg.RRT.start_idx]
+            if not isinstance(start_ids, (list, ListConfig)):
+                start_ids = [start_ids]
 
-            ENV = None
-            ABLATION_TYPE = None
+            # Determine Environment and Ablation
+            ENV = "unknown"
+            if "fingerRamp" in cfg.RRT.sim.mujoco_xml: ENV = "fingerRamp"
+            elif "twoFingers" in cfg.RRT.sim.mujoco_xml: ENV = "fingersBox"
+            elif "panda_single" in cfg.RRT.sim.mujoco_xml: ENV = "pandaHook"
+            elif "pandas_table" in cfg.RRT.sim.mujoco_xml: ENV = "pandasBox"
 
-            if "fingerRamp" in cfg.RRT.sim.mujoco_xml:
-                ENV = "fingerRamp"
-            elif "twoFingers" in cfg.RRT.sim.mujoco_xml:
-                ENV = "fingersBox"
-            elif "panda_single" in cfg.RRT.sim.mujoco_xml:
-                ENV = "pandaHook"
-            elif "pandas_table" in cfg.RRT.sim.mujoco_xml:
-                ENV = "pandasBox"
-
+            ABLATION_TYPE = "unknown"
             if is_multi_run:
-                #TODO
-                config_path_multi = os.path.join(dataset, "multirun.yaml")
+                config_path_multi = os.path.join(dataset, "../multirun.yaml")
                 cfg_multi = OmegaConf.load(config_path_multi)            
-                if cfg_multi.hydra.sweeper.params.get("n_best_actions", None) is not None:
+                if "RRT.n_best_actions" in cfg_multi.hydra.sweeper.params:
                     ABLATION_TYPE = "n_best_actions"
-                elif cfg_multi.hydra.sweeper.params.get("knnK", None) is not None:
+                elif "RRT.knnK" in cfg_multi.hydra.sweeper.params:
                     ABLATION_TYPE = "knnK"
-                else:
-                    raise RuntimeError
             else:
-                if cfg.RRT.disable_node_max_strikes == 1:
-                    ABLATION_TYPE = "baseline"
-                elif cfg.RRT.disable_node_max_strikes == -1:
-                    ABLATION_TYPE = "disable_node"
-                else:
-                    raise RuntimeError
-  
-            i = 0
+                if cfg.RRT.disable_node_max_strikes == 1 and cfg.RRT.knnK != 1 and cfg.RRT.sample_uniform_prob == 0 and cfg.RRT.n_best_actions != 1: ABLATION_TYPE = "baseline"
+                elif cfg.RRT.n_best_actions == 1: ABLATION_TYPE = "nonbest"
+                elif cfg.RRT.knnK == 1: ABLATION_TYPE = "noknnk"
+                elif cfg.RRT.sample_uniform_prob != 0: ABLATION_TYPE = "uniform"
+                elif cfg.RRT.disable_node_max_strikes == -1: ABLATION_TYPE = "disable_node"
 
-            for idx in start_ids[:3]:
-                knnK = cfg.RRT.knnK
+            print(f"Environment: {ENV}, Ablation Type: {ABLATION_TYPE}, Start IDs: {start_ids}")
 
+            # --- 3. LOOP OVER START_IDS ---
+            for idx in start_ids[:1]:
                 ERROR_THRESH = cfg.RRT.min_cost
-                path_diff_thresh = cfg.RRT.path_diff_thresh
                 cost_max_method = False
-
-                look_at_specific_start_idx = cfg.RRT.start_idx
-                look_at_specific_end_idx = cfg.RRT.end_idx
-                cfg.RRT.start_idx = 0
-                look_at_specific_end_idx = -1
-                # cutoff = 2500
                 cutoff = -1
-
                 q_mask = np.array(cfg.RRT.q_mask)
-                sim_cfg = cfg.RRT.sim
-
-                mujoco_xml = os.path.join("..", sim_cfg.mujoco_xml)
-
-                print(f"Looking at start_idx {look_at_specific_start_idx} and end_idx {look_at_specific_end_idx} with error threshold {ERROR_THRESH}.")
-                print(f"Tau action: {cfg.RRT.sim.tau_action}; Tau sim: {cfg.RRT.sim.tau_sim}")
 
                 tree_dataset = os.path.join(dataset, "trees")
-                trees, tree_count, total_nodes_count = load_trees(tree_dataset, cutoff, verbose=1)
+                trees, tree_count, total_nodes_count = load_trees(tree_dataset, cutoff, verbose=0)
 
-                if not q_mask.shape[0]:
+                if q_mask.size == 0:
                     q_mask = np.ones_like(trees[0][0]["state"][1])
 
-                print("Loaded ", total_nodes_count, " RRT nodes.")
-
-                # time_taken = float(np.loadtxt(os.path.join(dataset, "time_taken.txt")))
-                # print(f"Time taken to generate tree: {datetime.timedelta(seconds=time_taken)}")
-
-                si = 1 if look_at_specific_start_idx == -1 else look_at_specific_start_idx
-
                 costs_over_time = []
-                for i, node in tqdm(enumerate(trees[idx])):
-
+                # Compute costs for each node added to the tree
+                for i_node, node in tqdm(enumerate(trees[idx]), total=len(trees[idx]), desc=f"Tree {idx}"):
                     costs = []
-                    
                     for target_idx in range(tree_count):
-                        # TODO: Cost computation should maybe be the same for all in this case?
                         cost = cost_computation(trees[target_idx][0], node, q_mask, cost_max_method)
-                        if i == 0 or costs_over_time[i-1][target_idx] > cost:
+                        # Keep minimum cost found so far for this target
+                        if i_node == 0 or costs_over_time[i_node-1][target_idx] > cost:
                             costs.append(cost)
                         else:
-                            costs.append(costs_over_time[i-1][target_idx])
-
+                            costs.append(costs_over_time[i_node-1][target_idx])
                     costs_over_time.append(costs)
 
-                # Subtract 1 because it also contains a cost against itself
-                mean_cost_over_time = [sum(costs)/(len(costs)-1) for costs in costs_over_time]
-                found_paths_over_time = [len([1 for c in costs if c < ERROR_THRESH])-1 for costs in costs_over_time]
+                # Summary for this tree
+                mean_cost_ot = [sum(c)/(len(c)-1) for c in costs_over_time]
+                found_paths_ot = [len([1 for val in c if val < ERROR_THRESH])-1 for c in costs_over_time]
 
-                all_mean_costs.append(mean_cost_over_time)
-                all_found_paths.append(found_paths_over_time)
+                # Store in global list
+                all_mean_costs.append(mean_cost_ot)
+                all_found_paths.append(found_paths_ot)
 
-                fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-
-                axes[0].set_title(f"Avg. Cost Over Time for Start Node {si} for {cfg.RRT.max_configs}")
-                axes[0].plot(mean_cost_over_time, label="Mean Cost")
-
-                if cfg.RRT.end_idx != -1:
-                    cost_for_target_over_time = [costs[cfg.RRT.end_idx] for costs in costs_over_time]
-                    axes[0].plot(cost_for_target_over_time, label=f"Target {cfg.RRT.end_idx}")
-
-                axes[0].axhline(y=ERROR_THRESH, color="red", linestyle="--", label="Success Threshhold")
-                axes[0].legend()
-
-                axes[1].set_title(f"Found Paths Over Time for Start Node {si}")
-                axes[1].plot(found_paths_over_time)
-
-                if best_found_paths_count < found_paths_over_time[-1]:
-                    best_found_paths_count = found_paths_over_time[-1]
+                if found_paths_ot[-1] > best_found_paths_count:
+                    best_found_paths_count = found_paths_ot[-1]
                     best_folder_name = dataset
 
-                plt.tight_layout()
-                #plt.show()
-                if COMPUTE_HAUSDORFF:
-                    hd, hd_implicit =  compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH)
-                else: 
-                    hd, hd_implicit = 0, 0
-                
-                if COMPUTE_COVERAGE:
-                    coverage, n_paths = compute_coverage_number_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx = si)
-                else:
-                    coverage, n_paths = 0, 0
+                # Metrics
 
-                if COMPUTE_ENTROPY:
-                    entropy = compute_path_entropy(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH)
-                else:
-                    entropy = 0
-                all_coverage.append(coverage)
-                all_n_paths.append(n_paths)
-                print("Hausdorff:", hd)
-                print(f"knnK:", cfg.RRT.knnK)
+                if COMPUTE_HAUSDORFF or COMPUTE_COVERAGE or COMPUTE_ENTROPY:
+                    path_counts, end_nodes = compute_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH)
+                hd, hd_imp = (compute_hausdorff(path_counts) 
+                              if COMPUTE_HAUSDORFF else (0, 0))
+                cov, n_p = (compute_coverage_number_paths(path_counts, start_idx=idx) 
+                            if COMPUTE_COVERAGE else (0, 0))
+                ent = compute_path_entropy(path_counts, end_notes, ERROR_THRESH) if COMPUTE_ENTROPY else 0
+
                 all_hausdorffs.append(hd)
-                all_hd_implicit.append(hd_implicit)
-                all_entropies.append(entropy)
+                all_hd_implicit.append(hd_imp)
+                all_coverage.append(cov)
+                all_n_paths.append(n_p)
+                all_entropies.append(ent)
 
-            
+            # --- CALCULATE MEANS FOR THIS SUBFOLDER ---
+            if not all_mean_costs:
+                continue
 
-            # --- Calculate means and standard deviations ---
             min_len = min(len(x) for x in all_mean_costs)
             all_mean_costs_trimmed = np.array([x[:min_len] for x in all_mean_costs])
             all_found_paths_trimmed = np.array([x[:min_len] for x in all_found_paths])
@@ -195,44 +147,44 @@ for item in os.listdir(root_folder):
             avg_paths = np.mean(all_found_paths_trimmed, axis=0)
             std_paths = np.std(all_found_paths_trimmed, axis=0)
 
-            fig, axes = plt.subplots(1, 2, figsize=(14, 6)) # Slightly wider for better labels
+            # --- YOUR ORIGINAL PLOTTING STYLE ---
+            fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-            # --- Plot 1: Average Cost ---
-            axes[0].set_title(f"Global Average Cost Over Time\n fingerRamp Cost method: {cfg.RRT.cost_method} knnK: {cfg.RRT.knnK}", fontweight='bold')
+            # Plot 1: Average Cost
+            axes[0].set_title(f"Global Average Cost Over Time\n {ENV} Cost method: {cfg.RRT.cost_method} knnK: {cfg.RRT.knnK}, n_best_actions: {cfg.RRT.n_best_actions}", fontweight='bold')
             axes[0].plot(avg_cost, label="Global Mean Cost", color='blue', linewidth=2)
             axes[0].fill_between(range(min_len), avg_cost - std_cost, avg_cost + std_cost, alpha=0.15, color='blue')
             axes[0].axhline(y=ERROR_THRESH, color="red", linestyle="--", label="Success Threshold")
-
             axes[0].set_xlabel("Iteration/Node")
             axes[0].set_ylabel("Cost")
             axes[0].grid(True, alpha=0.3)
-
-            # Add ticks to the right side
             axes[0].tick_params(axis='y', which='both', right=True, labelright=True)
             axes[0].legend(loc='upper right')
 
-            # --- Plot 2: Average Found Paths ---
-            axes[1].set_title(f"Global Average Found Paths Over Time\n fingerRamp Cost method:{cfg.RRT.cost_method} knnK: {cfg.RRT.knnK}", fontweight='bold')
+            # Plot 2: Average Found Paths
+            axes[1].set_title(f"Global Average Found Paths Over Time\n {ENV} Cost method:{cfg.RRT.cost_method} knnK: {cfg.RRT.knnK} n_best_actions: {cfg.RRT.n_best_actions}", fontweight='bold')
             axes[1].plot(avg_paths, color='green', linewidth=2)
             axes[1].fill_between(range(min_len), avg_paths - std_paths, avg_paths + std_paths, alpha=0.15, color='green')
-
             axes[1].set_xlabel("Iteration/Node")
             axes[1].set_ylabel("Count")
             axes[1].grid(True, alpha=0.3)
-
-            # Add ticks to the right side
             axes[1].tick_params(axis='y', which='both', right=True, labelright=True)
 
-
-
             if ENV == "fingersBox":
-                axes[0].set_ylim(0, 2)
-                axes[1].set_ylim(0, 30)
+                axes[0].set_ylim(0, 2); axes[1].set_ylim(0, 30)
             elif ENV == "fingerRamp":
-                axes[0].set_ylim(0, .3)
-                axes[1].set_ylim(0, 25)
+                axes[0].set_ylim(0, .3); axes[1].set_ylim(0, 25)
+            elif ENV == "pandasBox":
+                pass
+            elif ENV == "pandaHook":
+                pass
 
-            # 1. Prepare the data dictionary
+            # --- SAVING PER FOLDER ---
+            save_dir = f"/home/denis/Desktop/{ENV}/{ABLATION_TYPE}"
+            os.makedirs(save_dir, exist_ok=True)
+            # Use folder_idx to name the file (0.png, 1.png, etc.)
+            save_path_base = os.path.join(save_dir, str(folder_idx))
+
             results_data = {
                 "n_best_actions": cfg.RRT.n_best_actions,
                 "knnK": cfg.RRT.knnK,
@@ -247,28 +199,11 @@ for item in os.listdir(root_folder):
                 "total_found_paths": int(sum(all_n_paths))
             }
 
-            #save_path_base = f"/home/denis/Desktop/fingersBox/knnK/{cfg.RRT.knnK}"
-            save_path_base = f"/home/denis/Desktop/{ENV}/{ABLATION_TYPE}/{i}"
-
-            # 2. Save as .json
             with open(f"{save_path_base}.json", "w") as f:
                 json.dump(results_data, f, indent=4)
-
 
             plt.tight_layout()
             plt.savefig(f"{save_path_base}.png")
             plt.close(fig)
 
-
-            i+=1
-
-            print(f"Fig and json saved in{save_path_base}")
-            print(f"Global Average Final Successes for cost {cfg.RRT.cost_method}: {avg_paths[-1]:.2f}")
-            print(f"Best Experiment Folder: {best_folder_name} ({best_found_paths_count} paths)")
-            print(f"Global Average Hausdorff: {np.mean(np.array(all_hausdorffs))}")
-            print(f"Global Average Coverage: {np.mean(np.array(all_coverage))}")
-            print(f"Global Found paths: {sum(all_n_paths)}")
-            print(f"Found paths: {len(all_found_paths)}")
-
-            if not is_multi_run:
-                break
+            print(f"Subfolder {folder_idx} processed and saved to {save_path_base}")
