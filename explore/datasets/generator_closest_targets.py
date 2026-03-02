@@ -640,11 +640,6 @@ class Search:
                     else:
                         print()
 
-                if len(self.end_ids)==1:
-                    print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
-                else:
-                    print()
-
             # Store information when appropriate
             if self.verbose > 3:
                 print(f"Storing tree {start_idx}")
