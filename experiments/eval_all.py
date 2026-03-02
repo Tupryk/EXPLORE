@@ -7,13 +7,16 @@ import matplotlib.pyplot as plt
 import json 
 from pathlib import Path
 
-from explore.datasets.utils import cost_computation, load_trees, compute_hausdorff, compute_coverage_number_paths, compute_path_entropy
+from explore.datasets.utils import cost_computation, load_trees, get_single_tree_reachability, compute_hausdorff_modular, compute_coverage_modular, compute_path_entropy_modular, compute_metrics_with_diversity
 
-COMPUTE_HAUSDORFF = False
-COMPUTE_ENTROPY = False
+COMPUTE_HAUSDORFF = True
+COMPUTE_ENTROPY = True
 COMPUTE_COVERAGE = True
 
 root_folder = "outputs/PandasBoxResults"
+
+HD_THRESHOLD = 0.05
+
 
 for item in os.listdir(root_folder):
     full_path = os.path.join(root_folder, item)
@@ -36,7 +39,11 @@ for item in os.listdir(root_folder):
             all_entropies = []
             all_coverage = []
             all_n_paths = []
-            
+            all_n_paths_filtered = []
+            all_hausdorffs_filtered = []
+            all_hd_implicit_filtered = []
+
+
             best_found_paths_count = 0
             best_folder_name = ""
             final_cfg = None # To save metadata for the final JSON
@@ -81,7 +88,7 @@ for item in os.listdir(root_folder):
             print(f"Environment: {ENV}, Ablation Type: {ABLATION_TYPE}, Start IDs: {start_ids}")
 
             # --- 3. LOOP OVER START_IDS ---
-            for idx in start_ids[:1]:
+            for idx in start_ids:
                 ERROR_THRESH = cfg.RRT.min_cost
                 cost_max_method = False
                 cutoff = -1
@@ -120,17 +127,30 @@ for item in os.listdir(root_folder):
 
                 # Metrics
                 
-                hd, hd_imp = (compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH) 
+                if COMPUTE_HAUSDORFF or COMPUTE_COVERAGE or COMPUTE_ENTROPY:
+                    counts, nodes = get_single_tree_reachability(trees, tree_count, q_mask, False, ERROR_THRESH, idx)
+
+                hd, hd_imp = (compute_hausdorff_modular(trees[idx], nodes, counts) 
                               if COMPUTE_HAUSDORFF else (0, 0))
-                cov, n_p = (compute_coverage_number_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx=idx) 
-                            if COMPUTE_COVERAGE else (0, 0))
-                ent = compute_path_entropy(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH) if COMPUTE_ENTROPY else 0
+                cov, n_p = (compute_coverage_modular(counts) if COMPUTE_COVERAGE else (0, 0))
+                ent = compute_path_entropy_modular(trees[idx], nodes, counts) if COMPUTE_ENTROPY else 0
+
+
+                coverage_2, n_p_filtered, hd_filtered, hd_imp_filtered = compute_metrics_with_diversity(
+                        trees[idx], nodes, counts, tree_count, hd_threshold=HD_THRESHOLD
+                    )
+
+                if cov != coverage_2:
+                    raise RuntimeError
 
                 all_hausdorffs.append(hd)
                 all_hd_implicit.append(hd_imp)
                 all_coverage.append(cov)
                 all_n_paths.append(n_p)
                 all_entropies.append(ent)
+                all_n_paths_filtered.append(n_p_filtered)
+                all_hausdorffs_filtered.append(hd_filtered)
+                all_hd_implicit_filtered.append(hd_imp_filtered)
 
             # --- CALCULATE MEANS FOR THIS SUBFOLDER ---
             if not all_mean_costs:
@@ -193,8 +213,11 @@ for item in os.listdir(root_folder):
                 "avg_hausdorff": float(np.mean(all_hausdorffs)),
                 "avg_hausdorff_implicit": float(np.mean(all_hd_implicit)),
                 "avg_coverage": float(np.mean(all_coverage)),
+                "avg_hausdorff_filtered": float(np.mean(all_hausdorffs_filtered)),
+                "avg_hausdorff_implicit_filtered": float(np.mean(all_hd_implicit_filtered)),
                 "avg_entropy": float(np.mean(all_entropies)),
-                "total_found_paths": int(sum(all_n_paths))
+                "average_paths": int(np.mean(all_n_paths)),
+                "average_paths_filtered": int(np.mean(all_n_paths_filtered))
             }
 
             with open(f"{save_path_base}.json", "w") as f:

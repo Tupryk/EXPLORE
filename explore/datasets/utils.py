@@ -374,93 +374,130 @@ def average_hausdorff_distance(state_paths):
     return float(np.mean(distances))
 
 
-def compute_coverage_number_paths(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx=1):
-    tree_path_count = [0 for _ in range(tree_count)]
+def get_single_tree_reachability(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx):
+    """
+    Computes reachability metadata for ONE specific tree against all target roots.
+    """
+    # tree_path_count[j] = how many nodes in trees[start_idx] reached root of trees[j]
+    tree_path_count = np.zeros(tree_count, dtype=int)
+    # tree_end_nodes[j] = list of node indices in trees[start_idx] that reached root of trees[j]
     tree_end_nodes = [[] for _ in range(tree_count)]
     
-    for n, node in enumerate(trees[start_idx]):
+    # Expensive computation loop (only for the specific start_idx)
+    for n_idx, node in enumerate(trees[start_idx]):
         for j in range(tree_count):
+            if start_idx == j:
+                continue
+            
             node_cost = cost_computation(trees[j][0], node, q_mask, cost_max_method)
-            if start_idx != j and node_cost < ERROR_THRESH:
+            if node_cost < ERROR_THRESH:
                 tree_path_count[j] += 1
-                tree_end_nodes[j].append(n)
-    
-    path_counts = np.array(tree_path_count)
-    coverage = np.count_nonzero(path_counts)/(len(path_counts)-1)
-    n_paths = sum(path_counts)
+                tree_end_nodes[j].append(n_idx)
+                
+    return tree_path_count, tree_end_nodes
 
-    print("path counts:", path_counts)
-    print("coverage", coverage)
-    print("sum", n_paths)
-    
+def compute_coverage_modular(tree_path_count):
+    # Coverage: what fraction of other targets were reached at least once?
+    coverage = np.count_nonzero(tree_path_count) / (len(tree_path_count) - 1)
+    n_paths = np.sum(tree_path_count)
     return coverage, n_paths
 
-
-def compute_hausdorff(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
-    path_counts = []
-    end_nodes = []
-
-    for i in tqdm(range(tree_count)):
-
-        tree_path_count = [0 for _ in range(tree_count)]
-        tree_end_nodes = [[] for _ in range(tree_count)]
+def filter_diverse_paths(state_paths, hd_threshold):
+    """
+    Only keeps paths that are at least 'hd_threshold' away from 
+    all other already accepted paths.
+    """
+    if not state_paths:
+        return []
         
-        for n, node in enumerate(trees[i]):
-            for j in range(tree_count):
-                node_cost = cost_computation(trees[j][0], node, q_mask, cost_max_method)
-                if i != j and node_cost < ERROR_THRESH:
-                    tree_path_count[j] += 1
-                    tree_end_nodes[j].append(n)
+    diverse_paths = [state_paths[0]] # Always keep the first found path
+    
+    for i in range(1, len(state_paths)):
+        current_path = state_paths[i]
+        # Check against all currently accepted paths
+        is_diverse = True
+        for accepted in diverse_paths:
+            if hausdorff_distance(current_path, accepted) < hd_threshold:
+                is_diverse = False
+                break
         
-        path_counts.append(tree_path_count)
-        end_nodes.append(tree_end_nodes)
-
-    path_counts = np.array(path_counts)
-
-    costs = np.full((tree_count, tree_count), np.inf)
-
-    for si in tqdm(range(tree_count)):
-        for ei in range(tree_count):
+        if is_diverse:
+            diverse_paths.append(current_path)
             
-            if path_counts[si][ei] == 0:
-                continue
+    return diverse_paths
 
-            # Load paths
-            paths = []
-            for end_node in end_nodes[si][ei]:
-                fp = build_path(trees[si], end_node)
-                paths.append(fp)
-                
-            path_count = len(paths)
+def compute_metrics_with_diversity(tree, tree_end_nodes, tree_path_count, tree_count, hd_threshold=0.05):
+    """
+    Filters paths by diversity first, then computes Coverage, Hausdorff, and Path Count.
+    """
+    filtered_path_counts = np.zeros(tree_count, dtype=int)
+    explicit_hds = []
+    implicit_hds = []
+    
+    for target_idx, count in enumerate(tree_path_count):
+        if count == 0:
+            continue
             
-            state_paths = []
-            for j in range(path_count):
-                tmp_path = []
-                for node in paths[j]:
-                    tmp_path.append(remove_rotation(node["state"][1]))
-                state_paths.append(np.array(tmp_path))
+         raw_state_paths = []
+        for node_idx in tree_end_nodes[target_idx]:
+            full_path = build_path(tree, node_idx)
+            path_states = np.array([remove_rotation(n["state"][1]) for n in full_path])
+            raw_state_paths.append(path_states)
+            
+        diverse_paths = filter_diverse_paths(raw_state_paths, hd_threshold)
+        
+        num_diverse = len(diverse_paths)
+        filtered_path_counts[target_idx] = num_diverse
+        
+        if num_diverse > 0:
+            avg_hd = average_hausdorff_distance(diverse_paths) if num_diverse > 1 else 0.0
+            if avg_hd > 0:
+                explicit_hds.append(avg_hd)
+            implicit_hds.append(avg_hd)
 
-            avg_hd = average_hausdorff_distance(state_paths)
-            #print(f"AVG hausdorff for paths between config {si} and {ei}: ",  average_hausdorff_distance(state_paths))
-            costs[si, ei] = avg_hd
-            #print(path_count)
+    # Final calculations
+    coverage = np.count_nonzero(filtered_path_counts) / (tree_count - 1)
+    n_paths = np.sum(filtered_path_counts)
+    
+    res_hd = np.mean(explicit_hds) if explicit_hds else 0.0
+    res_hd_imp = np.mean(implicit_hds) if implicit_hds else 0.0
+    
+    return coverage, n_paths, res_hd, res_hd_imp
 
 
-    hausdorff_score = []
-    hausdorff_score_implicit_coverage = []
-
-    for i in costs:
-        for j in i:
-            if j != np.inf and j!=0:
-                hausdorff_score.append(j)
-                hausdorff_score_implicit_coverage.append(j)
-            elif j != np.inf:
-                hausdorff_score_implicit_coverage.append(j)
-
-
-    print(np.mean(np.array(hausdorff_score)))
-
-    return np.mean(np.array(hausdorff_score)), np.mean(np.array(hausdorff_score_implicit_coverage))
+def compute_hausdorff_modular(tree, tree_end_nodes, tree_path_count):
+    """
+    Computes Hausdorff metrics based on pre-calculated reachability.
+    """
+    explicit_scores = []
+    implicit_scores = []
+    
+    for target_idx, count in enumerate(tree_path_count):
+        # If path_count is 0, it's unreachable (np.inf in your old code)
+        if count == 0:
+            continue
+            
+        # Reconstruct paths for successful connections
+        state_paths = []
+        for node_idx in tree_end_nodes[target_idx]:
+            full_path = build_path(tree, node_idx)
+            path_states = np.array([remove_rotation(n["state"][1]) for n in full_path])
+            state_paths.append(path_states)
+            
+        avg_hd = average_hausdorff_distance(state_paths) if len(state_paths) > 1 else 0.0
+        
+        # Explicit: Only non-zero distances (your original hausdorff_score)
+        if avg_hd > 0:
+            explicit_scores.append(avg_hd)
+        
+        # Implicit: Includes 0s for successful paths (your original hausdorff_score_implicit_coverage)
+        implicit_scores.append(avg_hd)
+    
+    # Handle empty cases to avoid division by zero
+    res_explicit = np.mean(explicit_scores) if explicit_scores else 0.0
+    res_implicit = np.mean(implicit_scores) if implicit_scores else 0.0
+    
+    return res_explicit, res_implicit
 
 def compute_entropy(states, k=5):
     n, d = states.shape
@@ -473,55 +510,17 @@ def compute_entropy(states, k=5):
     entropy = digamma(n) - digamma(k) + np.log(c_d) + (d/n) * np.sum(np.log(2 * k_nearest_dist + 1e-10))
     return entropy
 
-def compute_path_entropy(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH):
-    path_counts = []
-    end_nodes = []
-
-    for i in tqdm(range(tree_count)):
-
-        tree_path_count = [0 for _ in range(tree_count)]
-        tree_end_nodes = [[] for _ in range(tree_count)]
-        
-        for n, node in enumerate(trees[i]):
-            for j in range(tree_count):
-                node_cost = cost_computation(trees[j][0], node, q_mask, cost_max_method)
-                if i != j and node_cost < ERROR_THRESH:
-                    tree_path_count[j] += 1
-                    tree_end_nodes[j].append(n)
-        
-        path_counts.append(tree_path_count)
-        end_nodes.append(tree_end_nodes)
-
-    path_counts = np.array(path_counts)
-
-    costs = np.full((tree_count, tree_count), np.inf)
-
-    states = []
+def compute_path_entropy_modular(tree, tree_end_nodes, tree_path_count):
+    successful_states = []
     
-    for si in tqdm(range(tree_count)):
-        for ei in range(tree_count):
+    for target_idx, count in enumerate(tree_path_count):
+        if count == 0:
+            continue
             
-            if path_counts[si][ei] == 0:
-                continue
-
-            # Load paths
-            paths = []
-            for end_node in end_nodes[si][ei]:
-                fp = build_path(trees[si], end_node)
-                paths.append(fp)
-                
-            path_count = len(paths)
+        for node_idx in tree_end_nodes[target_idx]:
+            successful_states.append(remove_rotation(tree[node_idx]["state"][1]))
             
-            for j in range(path_count):
-                tmp_path = []
-                for node in paths[j]:
-                    states.append(remove_rotation(node["state"][1]))
-
-    states = np.array(states)
-    return compute_entropy(states)
-    # AdjMap(
-    #     costs,
-    #     min_value=0.0,
-    #     max_value=np.nanmax(costs[np.isfinite(costs)]),
-    #     save_as=""
-    # )
+    if not successful_states:
+        return 0.0
+        
+    return compute_entropy(np.array(successful_states))
