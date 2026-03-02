@@ -660,7 +660,6 @@ class Search:
         if self.verbose > 1:
             print(f"Total time taken: {total_time:.2f} seconds")
 
-        print("v0:", self.v_0, "v1:", self.v_1, "v2:", self.v_2)
         time_data_path = os.path.join(self.output_dir, f"time_taken.txt")
         with open(time_data_path, "w") as f:
             f.write(f"{total_time}\n")
