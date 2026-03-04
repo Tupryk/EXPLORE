@@ -36,7 +36,7 @@ class StaGE_task(Task):
         if self.cost_max_method:
             cost = jnp.abs(e).max()
         else:
-            cost = e.T @ e
+            cost = e.T @ e + .01*(state.qvel[:9] @ state.qvel[:9]) #+1*(jnp.linalg.norm(e[:3] - e[3:6]) - 0.15)**2
         return cost
 
     def terminal_cost(self, state: mjx.Data) -> jax.Array:
@@ -45,7 +45,7 @@ class StaGE_task(Task):
         if self.cost_max_method:
             cost = jnp.abs(e).max()
         else:
-            cost = e.T @ e
+            cost = 10*self.running_cost(state, jnp.zeros_like(state.qvel))
         return cost
 
     def domain_randomize_model(self, rng: jax.Array) -> Dict[str, jax.Array]:

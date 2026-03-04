@@ -191,10 +191,10 @@ class Search:
             end_state, traj = self.extend_node()  # replan + execute 0.1s
             full_traj.extend(traj)
             
-            cost = self.compute_cost(self.mj_data.qpos, self.configs[end_idx])
+            cost = self.compute_cost(self.mj_data.qpos, self.configs[end_idx]) #+  10*(np.linalg.norm(self.mj_data.qpos[:3]-self.mj_data.qpos[3:6])- .15)**2 #1e-2*np.inner(self.mj_data.qvel, self.mj_data.qvel) +
             print(f"Step {step}, cost to goal: {cost:.4f}")
             
-            if cost > 1000:
+            if cost > 100:
                 print("Cost exploded, stopping early.")
                 break
 
@@ -216,7 +216,8 @@ class Search:
             qvel=jnp.array(self.mj_data.qvel),
             time=self.mj_data.time
         )
-
+        #self.mjx_data = mjx.put_data(self.mj_model, self.mj_data)
+    
         # Do a replanning step
         self.policy_params, rollouts = self.jit_optimize(self.mjx_data, self.policy_params)
 
@@ -296,7 +297,7 @@ class Search:
         if self.cost_max_method:
             cost = np.abs(e).max()
         else:
-            cost = e.T @ e
+            cost = e.T @ e #+ (np.linalg.norm(e[:3]-e[3:6])- .15)**2
         return cost
     
     def store_tree(self, idx: int, folder_path: str, trees: list[list[MultiSearchNode]]):

@@ -183,7 +183,7 @@ def visualize_path_mppi(controls: np.ndarray,
 
     for i, ctrl in enumerate(controls):
         sim.step(
-            tau_action=sim.tau_sim,   # one sim step per control
+            tau_action=sim.tau_sim,   
             ctrl_target=ctrl,
             view="viewer"             # triggers viewer.sync()
         )

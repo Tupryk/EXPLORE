@@ -25,7 +25,7 @@ def main(cfg: DictConfig):
                 traj, reached_goal = S.run_mppi_baseline(1, j)
                 reached_trajs[f"target_{i}_{j}"] = (traj, reached_goal, i, j)
 
-    with h5py.File('results4.h5', 'w') as f:
+    with h5py.File('result_ramp.h5', 'w') as f:
         for key, (traj, reached, start_idx, end_idx) in reached_trajs.items():
             group = f.create_group(key)
             
