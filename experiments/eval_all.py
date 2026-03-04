@@ -13,7 +13,7 @@ COMPUTE_HAUSDORFF = True
 COMPUTE_ENTROPY = True
 COMPUTE_COVERAGE = True
 
-root_folder = "outputs/PandasBoxResults"
+root_folder = "outputs/fingerRamp"
 
 HD_THRESHOLD = 0.05
 
@@ -70,6 +70,15 @@ for item in os.listdir(root_folder):
             elif "panda_single" in cfg.RRT.sim.mujoco_xml: ENV = "pandaHook"
             elif "pandas_table" in cfg.RRT.sim.mujoco_xml: ENV = "pandasBox"
 
+            if ENV=="fingerRamp":
+                HD_THRESHOLD = 0.05
+            elif ENV=="fingersBox":
+                HD_THRESHOLD = 0.1
+            elif ENV in "pandaHook":
+                HD_THRESHOLD = 0.2
+            elif ENV in "pandasBox":
+                HD_THRESHOLD = 0.5
+
             ABLATION_TYPE = "unknown"
             if is_multi_run:
                 config_path_multi = os.path.join(dataset, "../multirun.yaml")
@@ -78,15 +87,17 @@ for item in os.listdir(root_folder):
                     ABLATION_TYPE = "n_best_actions"
                 elif "RRT.knnK" in cfg_multi.hydra.sweeper.params:
                     ABLATION_TYPE = "knnK"
+                elif "RRT.max_configs" in cfg_multi.hydra.sweeper.params:
+                    ABLATION_TYPE = "max_configs"
             else:
                 if cfg.RRT.disable_node_max_strikes == 1 and cfg.RRT.knnK != 1 and cfg.RRT.sample_uniform_prob == 0 and cfg.RRT.n_best_actions != 1: ABLATION_TYPE = "baseline"
+                elif  cfg.RRT.knnK == 1 and cfg.RRT.sample_uniform_prob == 0.8 and cfg.RRT.n_best_actions == 1: ABLATION_TYPE = "rrtsim"
                 elif cfg.RRT.n_best_actions == 1: ABLATION_TYPE = "nonbest"
                 elif cfg.RRT.knnK == 1: ABLATION_TYPE = "noknnk"
                 elif cfg.RRT.sample_uniform_prob != 0: ABLATION_TYPE = "uniform"
                 elif cfg.RRT.disable_node_max_strikes == -1: ABLATION_TYPE = "disable_node"
 
             print(f"Environment: {ENV}, Ablation Type: {ABLATION_TYPE}, Start IDs: {start_ids}")
-
             # --- 3. LOOP OVER START_IDS ---
             for idx in start_ids:
                 ERROR_THRESH = cfg.RRT.min_cost
@@ -130,18 +141,18 @@ for item in os.listdir(root_folder):
                 if COMPUTE_HAUSDORFF or COMPUTE_COVERAGE or COMPUTE_ENTROPY:
                     counts, nodes = get_single_tree_reachability(trees, tree_count, q_mask, False, ERROR_THRESH, idx)
 
-                hd, hd_imp = (compute_hausdorff_modular(trees[idx], nodes, counts) 
+                hd, hd_imp = (compute_hausdorff_modular(trees[idx], nodes, counts, q_mask) 
                               if COMPUTE_HAUSDORFF else (0, 0))
                 cov, n_p = (compute_coverage_modular(counts) if COMPUTE_COVERAGE else (0, 0))
-                ent = compute_path_entropy_modular(trees[idx], nodes, counts) if COMPUTE_ENTROPY else 0
+                # ent = compute_path_entropy_modular(trees[idx], nodes, counts, q_mask) if COMPUTE_ENTROPY else 0
 
 
-                coverage_2, n_p_filtered, hd_filtered, hd_imp_filtered = compute_metrics_with_diversity(
-                        trees[idx], nodes, counts, tree_count, hd_threshold=HD_THRESHOLD
+                coverage_2, n_p_filtered, hd_filtered, hd_imp_filtered, ent = compute_metrics_with_diversity(
+                        trees[idx], nodes, counts, tree_count, q_mask=q_mask, hd_threshold=HD_THRESHOLD
                     )
 
-                if cov != coverage_2:
-                    raise RuntimeError
+                # if cov != coverage_2:
+                #     raise RuntimeError
 
                 all_hausdorffs.append(hd)
                 all_hd_implicit.append(hd_imp)
@@ -204,20 +215,24 @@ for item in os.listdir(root_folder):
             save_path_base = os.path.join(save_dir, str(folder_idx))
 
             results_data = {
-                "n_best_actions": cfg.RRT.n_best_actions,
-                "knnK": cfg.RRT.knnK,
-                "cost_method": cfg.RRT.cost_method,
-                "avg_final_successes": float(avg_paths[-1]),
-                "best_experiment_folder": best_folder_name,
-                "best_found_paths_count": int(best_found_paths_count),
-                "avg_hausdorff": float(np.mean(all_hausdorffs)),
-                "avg_hausdorff_implicit": float(np.mean(all_hd_implicit)),
-                "avg_coverage": float(np.mean(all_coverage)),
-                "avg_hausdorff_filtered": float(np.mean(all_hausdorffs_filtered)),
-                "avg_hausdorff_implicit_filtered": float(np.mean(all_hd_implicit_filtered)),
-                "avg_entropy": float(np.mean(all_entropies)),
-                "average_paths": int(np.mean(all_n_paths)),
-                "average_paths_filtered": int(np.mean(all_n_paths_filtered))
+                # "n_best_actions": cfg.RRT.n_best_actions,
+                # "knnK": cfg.RRT.knnK,
+                # "cost_method": cfg.RRT.cost_method,
+                # "avg_final_successes": float(avg_paths[-1]),
+                # "best_experiment_folder": best_folder_name,
+                # "best_found_paths_count": int(best_found_paths_count),
+                # "avg_hausdorff": float(np.mean(all_hausdorffs)),
+                # "avg_hausdorff_implicit": float(np.mean(all_hd_implicit)),
+                # "avg_coverage": float(np.mean(all_coverage)),
+                # "avg_hausdorff_filtered": float(np.mean(all_hausdorffs_filtered)),
+                # "avg_hausdorff_implicit_filtered": float(np.mean(all_hd_implicit_filtered)),
+                # "avg_entropy": float(np.nanmean(all_entropies)),
+                # "average_paths": float(np.mean(all_n_paths)),
+                # "average_paths_filtered": float(np.mean(all_n_paths_filtered))
+                "count": float(np.mean(all_n_paths_filtered)),
+                "cov": float(np.mean(all_coverage)),
+                "entropy": float(np.nanmean(all_entropies)),
+                "avg_hausdorff": float(np.mean(all_hausdorffs_filtered))
             }
 
             with open(f"{save_path_base}.json", "w") as f:

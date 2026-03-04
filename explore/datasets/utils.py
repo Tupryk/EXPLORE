@@ -7,6 +7,8 @@ import mujoco
 from itertools import combinations
 from scipy.spatial.distance import directed_hausdorff, pdist, squareform
 from scipy.special import digamma, gamma
+import networkx as nx
+from networkx.algorithms.approximation import maximum_independent_set 
 
 class Normalizer:
     def __init__(self, data: torch.Tensor):
@@ -338,11 +340,6 @@ def get_diverse_paths(
     return final_paths, final_paths_start_end_indices
 
 
-
-def remove_rotation(state):
-    return state[..., :6] # for finger ramp
-
-
 def hausdorff_distance(A: np.ndarray, B: np.ndarray) -> float:
     """
     Compute symmetric Hausdorff distance between two point sets.
@@ -409,7 +406,20 @@ def filter_diverse_paths(state_paths, hd_threshold):
     """
     if not state_paths:
         return []
+
+    # approximate maximum ind. set
+    # adj_dist_matrix = np.zeros((len(state_paths), len(state_paths)), dtype=bool)
+    # for i in range(len(state_paths)):
+    #     for j in range(i + 1, len(state_paths)):
+    #         is_smaller = hausdorff_distance(state_paths[i], state_paths[j]) < hd_threshold
+    #         adj_dist_matrix[i][j] = is_smaller
+    #         adj_dist_matrix[j][i] = is_smaller
         
+    # G = nx.from_numpy_array(adj_dist_matrix)
+    # independent_set = maximum_independent_set(G)
+    # diverse_paths = [state_paths[i] for i in independent_set]
+
+    # greedy
     diverse_paths = [state_paths[0]] # Always keep the first found path
     
     for i in range(1, len(state_paths)):
@@ -426,25 +436,29 @@ def filter_diverse_paths(state_paths, hd_threshold):
             
     return diverse_paths
 
-def compute_metrics_with_diversity(tree, tree_end_nodes, tree_path_count, tree_count, hd_threshold=0.05):
+def compute_metrics_with_diversity(tree, tree_end_nodes, tree_path_count, tree_count, q_mask, hd_threshold=0.05):
     """
     Filters paths by diversity first, then computes Coverage, Hausdorff, and Path Count.
     """
     filtered_path_counts = np.zeros(tree_count, dtype=int)
     explicit_hds = []
     implicit_hds = []
+
+    states_visited = []
     
     for target_idx, count in enumerate(tree_path_count):
         if count == 0:
             continue
             
-         raw_state_paths = []
+        raw_state_paths = []
         for node_idx in tree_end_nodes[target_idx]:
             full_path = build_path(tree, node_idx)
-            path_states = np.array([remove_rotation(n["state"][1]) for n in full_path])
+            path_states = np.array([n["state"][1]*q_mask for n in full_path])
             raw_state_paths.append(path_states)
             
         diverse_paths = filter_diverse_paths(raw_state_paths, hd_threshold)
+        for path in diverse_paths:
+            states_visited.extend(path)
         
         num_diverse = len(diverse_paths)
         filtered_path_counts[target_idx] = num_diverse
@@ -461,11 +475,13 @@ def compute_metrics_with_diversity(tree, tree_end_nodes, tree_path_count, tree_c
     
     res_hd = np.mean(explicit_hds) if explicit_hds else 0.0
     res_hd_imp = np.mean(implicit_hds) if implicit_hds else 0.0
+
+    ent = compute_entropy(np.array(states_visited)) if states_visited else 0.0
     
-    return coverage, n_paths, res_hd, res_hd_imp
+    return coverage, n_paths, res_hd, res_hd_imp, ent
 
 
-def compute_hausdorff_modular(tree, tree_end_nodes, tree_path_count):
+def compute_hausdorff_modular(tree, tree_end_nodes, tree_path_count, q_mask):
     """
     Computes Hausdorff metrics based on pre-calculated reachability.
     """
@@ -481,7 +497,9 @@ def compute_hausdorff_modular(tree, tree_end_nodes, tree_path_count):
         state_paths = []
         for node_idx in tree_end_nodes[target_idx]:
             full_path = build_path(tree, node_idx)
-            path_states = np.array([remove_rotation(n["state"][1]) for n in full_path])
+            if len(full_path) <= 2:
+                continue
+            path_states = np.array([n["state"][1]*q_mask for n in full_path])
             state_paths.append(path_states)
             
         avg_hd = average_hausdorff_distance(state_paths) if len(state_paths) > 1 else 0.0
@@ -499,18 +517,39 @@ def compute_hausdorff_modular(tree, tree_end_nodes, tree_path_count):
     
     return res_explicit, res_implicit
 
-def compute_entropy(states, k=5):
+def compute_entropy(states, k=10, n_subsample=100, times=10):
     n, d = states.shape
-    k = min(k, n-1)  # Ensure k is less than n
+    print(f"Computing entropy for {n} states in {d}-dimensional space with k={k}...")
+    # 1. Guard clause: If we don't have enough points, entropy is undefined/0
+    if n <= n_subsample:
+        return np.nan
+    
+    # 2. Adjust k: The maximum possible k-th neighbor is n-1 
+    # (since a point cannot be its own neighbor in this context)
+    if k >= n:
+        return np.nan
+    entropy = 0.0
+    for _ in range(times):
+        states = states[np.random.choice(n, n_subsample, replace=False)]
+        n = n_subsample
+        dist_matrix = squareform(pdist(states))
+        
+        # 3. FIX: np.partition(matrix, kth) 
+        # If k=2 and n=3, valid indices are 0, 1, 2. 
+        # We want the 2nd index (the k-th nearest neighbor).
+        # We do NOT use k+1 here; k is the actual index we want to "sort" to that position.
+        partitioned_dist = np.partition(dist_matrix, k, axis=1)
+        k_nearest_dist = partitioned_dist[:, k]
 
-    dist_matrix = squareform(pdist(states))
-    k_nearest_dist = np.partition(dist_matrix, k + 1, axis=1)[:, k]
+        # Constants for the estimator
+        # Note: Ensure k is at least 1 for gamma(k) and digamma(k)
+        k_val = max(1, k)
+        c_d = (gamma(d/2 + 1) * np.pi**(d/2)) / gamma(k_val)
+        
+        entropy += digamma(n) - digamma(k_val) + np.log(c_d) + (d/n) * np.sum(np.log(2 * k_nearest_dist + 1e-10))
+    return entropy / times
 
-    c_d = (gamma(d/2 + 1) * np.pi**(d/2)) / gamma(k)
-    entropy = digamma(n) - digamma(k) + np.log(c_d) + (d/n) * np.sum(np.log(2 * k_nearest_dist + 1e-10))
-    return entropy
-
-def compute_path_entropy_modular(tree, tree_end_nodes, tree_path_count):
+def compute_path_entropy_modular(tree, tree_end_nodes, tree_path_count, q_mask):
     successful_states = []
     
     for target_idx, count in enumerate(tree_path_count):
@@ -518,9 +557,12 @@ def compute_path_entropy_modular(tree, tree_end_nodes, tree_path_count):
             continue
             
         for node_idx in tree_end_nodes[target_idx]:
-            successful_states.append(remove_rotation(tree[node_idx]["state"][1]))
+            # Ensure we are handling the state extraction correctly
+            state = tree[node_idx]["state"][1] * q_mask
+            successful_states.append(state)
             
-    if not successful_states:
+    # 4. Better guard: compute_entropy needs at least 2 points to find a neighbor
+    if len(successful_states) < 2:
         return 0.0
         
     return compute_entropy(np.array(successful_states))
