@@ -95,12 +95,12 @@ class Search:
 
         self.controller = PredictiveSampling(
             self.task,
-            num_samples = 2048,
-            noise_level= .02,
+            num_samples = 4096,
+            noise_level= .005,
             plan_horizon= .5,
             spline_type= "zero",
-            num_knots= 16,
-            iterations= 10,
+            num_knots= 32,
+            iterations= 5,
             )
 
 

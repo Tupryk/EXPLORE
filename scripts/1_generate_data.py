@@ -17,7 +17,7 @@ def main(cfg: DictConfig):
     #S.jit_simulator()
 
     reached_trajs = {}
-    for i in range(26):
+    for i in range(1,11):
         for j in range(26):
             if i == j:
                 continue
