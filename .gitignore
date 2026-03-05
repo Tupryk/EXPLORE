@@ -9,3 +9,4 @@ outcmaes/
 MUJOCO_LOG.TXT
 *.scad
 *.h5
+tmp/

@@ -33,11 +33,19 @@ class StaGE_task(Task):
     def running_cost(self, state: mjx.Data, control: jax.Array) -> jax.Array:
         """The running cost ℓ(xₜ, uₜ)."""
         e = (state.qpos - self.target_state) * self.q_mask
+        # jax.debug.print("qpos: {}", state.qpos)
+        #jax.debug.print("target_state: {}", self.target_state)
+        # jax.debug.print("q_mask: {}", self.q_mask)
         if self.cost_max_method:
             cost = jnp.abs(e).max()
         else:
-            cost = e.T @ e + .01*(state.qvel[:9] @ state.qvel[:9]) #+1*(jnp.linalg.norm(e[:3] - e[3:6]) - 0.15)**2
+            dist = jnp.linalg.norm(state.qpos[:3] - state.qpos[3:6])
+            contact_cost = (dist - 0.15) ** 2
+            print(f"control: {control}, dist: {dist}, contact_cost: {contact_cost}")
+            cost = e.T @ e  #+ .0001*jnp.linalg.norm(state.qacc[:3])**2) # +.001*(contact_cost) #
+
         return cost
+
 
     def terminal_cost(self, state: mjx.Data) -> jax.Array:
         """The terminal cost ϕ(x_T)."""
@@ -45,8 +53,10 @@ class StaGE_task(Task):
         if self.cost_max_method:
             cost = jnp.abs(e).max()
         else:
-            cost = 10*self.running_cost(state, jnp.zeros_like(state.qvel))
+            cost = 10*e.T @ e
+
         return cost
+
 
     def domain_randomize_model(self, rng: jax.Array) -> Dict[str, jax.Array]:
         """Randomize the friction parameters."""

@@ -8,10 +8,14 @@ import numpy as np
 from mujoco import mjx
 import jax.numpy as jnp
 from tqdm import trange
-from hydrax.algs import MPPI
+from hydrax.algs import MPPI, PredictiveSampling, Evosax, DIAL
 from omegaconf import DictConfig, ListConfig
 print(jax.devices())  # should show CudaDevice, not CpuDevice
 from explore.env.tasks import StaGE_task
+from explore.models.mppi_lr import MPPI_lr
+from explore.models.traj_opt import TrajectoryOptimizer
+import matplotlib.pyplot as plt
+from evosax.algorithms.distribution_based import CMA_ES
 
 # 1. Disable the Command Buffer/CUDA Graph feature that is crashing
 os.environ["XLA_FLAGS"] = "--xla_gpu_enable_command_buffer=" 
@@ -87,38 +91,78 @@ class Search:
         self.mj_model.opt.o_solimp = [0.9, 0.95, 0.001, 0.5, 2]
         self.mj_model.opt.enableflags = mujoco.mjtEnableBit.mjENBL_OVERRIDE
 
+
+
+        self.controller = PredictiveSampling(
+            self.task,
+            num_samples = 2048,
+            noise_level= .02,
+            plan_horizon= .5,
+            spline_type= "zero",
+            num_knots= 16,
+            iterations= 10,
+            )
+
+
         # self.controller = MPPI(
         #     self.task,
-        #     num_samples=128,
-        #     noise_level=0.05,
+        #     num_samples=4096,
+        #     noise_level=0.5,
         #     temperature=0.01,
         #     num_randomizations=1,
         #     plan_horizon=.5,
         #     spline_type="zero",
-        #     num_knots=64,
+        #     num_knots=20,
+        #     iterations=2
         # )
 
-        self.controller = MPPI(
-            self.task,
-            num_samples=128,
-            noise_level=0.05,
-            temperature=0.01,
-            num_randomizations=1,
-            plan_horizon=.5,
-            spline_type="zero",
-            num_knots=16,
-        )
 
-        # self.controller = empepei(
-        # self.task,
-        # num_samples=256,       # More samples = better "mean" action
-        # noise_level=0.05,      # Much lower noise for precision
-        # temperature=0.01,     # Lower temperature makes it follow the 'best' path strictly
-        # num_randomizations=1, 
-        # plan_horizon=0.5,      # Shorten the horizon so it focuses on not dropping the ball NOW
-        # spline_type="cubic",   # Smooth movements
-        # num_knots=12,           # More control points for a shorter horizon
+        # self.controller = MPPI(
+        #     self.task,
+        #     num_samples=512,
+        #     noise_level=0.5,
+        #     temperature=0.01,
+        #     num_randomizations=1,
+        #     plan_horizon=.5,
+        #     spline_type="zero",
+        #     num_knots=10,
+        #     iterations=10
         # )
+
+        # self.controller = DIAL(
+        #     self.task,
+        #     num_samples=512,
+        #     noise_level=0.5,
+        #     temperature=0.15,
+        #     num_randomizations=1,
+        #     plan_horizon=.5,
+        #     spline_type="zero",
+        #     num_knots=10,
+        #     iterations=5
+        # )
+
+        # self.controller = Evosax(
+        #     task=self.task,
+        #     optimizer=CMA_ES,
+        #     num_samples=64,
+        #     plan_horizon=1.5,
+        #     spline_type="zero",
+        #     num_knots=15,
+        #     )
+        # self.controller.es_params = self.controller.es_params.replace(std_init = 0.1)
+
+
+        # self.to = TrajectoryOptimizer(
+        #     "algo",
+        #     self.controller,
+        #     self.mj_model,
+        #     self.mj_data,
+        #     )
+        
+        # cost_per_iter, controls = to.optimize(10)
+        # print(cost_per_iter)   
+
+
 
 
         self.ctrl_dim = self.mj_data.ctrl.shape[0]
@@ -187,6 +231,13 @@ class Search:
         print(self.mj_model.opt.timestep, self.sim_steps_per_replan, n_steps)
 
         reached_goal = False
+
+        # cost_per_iter, controls = self.to.optimize(200)
+        # print(cost_per_iter)   
+        # plt.plot(cost_per_iter)
+        # plt.show()
+        # self.to.visualize_solution(controls[-1])
+
         for step in range(n_steps):
             end_state, traj = self.extend_node()  # replan + execute 0.1s
             full_traj.extend(traj)

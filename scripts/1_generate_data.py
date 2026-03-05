@@ -14,18 +14,20 @@ def main(cfg: DictConfig):
     file = h5py.File(cfg.configs_path, 'r')
 
     S = Search(file["qpos"], file["ctrl"], cfg.RRT)
-    S.jit_simulator()
+    #S.jit_simulator()
 
     reached_trajs = {}
     for i in range(26):
-        for j in range(5):
+        for j in range(26):
             if i == j:
                 continue
-            elif i==1:
-                traj, reached_goal = S.run_mppi_baseline(1, j)
+            else:
+                S.jit_simulator()
+                traj, reached_goal = S.run_mppi_baseline(i, j)
                 reached_trajs[f"target_{i}_{j}"] = (traj, reached_goal, i, j)
 
-    with h5py.File('result_ramp.h5', 'w') as f:
+
+    with h5py.File('result_ramp_mppi.h5', 'w') as f:
         for key, (traj, reached, start_idx, end_idx) in reached_trajs.items():
             group = f.create_group(key)
             
