@@ -1,4 +1,5 @@
 <mujoco model="ry_convert">
+  <size njmax="500" nconmax="500"/>
   <asset />
   <visual>
     <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.1 0.1 0.1" />

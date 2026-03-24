@@ -20,10 +20,11 @@ RRT:
   sample_uniform_prob: 0.0
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
+  use_gpu: false
   start_idx: -1
   end_idx: -1
   bidirectional: false
-  cost_max_method: false
+  cost_method: "se"
   sample_count: 500
   sampling_strategy: rs
   n_best_actions: 16  # Only for random sampling strategy

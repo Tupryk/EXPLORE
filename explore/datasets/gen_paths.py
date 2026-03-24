@@ -1,23 +1,21 @@
 import os
-import cma
 import time
+import math
+import mujoco
 import psutil
 import pickle
 import hnswlib
+import warp as wp
 import numpy as np
 from tqdm import trange
+import mujoco_warp as mjw
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from explore.utils.utils import signum
 from explore.env.mujoco_sim import MjSim
-import mujoco
 
-def signum(q1, q2):
-    if np.inner(q1, q2)>=0:
-        return 1
-    else:
-        return -1
 
 class MultiSearchNode:
     def __init__(self,
@@ -54,9 +52,6 @@ class Search:
         self.config_count = self.configs.shape[0]
 
         self.max_nodes_per_tree = int(cfg.max_nodes_per_tree)
-        self.v_0 = 0
-        self.v_1 = 0
-        self.v_2 = 0
 
         self.stepsize = cfg.stepsize
         if isinstance(self.stepsize, ListConfig):
@@ -97,6 +92,8 @@ class Search:
         self.verbose = cfg.verbose
         if self.threading:
             self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
+        self.use_gpu = cfg.use_gpu
+        assert not (self.threading and self.use_gpu)
         
         self.start_ids = cfg.start_idx
         self.end_ids = cfg.end_idx
@@ -126,6 +123,11 @@ class Search:
         ]
         assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
         
+        if self.use_gpu:
+            self.warp_model = mjw.put_model(self.sim[0].model)
+            mujoco.mj_forward(self.sim[0].model, self.sim[0].data)
+            self.warp_data = mjw.put_data(self.sim[0].model, self.sim[0].data, nworld=self.sample_count, njmax=500, nconmax=500)
+
         self.scene_quat_indices = []
         for j in range(self.sim[0].model.njnt):
             joint_type = self.sim[0].model.jnt_type[j]
@@ -143,8 +145,6 @@ class Search:
         
         if self.sampling_strategy == "rs":
             self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
-        elif self.sampling_strategy == "cma":
-            self.action_sampler = lambda o, t: self.cma_sample_ctrls(o, t)
         elif self.sampling_strategy == "cem":
             self.cem_steps = cfg.cem_steps
             self.action_sampler = lambda o, t: self.cem_sample_ctrls(o, t)
@@ -221,47 +221,6 @@ class Search:
 
         return best_results
     
-    def cma_sample_ctrls(
-            self,
-            parent_node: MultiSearchNode,
-            target: np.ndarray
-        ) -> list[tuple[float, np.ndarray, np.ndarray]]:
-
-        pop_size = 200
-        initial_guess = np.full(self.horizon, parent_node.state[3])
-
-        es = cma.CMAEvolutionStrategy(
-            initial_guess, 0.5,
-            {
-                "popsize": pop_size,
-                "maxfevals": self.sample_count,
-                "verbose": -1
-            },
-        )
-
-        all_results = []
-
-        while not es.stop():
-            candidates = es.ask()
-
-            results = self.eval_multiple_ctrls(
-                candidates.reshape(-1, self.horizon, self.ctrl_dim), parent_node.state, target)
-            fitness_values = [r[0] for r in results]
-
-            all_results.extend(results)
-
-            es.tell(candidates, fitness_values)
-
-            if self.verbose > 3:
-                es.disp()
-
-        if self.n_best_actions != -1:
-            best_results = sorted(all_results, key=lambda x: x[0])[:self.n_best_actions]
-        else:
-            best_results = all_results
-        
-        return best_results
-    
     def cem_sample_ctrls(
             self,
             parent_node: MultiSearchNode,
@@ -314,9 +273,47 @@ class Search:
             ]
             for future in as_completed(futures):
                 results.extend(future.result())
+        
+        elif self.use_gpu:
+            self.warp_data.time.fill_(origin[0])
+            wp.copy(self.warp_data.qpos, wp.array(origin[1], dtype=wp.float32))
+            wp.copy(self.warp_data.qvel, wp.array(origin[2], dtype=wp.float32))
+            wp.copy(self.warp_data.ctrl, wp.array(origin[3], dtype=wp.float32))
+
+            mjw.reset_data(self.warp_model, self.warp_data)
+
+            steps = math.ceil(self.tau_action / self.tau_sim)
+
+            prev_ctrl = np.copy(origin[3])
+
+            for k in range(steps):
+
+                perc = (k+1)/steps
+                ctrl_np = prev_ctrl * (1 - perc) + ctrls * perc
+                wp.copy(self.warp_data.ctrl, wp.array(ctrl_np, dtype=wp.float32))
+                
+                mjw.step(self.warp_model, self.warp_data)
+            
+            results = []
+            time_ = self.warp_data.time.numpy()
+            qpos = self.warp_data.qpos.numpy()
+            qvel = self.warp_data.qvel.numpy()
+            ctrl = self.warp_data.ctrl.numpy()
+
+            for i in range(self.sample_count):
+                state = (
+                    time_[i], qpos[i], qvel[i], ctrl[i]
+                )
+                cost2target = self.compute_cost(target, state[1], state[2])
+                
+                reg_e = ctrls[i][0] - prev_ctrl
+                cost2target += self.regularization_weight * (reg_e.T @ reg_e)
+
+                results.append((cost2target, state, ctrls[i]))
+            
         else:
             self.eval_multiple_ctrls_seq(ctrls, origin, target)
-            
+
         
         if self.verbose > 3:
             results_plot = []
@@ -389,21 +386,10 @@ class Search:
             self.sim[sim_idx].step(self.tau_action, c)
         
         state = self.sim[sim_idx].getState()
-        
-        v0 = np.linalg.norm(state[2][:3])
-        v1 = np.linalg.norm(state[2][3:6])
-        v2 = np.linalg.norm(state[2][6:9])
-
-        if v0 > self.v_0:
-            self.v_0 = v0
-        if v1 > self.v_1:
-            self.v_1 = v1
-        if v2 > self.v_2:
-            self.v_2 = v2
 
         cost2target = self.compute_cost(target, state[1], state[2])
         
-        reg_e = state[3] - origin[3].T
+        reg_e = state[3] - origin[3]
         cost2target += self.regularization_weight * (reg_e.T @ reg_e)
         
         return cost2target, state, ctrl

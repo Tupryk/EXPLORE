@@ -328,3 +328,8 @@ def extract_balls_mask(img: np.ndarray, verbose: int = 0) -> np.ndarray:
 
     return masks_rgb
 
+def signum(q1, q2):
+    if np.inner(q1, q2)>=0:
+        return 1
+    else:
+        return -1
