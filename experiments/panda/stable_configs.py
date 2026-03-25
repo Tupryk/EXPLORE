@@ -9,8 +9,11 @@ from explore.env.mujoco_sim import MjSim
 # h5_file = "configs/stable/grasp_configs.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
 
-h5_file = "configs/stable/pandaHook.h5"
-mujoco_xml = "configs/mujoco_/franka_emika_panda/panda_single.xml"
+# h5_file = "configs/stable/pandaHook.h5"
+# mujoco_xml = "configs/mujoco_/franka_emika_panda/panda_single.xml"
+
+h5_file = "outputs/2026-03-23/14-25-06/stable_configs.h5"
+mujoco_xml = "configs/mujoco_/unitree_g1/scene.xml"
 
 # h5_file = "configs/stable/g1.h5"
 # mujoco_xml = "configs/mujoco_/unitree_g1/g1_single.xml"

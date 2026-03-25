@@ -3,7 +3,12 @@ import torch
 import pickle
 import numpy as np
 from tqdm import tqdm
-
+import mujoco
+from itertools import combinations
+from scipy.spatial.distance import directed_hausdorff, pdist, squareform
+from scipy.special import digamma, gamma
+import networkx as nx
+from networkx.algorithms.approximation import maximum_independent_set 
 
 class Normalizer:
     def __init__(self, data: torch.Tensor):
@@ -37,16 +42,29 @@ class MinMaxNormalizer(Normalizer):
     def de_normalize(self, x: torch.Tensor) -> torch.Tensor:
         return (x + 1) * 0.5 * self.range + self.mins
 
+def signum(q1, q2):
+    if np.inner(q1, q2)>=0:
+        return 1
+    else:
+        return -1
 
 def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=False) -> float:
     
-    e = (node1["state"][1] - node2["state"][1]) * q_mask
-    
+    e = (node1["state"][1] - node2["state"][1])  #* self.q_mask
+  
+
     if cost_max_method:
         cost = np.abs(e).max()
     else:
-        cost = e.T @ e
-    
+        e_linear = e[:-4]        
+        e_rotation = node1["state"][1][-4:] - signum(node1["state"][1][-4:] , node2["state"][1][-4:]) * node2["state"][1][-4:]
+
+        E_total = np.concatenate([e_linear, e_rotation])
+        E_total *= q_mask
+        
+        cost = np.linalg.norm(E_total)**2
+
+
     return cost
 
 def load_trees(tree_dataset: str, cutoff: int=-1, verbose: int=0
@@ -320,3 +338,231 @@ def get_diverse_paths(
     print(f"Total config pairs found: {found_pairs_count} of {max_config_pairs}")
     print(f"Total paths found: {final_paths_count}")
     return final_paths, final_paths_start_end_indices
+
+
+def hausdorff_distance(A: np.ndarray, B: np.ndarray) -> float:
+    """
+    Compute symmetric Hausdorff distance between two point sets.
+    
+    A: (N, d)
+    B: (M, d)
+    """
+    d_ab = directed_hausdorff(A, B)[0]
+    d_ba = directed_hausdorff(B, A)[0]
+    return max(d_ab, d_ba)
+
+
+def average_hausdorff_distance(state_paths):
+    """
+    Compute the average pairwise Hausdorff distance
+    across a list of paths.
+    
+    state_paths: list of arrays of shape (Ni, 6)
+    """
+    if len(state_paths) < 2:
+        return 0.0
+
+    distances = []
+    
+    for A, B in combinations(state_paths, 2):
+        d = hausdorff_distance(A, B)
+        distances.append(d)
+
+    return float(np.mean(distances))
+
+
+def get_single_tree_reachability(trees, tree_count, q_mask, cost_max_method, ERROR_THRESH, start_idx):
+    """
+    Computes reachability metadata for ONE specific tree against all target roots.
+    """
+    # tree_path_count[j] = how many nodes in trees[start_idx] reached root of trees[j]
+    tree_path_count = np.zeros(tree_count, dtype=int)
+    # tree_end_nodes[j] = list of node indices in trees[start_idx] that reached root of trees[j]
+    tree_end_nodes = [[] for _ in range(tree_count)]
+    
+    # Expensive computation loop (only for the specific start_idx)
+    for n_idx, node in enumerate(trees[start_idx]):
+        for j in range(tree_count):
+            if start_idx == j:
+                continue
+            
+            node_cost = cost_computation(trees[j][0], node, q_mask, cost_max_method)
+            if node_cost < ERROR_THRESH:
+                tree_path_count[j] += 1
+                tree_end_nodes[j].append(n_idx)
+                
+    return tree_path_count, tree_end_nodes
+
+def compute_coverage_modular(tree_path_count):
+    # Coverage: what fraction of other targets were reached at least once?
+    coverage = np.count_nonzero(tree_path_count) / (len(tree_path_count) - 1)
+    n_paths = np.sum(tree_path_count)
+    return coverage, n_paths
+
+def filter_diverse_paths(state_paths, hd_threshold):
+    """
+    Only keeps paths that are at least 'hd_threshold' away from 
+    all other already accepted paths.
+    """
+    if not state_paths:
+        return []
+
+    # approximate maximum ind. set
+    # adj_dist_matrix = np.zeros((len(state_paths), len(state_paths)), dtype=bool)
+    # for i in range(len(state_paths)):
+    #     for j in range(i + 1, len(state_paths)):
+    #         is_smaller = hausdorff_distance(state_paths[i], state_paths[j]) < hd_threshold
+    #         adj_dist_matrix[i][j] = is_smaller
+    #         adj_dist_matrix[j][i] = is_smaller
+        
+    # G = nx.from_numpy_array(adj_dist_matrix)
+    # independent_set = maximum_independent_set(G)
+    # diverse_paths = [state_paths[i] for i in independent_set]
+
+    # greedy
+    diverse_paths = [state_paths[0]] # Always keep the first found path
+    
+    for i in range(1, len(state_paths)):
+        current_path = state_paths[i]
+        # Check against all currently accepted paths
+        is_diverse = True
+        for accepted in diverse_paths:
+            if hausdorff_distance(current_path, accepted) < hd_threshold:
+                is_diverse = False
+                break
+        
+        if is_diverse:
+            diverse_paths.append(current_path)
+            
+    return diverse_paths
+
+def compute_metrics_with_diversity(tree, tree_end_nodes, tree_path_count, tree_count, q_mask, hd_threshold=0.05):
+    """
+    Filters paths by diversity first, then computes Coverage, Hausdorff, and Path Count.
+    """
+    filtered_path_counts = np.zeros(tree_count, dtype=int)
+    explicit_hds = []
+    implicit_hds = []
+
+    states_visited = []
+    
+    for target_idx, count in enumerate(tree_path_count):
+        if count == 0:
+            continue
+            
+        raw_state_paths = []
+        for node_idx in tree_end_nodes[target_idx]:
+            full_path = build_path(tree, node_idx)
+            path_states = np.array([n["state"][1]*q_mask for n in full_path])
+            raw_state_paths.append(path_states)
+            
+        diverse_paths = filter_diverse_paths(raw_state_paths, hd_threshold)
+        for path in diverse_paths:
+            states_visited.extend(path)
+        
+        num_diverse = len(diverse_paths)
+        filtered_path_counts[target_idx] = num_diverse
+        
+        if num_diverse > 0:
+            avg_hd = average_hausdorff_distance(diverse_paths) if num_diverse > 1 else 0.0
+            if avg_hd > 0:
+                explicit_hds.append(avg_hd)
+            implicit_hds.append(avg_hd)
+
+    # Final calculations
+    coverage = np.count_nonzero(filtered_path_counts) / (tree_count - 1)
+    n_paths = np.sum(filtered_path_counts)
+    
+    res_hd = np.mean(explicit_hds) if explicit_hds else 0.0
+    res_hd_imp = np.mean(implicit_hds) if implicit_hds else 0.0
+
+    ent = compute_entropy(np.array(states_visited)) if states_visited else 0.0
+    
+    return coverage, n_paths, res_hd, res_hd_imp, ent
+
+
+def compute_hausdorff_modular(tree, tree_end_nodes, tree_path_count, q_mask):
+    """
+    Computes Hausdorff metrics based on pre-calculated reachability.
+    """
+    explicit_scores = []
+    implicit_scores = []
+    
+    for target_idx, count in enumerate(tree_path_count):
+        # If path_count is 0, it's unreachable (np.inf in your old code)
+        if count == 0:
+            continue
+            
+        # Reconstruct paths for successful connections
+        state_paths = []
+        for node_idx in tree_end_nodes[target_idx]:
+            full_path = build_path(tree, node_idx)
+            if len(full_path) <= 2:
+                continue
+            path_states = np.array([n["state"][1]*q_mask for n in full_path])
+            state_paths.append(path_states)
+            
+        avg_hd = average_hausdorff_distance(state_paths) if len(state_paths) > 1 else 0.0
+        
+        # Explicit: Only non-zero distances (your original hausdorff_score)
+        if avg_hd > 0:
+            explicit_scores.append(avg_hd)
+        
+        # Implicit: Includes 0s for successful paths (your original hausdorff_score_implicit_coverage)
+        implicit_scores.append(avg_hd)
+    
+    # Handle empty cases to avoid division by zero
+    res_explicit = np.mean(explicit_scores) if explicit_scores else 0.0
+    res_implicit = np.mean(implicit_scores) if implicit_scores else 0.0
+    
+    return res_explicit, res_implicit
+
+def compute_entropy(states, k=10, n_subsample=100, times=10):
+    n, d = states.shape
+    print(f"Computing entropy for {n} states in {d}-dimensional space with k={k}...")
+    # 1. Guard clause: If we don't have enough points, entropy is undefined/0
+    if n <= n_subsample:
+        return np.nan
+    
+    # 2. Adjust k: The maximum possible k-th neighbor is n-1 
+    # (since a point cannot be its own neighbor in this context)
+    if k >= n:
+        return np.nan
+    entropy = 0.0
+    for _ in range(times):
+        states = states[np.random.choice(n, n_subsample, replace=False)]
+        n = n_subsample
+        dist_matrix = squareform(pdist(states))
+        
+        # 3. FIX: np.partition(matrix, kth) 
+        # If k=2 and n=3, valid indices are 0, 1, 2. 
+        # We want the 2nd index (the k-th nearest neighbor).
+        # We do NOT use k+1 here; k is the actual index we want to "sort" to that position.
+        partitioned_dist = np.partition(dist_matrix, k, axis=1)
+        k_nearest_dist = partitioned_dist[:, k]
+
+        # Constants for the estimator
+        # Note: Ensure k is at least 1 for gamma(k) and digamma(k)
+        k_val = max(1, k)
+        c_d = (gamma(d/2 + 1) * np.pi**(d/2)) / gamma(k_val)
+        
+        entropy += digamma(n) - digamma(k_val) + np.log(c_d) + (d/n) * np.sum(np.log(2 * k_nearest_dist + 1e-10))
+    return entropy / times
+
+def compute_path_entropy_modular(tree, tree_end_nodes, tree_path_count, q_mask):
+    successful_states = []
+    
+    for target_idx, count in enumerate(tree_path_count):
+        if count == 0:
+            continue
+            
+        for node_idx in tree_end_nodes[target_idx]:
+            # Ensure we are handling the state extraction correctly
+            state = tree[node_idx]["state"][1] * q_mask
+            successful_states.append(state)
+            
+    # 4. Better guard: compute_entropy needs at least 2 points to find a neighbor
+    if len(successful_states) < 2:
+        return 0.0
+        
+    return compute_entropy(np.array(successful_states))

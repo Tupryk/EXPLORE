@@ -1,14 +1,19 @@
 import os
-import cma
 import time
+import math
+import mujoco
 import psutil
 import pickle
+import hnswlib
+import warp as wp
 import numpy as np
 from tqdm import trange
+import mujoco_warp as mjw
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from explore.utils.utils import signum
 from explore.env.mujoco_sim import MjSim
 
 
@@ -47,6 +52,7 @@ class Search:
         self.config_count = self.configs.shape[0]
 
         self.max_nodes_per_tree = int(cfg.max_nodes_per_tree)
+
         self.stepsize = cfg.stepsize
         if isinstance(self.stepsize, ListConfig):
             self.stepsize = np.array(self.stepsize)
@@ -64,8 +70,7 @@ class Search:
         
         self.horizon = cfg.horizon
         self.sample_count = cfg.sample_count
-        self.cost_max_method = cfg.cost_max_method
-        self.sample_uniform = cfg.sample_uniform
+        self.cost_method = cfg.cost_method # "se" for squared error, "max" for max error, sefo for se with derivates
         self.warm_start = cfg.warm_start
         self.sampling_strategy = cfg.sampling_strategy
         self.q_mask = np.array(cfg.q_mask)
@@ -74,6 +79,11 @@ class Search:
             
         assert (self.warm_start and self.horizon == 1) or not self.warm_start
         
+        self.sample_uniform_prob = cfg.sample_uniform_prob
+        if self.sample_uniform_prob:
+            self.mins_uniform_sample = np.array(cfg.mins_uniform_sample)
+            self.maxs_uniform_sample = np.array(cfg.maxs_uniform_sample)
+
         # Does not always provide faster execution! Depends on weird factors like tau_sim
         self.threading = cfg.threading
         # Five Workers and ten simulators seem to be optimal
@@ -82,20 +92,27 @@ class Search:
         self.verbose = cfg.verbose
         if self.threading:
             self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
+        self.use_gpu = cfg.use_gpu
+        assert not (self.threading and self.use_gpu)
         
         self.start_ids = cfg.start_idx
+        self.end_ids = cfg.end_idx
         if not isinstance(self.start_ids, ListConfig):
             if self.start_ids == -1:
                 self.start_ids = list(range(self.config_count))
             else:
                 self.start_ids = [self.start_ids]
-        self.end_idx = cfg.end_idx
-        self.n_best_actions = cfg.n_best_actions
-        self.regularization_weight = cfg.regularization_weight
-
-        self.disable_node_max_strikes = cfg.disable_node_max_strikes
+        if not isinstance(self.end_ids, ListConfig):
+            if self.end_ids == -1:
+                self.end_ids = []
+            else:
+                self.end_ids = [self.end_ids]
+        self.end_ids = np.array(self.end_ids)
         
+        self.disable_node_max_strikes = cfg.disable_node_max_strikes
+        self.n_best_actions = cfg.n_best_actions
         self.knnK = cfg.knnK
+        self.regularization_weight = cfg.regularization_weight
 
         self.sim = [
             MjSim(
@@ -106,14 +123,28 @@ class Search:
         ]
         assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
         
+        if self.use_gpu:
+            self.warp_model = mjw.put_model(self.sim[0].model)
+            mujoco.mj_forward(self.sim[0].model, self.sim[0].data)
+            self.warp_data = mjw.put_data(self.sim[0].model, self.sim[0].data, nworld=self.sample_count, njmax=500, nconmax=500)
+
+        self.scene_quat_indices = []
+        for j in range(self.sim[0].model.njnt):
+            joint_type = self.sim[0].model.jnt_type[j]
+            qpos_adr = self.sim[0].model.jnt_qposadr[j]
+
+            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
+                self.scene_quat_indices.append(int(qpos_adr+3))
+
+        if self.verbose > 2:
+            print("Quaternions in scene: ", self.scene_quat_indices)
+
         self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
         self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
         self.state_dim = self.sim[0].data.qpos.shape[0]
         
         if self.sampling_strategy == "rs":
             self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
-        elif self.sampling_strategy == "cma":
-            self.action_sampler = lambda o, t: self.cma_sample_ctrls(o, t)
         elif self.sampling_strategy == "cem":
             self.cem_steps = cfg.cem_steps
             self.action_sampler = lambda o, t: self.cem_sample_ctrls(o, t)
@@ -190,47 +221,6 @@ class Search:
 
         return best_results
     
-    def cma_sample_ctrls(
-            self,
-            parent_node: MultiSearchNode,
-            target: np.ndarray
-        ) -> list[tuple[float, np.ndarray, np.ndarray]]:
-
-        pop_size = 200
-        initial_guess = np.full(self.horizon, parent_node.state[3])
-
-        es = cma.CMAEvolutionStrategy(
-            initial_guess, 0.5,
-            {
-                "popsize": pop_size,
-                "maxfevals": self.sample_count,
-                "verbose": -1
-            },
-        )
-
-        all_results = []
-
-        while not es.stop():
-            candidates = es.ask()
-
-            results = self.eval_multiple_ctrls(
-                candidates.reshape(-1, self.horizon, self.ctrl_dim), parent_node.state, target)
-            fitness_values = [r[0] for r in results]
-
-            all_results.extend(results)
-
-            es.tell(candidates, fitness_values)
-
-            if self.verbose > 3:
-                es.disp()
-
-        if self.n_best_actions != -1:
-            best_results = sorted(all_results, key=lambda x: x[0])[:self.n_best_actions]
-        else:
-            best_results = all_results
-        
-        return best_results
-    
     def cem_sample_ctrls(
             self,
             parent_node: MultiSearchNode,
@@ -283,9 +273,47 @@ class Search:
             ]
             for future in as_completed(futures):
                 results.extend(future.result())
+        
+        elif self.use_gpu:
+            self.warp_data.time.fill_(origin[0])
+            wp.copy(self.warp_data.qpos, wp.array(origin[1], dtype=wp.float32))
+            wp.copy(self.warp_data.qvel, wp.array(origin[2], dtype=wp.float32))
+            wp.copy(self.warp_data.ctrl, wp.array(origin[3], dtype=wp.float32))
+
+            mjw.reset_data(self.warp_model, self.warp_data)
+
+            steps = math.ceil(self.tau_action / self.tau_sim)
+
+            prev_ctrl = np.copy(origin[3])
+
+            for k in range(steps):
+
+                perc = (k+1)/steps
+                ctrl_np = prev_ctrl * (1 - perc) + ctrls * perc
+                wp.copy(self.warp_data.ctrl, wp.array(ctrl_np, dtype=wp.float32))
+                
+                mjw.step(self.warp_model, self.warp_data)
+            
+            results = []
+            time_ = self.warp_data.time.numpy()
+            qpos = self.warp_data.qpos.numpy()
+            qvel = self.warp_data.qvel.numpy()
+            ctrl = self.warp_data.ctrl.numpy()
+
+            for i in range(self.sample_count):
+                state = (
+                    time_[i], qpos[i], qvel[i], ctrl[i]
+                )
+                cost2target = self.compute_cost(target, state[1], state[2])
+                
+                reg_e = ctrls[i][0] - prev_ctrl
+                cost2target += self.regularization_weight * (reg_e.T @ reg_e)
+
+                results.append((cost2target, state, ctrls[i]))
+            
         else:
             self.eval_multiple_ctrls_seq(ctrls, origin, target)
-            
+
         
         if self.verbose > 3:
             results_plot = []
@@ -303,12 +331,49 @@ class Search:
         
         return results
     
-    def compute_cost(self, state1: np.ndarray, state2: np.ndarray) -> float:
-        e = (state1 - state2) * self.q_mask
-        if self.cost_max_method:
+    def compute_cost(self, state1: np.ndarray, state2: np.ndarray, vel_state2: np.ndarray = None) -> float:
+        
+        e = (state1 - state2)
+        for i in self.scene_quat_indices:
+            i0 = i + 4
+            e[i:i0] = state1[i:i0] - signum(state1[i:i0], state2[i:i0]) * state2[i:i0]
+        
+        e *= self.q_mask
+        
+        if self.cost_method == "max":
             cost = np.abs(e).max()
-        else:
+        
+        elif self.cost_method == "se":
             cost = e.T @ e
+
+        elif self.cost_method == "sefo" and vel_state2 is not None:
+
+            raise Exception("Sefo is currently out of service, we apologise for any inconvenience.")
+            e_linear = e[:-4]
+            v_linear = vel_state2[:-3]
+            
+
+            delta_theta = np.zeros(3)
+            mujoco.mju_subQuat(delta_theta, state2[-4:], state1[-4:])
+            
+            E_total = np.concatenate([e_linear, delta_theta])
+
+            E_total *= self.q_mask
+
+            V_total = np.concatenate([v_linear, vel_state2[-3:]]) 
+            V_total *= self.q_mask
+            
+            v_max = 1
+            alpha = (1 - 1e-3) / v_max
+            
+            dist = np.linalg.norm(E_total)
+            alignment = np.inner(V_total, E_total)
+            
+            cost = (dist - alpha * alignment)**2
+        
+        else:
+            raise Exception("Cost method '{}' not implemented yet!")
+        
         return cost
     
     def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
@@ -321,10 +386,10 @@ class Search:
             self.sim[sim_idx].step(self.tau_action, c)
         
         state = self.sim[sim_idx].getState()
+
+        cost2target = self.compute_cost(target, state[1], state[2])
         
-        cost2target = self.compute_cost(target, state[1])
-        
-        reg_e = state[3] - origin[3].T
+        reg_e = state[3] - origin[3]
         cost2target += self.regularization_weight * (reg_e.T @ reg_e)
         
         return cost2target, state, ctrl
@@ -358,8 +423,8 @@ class Search:
             min_cost = costs.min()
 
             f.write(f"{mean_cost}, {min_cost}")
-            if self.end_idx != -1:
-                f.write(f", {self.trees_closest_nodes_costs[idx][self.end_idx, 0]}\n")
+            if len(self.end_ids) == 1:
+                f.write(f", {self.trees_closest_nodes_costs[idx][self.end_ids[0], 0]}\n")
             else:
                 f.write("\n")
 
@@ -428,32 +493,52 @@ class Search:
         
         start_time = time.time()
         
-        for start_idx in self.start_ids:
+        for i, start_idx in enumerate(self.start_ids):
+
+            if self.sample_uniform_prob:
+                max_elems = self.n_best_actions * self.max_nodes_per_tree
+                kNN_tree = hnswlib.Index(space="l2", dim=self.state_dim)
+                kNN_tree.init_index(max_elements=max_elems, ef_construction=200, M=16)
+                kNN_tree.add_items(self.configs[start_idx], ids=[0])
+                kNN_tree_size = 1
 
             if self.verbose > 0:
-                pbar = trange(self.max_nodes_per_tree, desc=f"Tree {start_idx}/{self.config_count}", unit="nodes")
+                pbar = trange(self.max_nodes_per_tree, desc=f"Tree {i+1}/{len(self.start_ids)}", unit="nodes")
             else:
                 pbar = range(self.max_nodes_per_tree)
             
             for _ in pbar:
 
                 # Sample random sim state
-                exploring = not (np.random.uniform() < self.target_prob) or self.end_idx == -1
+                exploring = not (np.random.uniform() < self.target_prob) or not len(self.end_ids)
                 
-                if not exploring and self.end_idx != -1:
-                    target_config_idx = self.end_idx
+                if not exploring:
+                    target_config_idx = np.random.choice(self.end_ids)
                     sim_sample = self.configs[target_config_idx]
+                
                 else:
                     sim_sample, target_config_idx = self.sample_state(start_idx)
                 
                 # Pick closest node
-                node_ids = self.trees_closest_nodes_idxs[start_idx][target_config_idx]
-                valid_ids = node_ids[node_ids != -1]
-                if len(valid_ids):
-                    node_id = np.random.choice(valid_ids)
+                if self.sample_uniform_prob and exploring and (np.random.uniform() <  self.sample_uniform_prob):
+
+                    target_config_idx = -1
+                    
+                    sim_sample = np.random.uniform(low=self.mins_uniform_sample, high=self.maxs_uniform_sample)
+
+                    k = min(self.knnK, kNN_tree_size)
+                    node_id, _ = kNN_tree.knn_query(sim_sample * self.q_mask, k=k)
+                    node_id = np.random.choice(node_id[0])
+
                 else:
-                    node_id = 0
-                assert node_id != -1
+                    node_ids = self.trees_closest_nodes_idxs[start_idx][target_config_idx]
+                    valid_ids = node_ids[node_ids != -1]
+                    if len(valid_ids):
+                        node_id = np.random.choice(valid_ids)
+                    else:
+                        node_id = 0
+                    assert node_id != -1
+
                 node: MultiSearchNode = self.trees[start_idx][node_id]
 
                 # Expand node
@@ -486,6 +571,10 @@ class Search:
                             target_config_idx=target_config_idx,
                             q_sequence=best_q)
                         self.trees[start_idx].append(best_node)
+                        
+                        if self.sample_uniform_prob:
+                            kNN_tree.add_items(best_state[1] * self.q_mask, ids=[kNN_tree_size])
+                            kNN_tree_size += 1
 
                 if not expanded:
 
@@ -532,14 +621,14 @@ class Search:
                     min_cost = costs.min()
 
                     print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost}", end="")
-                    if self.end_idx != -1:
-                        print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_idx, 0]}")
+                    if len(self.end_ids) == 1:
+                        print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
                     else:
                         print()
 
             # Store information when appropriate
             if self.verbose > 3:
-                print(f"Storing tree {start_idx} at i {i}")
+                print(f"Storing tree {start_idx}")
             
             self.store_tree(start_idx, folder_path, self.trees)
             

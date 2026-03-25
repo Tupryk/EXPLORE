@@ -1,0 +1,11 @@
+output_dir: ${hydra:runtime.output_dir}
+config_count: 10
+verbose: 1
+sim:
+  tau_sim: 0.005
+  tau_action: 0.25
+  interpolate_actions: true
+  joints_are_same_as_ctrl: true
+  use_spline_ref: false
+  mujoco_xml: configs/mujoco_/unitree_g1/scene.xml
+  camera: fixed_cam

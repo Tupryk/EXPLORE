@@ -1,0 +1,21 @@
+import h5py
+import hydra
+from omegaconf import DictConfig
+
+from explore.datasets.gen_paths import Search
+
+
+@hydra.main(version_base="1.3",
+            config_path="../configs/yaml",
+            config_name="panda_hook_gen")
+def main(cfg: DictConfig):
+    
+    file = h5py.File(cfg.configs_path, 'r')
+
+    S = Search(file["qpos"], file["ctrl"], cfg.RRT)
+
+    S.run()
+
+
+if __name__ == "__main__":
+    main()
