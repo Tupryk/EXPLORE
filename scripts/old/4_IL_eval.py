@@ -7,7 +7,7 @@ from explore.utils.logger import get_logger
 from explore.env.utils import eval_il_policy
 from explore.policies.flow import FlowPolicy
 from explore.datasets.dataset import ExploreDataset
-from explore.env.stable_configs_env import StableConfigsEnv
+from explore.env.SGRL_env import StableConfigsEnv
 
 
 @hydra.main(version_base="1.3", config_path="../configs/yaml", config_name="eval_IL_policy")

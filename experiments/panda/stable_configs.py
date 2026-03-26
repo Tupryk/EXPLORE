@@ -6,14 +6,14 @@ import matplotlib.pyplot as plt
 from explore.env.mujoco_sim import MjSim
 
 
-# h5_file = "configs/stable/grasp_configs.h5"
+# h5_file = "configs/stable/pandasTableConfigs.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
 
-# h5_file = "configs/stable/pandaHook.h5"
+# h5_file = "configs/stable/pandaHook_balanced.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/panda_single.xml"
 
-h5_file = "outputs/2026-03-23/14-25-06/stable_configs.h5"
-mujoco_xml = "configs/mujoco_/unitree_g1/scene.xml"
+h5_file = "experiments/stable_configs_copy.h5"
+mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
 
 # h5_file = "configs/stable/g1.h5"
 # mujoco_xml = "configs/mujoco_/unitree_g1/g1_single.xml"
@@ -46,12 +46,14 @@ stable_configs_ctrl = file["ctrl"]
 sim = MjSim(mujoco_xml, view=True, verbose=1, tau_sim=1e-3)
 
 sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
+print("Total configs: ", stable_configs)
+print(stable_configs.shape)
 
 # for i, sc in enumerate(sampled_configs):
 for i, sc in enumerate(stable_configs):
     print(i)
-    # if i != 87:
-        # continue
+    # if i < 50 or i> 60:
+    #     continue
     # sim.pushConfig(sc)
     # print(sc)
     # print(stable_configs_ctrl[i])
@@ -59,7 +61,7 @@ for i, sc in enumerate(stable_configs):
     # q[7] = 0
     # q[15] = 0
     sim.pushConfig(sc, q)
-    time.sleep(1.)
+    input()
     # time.sleep(10.)
     sim.step(.1, view=.1)
     print("sum: ", sum([float(i) for i in sim.getContacts()]))

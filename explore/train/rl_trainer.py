@@ -5,7 +5,7 @@ from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import CheckpointCallback
 
-from explore.env.stable_configs_env import StableConfigsEnv
+from explore.env.SGRL_env import StableConfigsEnv
 
 
 class RL_Trainer:

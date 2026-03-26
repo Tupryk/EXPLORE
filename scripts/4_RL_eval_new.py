@@ -35,9 +35,9 @@ def main(cfg: DictConfig):
     for i in range(cfg.eval_count):
         
         if cfg.start_idx != -1 and cfg.end_idx != -1:
-            options = {"traj_pair": (cfg.start_idx, cfg.end_idx), "eval_view": cfg.eval_view, "no_exist_fine": True, "alpha": 1.0}
+            options = {"traj_pair": (cfg.start_idx, cfg.end_idx), "eval_view": cfg.eval_view, "no_exist_fine": True}
         else:
-            options = {"eval_view": cfg.eval_view, "alpha": 1.0}
+            options = {"eval_view": cfg.eval_view}
 
         obs, init_info = env.reset(options=options)
         logger.info(init_info)

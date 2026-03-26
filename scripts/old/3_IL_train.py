@@ -6,7 +6,7 @@ from explore.utils.logger import get_logger
 from explore.policies.flow import FlowPolicy
 from explore.train.il_trainer import IL_Trainer
 from explore.datasets.dataset import ExploreDataset
-from explore.env.stable_configs_env import StableConfigsEnv
+from explore.env.SGRL_env import StableConfigsEnv
 
 
 @hydra.main(version_base="1.3", config_path="../configs/yaml", config_name="IL_flow")

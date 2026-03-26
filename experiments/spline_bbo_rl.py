@@ -35,7 +35,7 @@ class BSpline:
         return point
 
 
-new_file_path = "configs/new_rnd_twoFingers.h5"
+new_file_path = "configs/stable/new_rnd_twoFingers.h5"
 
 file = h5py.File(new_file_path, 'r')
 stable_configs = file["qpos"]
@@ -45,7 +45,7 @@ start_ctrl = stable_configs_ctrl[start_idx]
 end_ctrl = stable_configs_ctrl[end_idx]
 spline = BSpline(start_ctrl, end_ctrl)
 
-sim = MjSim("configs/twoFingers.xml", view=False, verbose=0)
+sim = MjSim("configs/mujoco_/twoFingers.xml", view=False, verbose=0)
 
 def eval_spline(points: np.ndarray, sim: MjSim, vis: bool=False) -> float:
 
@@ -68,7 +68,7 @@ def eval_splines(candidates: np.ndarray, sim: MjSim) -> list[float]:
 
     results = []
     for c in candidates:
-        v = eval_spline(c.reshape(-1, 6), sim, vis=False)
+        v = eval_spline(c.reshape(-1, 6), sim, vis=True)
         results.append(v)
     
     return results
@@ -115,7 +115,7 @@ plt.tight_layout()
 plt.show()
 
 del sim
-sim = MjSim("configs/twoFingers.xml", view=True, verbose=0)
+sim = MjSim("configs/mujoco_/twoFingers.xml", view=True, verbose=0, joints_are_same_as_ctrl=True)
 sim.pushConfig(stable_configs[start_idx])
 time.sleep(3)
 sim.pushConfig(stable_configs[end_idx])

@@ -19,8 +19,8 @@ RRT:
   disable_node_max_strikes: 1
   sample_uniform_prob: 0.0
   warm_start: false
-  threading: true  # Depending on the hardware this may lead to faster computations.
-  use_gpu: false
+  threading: false  # Depending on the hardware this may lead to faster computations.
+  use_gpu: true
   start_idx: -1
   end_idx: -1
   bidirectional: false

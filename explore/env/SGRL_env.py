@@ -17,6 +17,11 @@ class StableConfigsEnv(gym.Env):
         
         super().__init__()
 
+        self.use_schedule = cfg.use_schedule
+        self.schedule_alpha_update_rate = cfg.schedule_alpha_update_rate
+        self.schedule_alpha_update_step = cfg.schedule_alpha_update_step
+        self.schedule_alpha = cfg.schedule_alpha_init
+        self.last_alpha_update = 0
         self.tau_sim = cfg.sim.tau_sim
         self.tau_action = cfg.sim.tau_action
         self.interpolate_actions = cfg.sim.interpolate_actions
@@ -52,6 +57,7 @@ class StableConfigsEnv(gym.Env):
         config_path = os.path.join(cfg.trajectory_data_path, ".hydra/config.yaml")
         trees_cfg = OmegaConf.load(config_path)
         self.q_mask = np.array(trees_cfg.RRT.q_mask)
+        self.min_cost = trees_cfg.RRT.min_cost
         self.dataset_tau_action = trees_cfg.RRT.sim.tau_action
         self.time_scaling = np.ceil(self.dataset_tau_action / self.tau_action) if cfg.time_scaling == -1 else cfg.time_scaling
 
@@ -70,7 +76,7 @@ class StableConfigsEnv(gym.Env):
             for p in paths_pre:
                 path = []
                 for sp in p:
-                    path.extend([n["state"][1] for n in sp])
+                    path.extend([n["state"] for n in sp])
                 self.paths.append(path)
             
             if not len(self.traj_pairs):
@@ -121,7 +127,7 @@ class StableConfigsEnv(gym.Env):
     def getState(self) -> np.ndarray:
         
         self.sim_state = self.sim.getState()
-        time_, qpos, qvel, ctrl = self.sim_state
+        time_, qpos, qvel, ctrl, _, _ = self.sim_state
         
         if self.use_vision:
             
@@ -165,7 +171,7 @@ class StableConfigsEnv(gym.Env):
 
         # Choose start and end configurations
         self.unknown_path = False
-        self.currently_guiding = (self.guiding and np.random.random() < self.guiding_prob) or "traj_pair" in options
+        self.currently_guiding = (self.guiding > 0 and np.random.random() < self.guiding_prob) or "traj_pair" in options
         if self.currently_guiding:
             
             if "no_exist_fine" in options and options["no_exist_fine"]:
@@ -202,14 +208,6 @@ class StableConfigsEnv(gym.Env):
         
         self.target_state = self.stable_configs["qpos"][e_cfg_idx]
         
-        # Reset simulation state
-        self.sim.pushConfig(
-            self.trees[s_cfg_idx][0]["state"][1],
-            self.trees[s_cfg_idx][0]["state"][3]
-        )
-        
-        self.iter = 0
-        
         # Load guiding trajectory
         self.guiding_path = []
         # TODO: Checkout this line, and make things nicer
@@ -223,6 +221,32 @@ class StableConfigsEnv(gym.Env):
         
         else:
             self.max_steps = self.max_steps_default
+        
+        # Reset simulation state
+        self.last_alpha_update += 1
+        if self.last_alpha_update >= self.schedule_alpha_update_rate:
+            self.last_alpha_update = 0
+            self.schedule_alpha += self.schedule_alpha_update_step
+            if self.schedule_alpha > 1.0:
+                self.schedule_alpha = 1.0
+        
+        print("Current alpha: ", self.schedule_alpha)
+
+        if "alpha" in options:
+            self.schedule_alpha = options["alpha"]
+        
+        if self.use_schedule:
+            node_idx = int(len(self.guiding_path) * (1.0 - self.schedule_alpha))
+            if node_idx == len(self.guiding_path): node_idx = len(self.guiding_path)-1
+            start_qpos = self.guiding_path[node_idx][1]
+            start_ctrl = self.guiding_path[node_idx][3]
+            self.max_steps = max(int(len(self.guiding_path[node_idx:]) * 1.5) * self.time_scaling, 20)
+        else:
+            start_qpos = self.trees[s_cfg_idx][0]["state"][1]
+            start_ctrl = self.trees[s_cfg_idx][0]["state"][3]
+
+        self.sim.pushConfig(start_qpos, start_ctrl)
+        self.iter = 0
         
         if self.verbose > 1:
             print(f"Reseting enviroment with start config {s_cfg_idx} and end config {e_cfg_idx}.")
@@ -249,35 +273,28 @@ class StableConfigsEnv(gym.Env):
 
         ### Reward Computation ###
         eval_state = self.sim_state[1]
-        node_idx = int(np.ceil(self.iter/self.time_scaling))
+            
+        e = (eval_state - self.target_state) * self.q_mask
+        cost = e.T @ e
         
-        goal_reward = 0.0
-        if node_idx >= len(self.guiding_path):
-            
-            e = (eval_state - self.target_state) * self.q_mask
-            
-            goal_reward = -1.0 * (e.T @ e)
-            goal_reward = np.max((goal_reward, -0.2))
+        if cost < self.min_cost:
+            goal_reached_reward = 1.0 
+            truncated = True
+        else:
+            goal_reached_reward = 0.0 
+            truncated = False
+
+        self.reward = goal_reached_reward
+
+        if self.iter > self.max_steps:
+            truncated = True
         
-        guiding_reward = 0.0
-        if self.currently_guiding and not self.unknown_path and node_idx < len(self.guiding_path):
-            
-            guiding_step = self.guiding_path[node_idx]
-
-            e = (eval_state - guiding_step) * self.q_mask
-            guiding_reward = -1.0 * (e.T @ e)
-            guiding_reward = np.max((guiding_reward, -0.2))
-
-        self.reward = goal_reward * 0.65 + guiding_reward * 0.35
-
-        truncated = self.iter >= self.max_steps
         terminated = truncated
         info = {
             "frames": frames,
             "states": ss,
             "ctrls": cs,
-            "goal_reward": goal_reward,
-            "guiding_reward": guiding_reward
+            "reward": self.reward
         }
 
         return self.state, self.reward, terminated, truncated, info

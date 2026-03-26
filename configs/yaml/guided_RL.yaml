@@ -1,15 +1,20 @@
 rl_method: "SAC"
 verbose: 1
-total_timesteps: 2e7
+total_timesteps: 2e6
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 net_arch: [256, 256]
 save_freq: 25e4
+scheduler_rate: 0.01
 env:
   time_scaling: 1.0
   stepsize: 0.04
   max_steps: 125
-  actions_noise_sigma: 0.001
+  use_schedule: true
+  schedule_alpha_update_rate: 100
+  schedule_alpha_update_step: 0.001
+  schedule_alpha_init: 0.1
+  actions_noise_sigma: 0.0
   use_vel: true
   guiding: true
   guiding_prob: 1.
@@ -17,6 +22,8 @@ env:
   target_config_idx: -1
   goal_conditioning: true
   use_vision: false
+  render_w: 640
+  render_h: 480
   camera_filter: "balls_mask"
   verbose: 1
   sim:

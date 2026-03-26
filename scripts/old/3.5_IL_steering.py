@@ -8,7 +8,7 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from explore.utils.logger import get_logger
 from explore.policies.flow import FlowPolicy
 from explore.datasets.dataset import ExploreDataset
-from explore.env.stable_configs_env import StableConfigsEnv
+from explore.env.SGRL_env import StableConfigsEnv
 from explore.env.flow_policy_wrapper import FlowPolicyEnvWrapper
 
 

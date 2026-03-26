@@ -1,6 +1,8 @@
 output_dir: ${hydra:runtime.output_dir}
-config_count: 10
-verbose: 1
+config_count: 1000
+sim_instances: 128
+use_gpu: true
+verbose: 3
 sim:
   tau_sim: 0.005
   tau_action: 0.25
