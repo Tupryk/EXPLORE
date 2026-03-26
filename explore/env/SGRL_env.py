@@ -238,14 +238,13 @@ class StableConfigsEnv(gym.Env):
         if self.use_schedule:
             node_idx = int(len(self.guiding_path) * (1.0 - self.schedule_alpha))
             if node_idx == len(self.guiding_path): node_idx = len(self.guiding_path)-1
-            start_qpos = self.guiding_path[node_idx][1]
-            start_ctrl = self.guiding_path[node_idx][3]
             self.max_steps = max(int(len(self.guiding_path[node_idx:]) * 1.5) * self.time_scaling, 20)
+            self.sim.setState(*self.guiding_path[node_idx])
         else:
             start_qpos = self.trees[s_cfg_idx][0]["state"][1]
             start_ctrl = self.trees[s_cfg_idx][0]["state"][3]
-
-        self.sim.pushConfig(start_qpos, start_ctrl)
+            self.sim.pushConfig(start_qpos, start_ctrl)
+            
         self.iter = 0
         
         if self.verbose > 1:
