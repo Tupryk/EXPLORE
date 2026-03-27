@@ -229,7 +229,7 @@ def get_diverse_paths(
         tree_end_nodes = [[] for _ in range(tree_count)]
         
         for n, node in enumerate(trees[i]):
-            for j in range(100):
+            for j in range(tree_count):
                 node_cost = cost_computation(trees[j][0], node, q_mask, scene_quats)
                 if i != j and node_cost < error_thresh:
                     tree_path_count[j] += 1
