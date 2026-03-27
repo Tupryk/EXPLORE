@@ -68,6 +68,23 @@ def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=Fal
 
     return cost
 
+def cost_computation_on_states(state1: np.ndarray, state2: np.ndarray, q_mask, cost_max_method: bool=False, scene_quat_indices: list=[]) -> float:
+    
+    e = (state1 - state2)
+    
+    for i in scene_quat_indices:
+        i0 = i + 4
+        e[i:i0] = state1[i:i0] - signum(state1[i:i0], state2[i:i0]) * state2[i:i0]
+
+    e *= q_mask
+
+    if cost_max_method:
+        cost = np.abs(e).max()
+    else:
+        cost = e.T @ e
+
+    return cost
+
 def load_trees(tree_dataset: str, cutoff: int=-1, verbose: int=0
                ) -> tuple[list[list[dict]], int, int]:
     tree_count = len([n for n in os.listdir(tree_dataset) if ".pkl" in n])

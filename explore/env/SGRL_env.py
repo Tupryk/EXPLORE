@@ -7,8 +7,9 @@ from gymnasium import spaces
 from omegaconf import DictConfig, OmegaConf
 
 from explore.env.mujoco_sim import MjSim
-from explore.datasets.utils import load_trees
+from explore.utils.mj import get_model_quaternions
 from explore.utils.utils import randint_excluding, extract_balls_mask
+from explore.datasets.utils import load_trees, cost_computation_on_states
 
 
 class StableConfigsEnv(gym.Env):
@@ -88,6 +89,7 @@ class StableConfigsEnv(gym.Env):
         self.sim = MjSim(self.mujoco_xml, self.tau_sim,
                          interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl)
         self.sim.setupRenderer(cfg.render_w, cfg.render_h, camera=cfg.sim.camera)
+        self.model_quats = get_model_quaternions(self.sim.model)
         
         # Defines observation space
         state = self.sim.getState()
@@ -272,9 +274,8 @@ class StableConfigsEnv(gym.Env):
 
         ### Reward Computation ###
         eval_state = self.sim_state[1]
-            
-        e = (eval_state - self.target_state) * self.q_mask
-        cost = e.T @ e
+        
+        cost = cost_computation_on_states(eval_state, self.target_state, self.q_mask, scene_quat_indices=self.model_quats)
         
         if cost < self.min_cost:
             goal_reached_reward = 1.0 
