@@ -10,7 +10,7 @@ from explore.utils.logger import get_logger
 from explore.env.SGRL_env import StableConfigsEnv
 
 
-@hydra.main(version_base="1.3", config_path="../configs/yaml", config_name="eval_policy")
+@hydra.main(version_base="1.3", config_path="../configs/yaml", config_name="eval_RL_policy")
 def main(cfg: DictConfig):
     logger = get_logger(cfg)
     logger.info("Starting evaluation...")
@@ -51,15 +51,16 @@ def main(cfg: DictConfig):
             frames = info["frames"]
             imgs.extend(frames)
             done = terminated or truncated
-            print(f"Iter: {env.iter}; Reward: {env.reward:.4f} (Goal Reward: {info['goal_reward']:.4f} Guiding Reward: {info['guiding_reward']:.4f})")
+            print(f"Iter: {env.iter}; Reward: {env.reward:.4f} (Reward: {info['reward']:.4f})")
 
         # Save results
-        result_path = os.path.join(cfg.output_dir, f"result{i}.gif")
-        imageio.mimsave(result_path, imgs, fps=24, loop=0)
-
         im_start = env.render(cfg.eval_view, config_idx=init_info["start_config_idx"])
         im_end = env.render(cfg.eval_view, config_idx=init_info["end_config_idx"])
         im_reached = env.render(cfg.eval_view)
+
+        imgs = [(im.astype(float)*0.8 + im_end.astype(float)*0.2).astype(im.dtype) for im in imgs]
+        result_path = os.path.join(cfg.output_dir, f"result{i}.gif")
+        imageio.mimsave(result_path, imgs, fps=24, loop=0)
 
         fig, axes = plt.subplots(1, 3, figsize=(30, 20))
         axes[0].set_title("Start Config", fontsize=24, fontweight="bold")

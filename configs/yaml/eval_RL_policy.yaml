@@ -1,5 +1,5 @@
-policy_dir: "data/policies/sac_more_paths_timewarp_less_noise"
-checkpoint: "checkpoints/SAC_2500000_steps"
+policy_dir: "outputs/2026-03-26/17-49-32"
+checkpoint: "checkpoints/SAC_2000000_steps"
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 start_idx: -1
