@@ -194,7 +194,7 @@ def get_diverse_paths(
     cached_folder: str="",
     start_idx: int=-1,
     end_idx: int=-1,
-    min_len: int=1
+    scene_quats: list=[]
     ) -> tuple[list[list[dict]], list[tuple[int, int]]]:
     
     # TODO: There is probably a more efficient way to do this
@@ -214,6 +214,8 @@ def get_diverse_paths(
                     final_paths_start_end_indices.append(b)
             
             print(f"Loaded {len(final_paths)} cached trajectories from {traj_path}.")
+            path_lens = [len(p) for p in final_paths]
+            print("Avg. path length: ", sum(path_lens)/len(path_lens))
             return final_paths, final_paths_start_end_indices
     
     # Collect nodes that arrive at a stable configuration
@@ -227,8 +229,8 @@ def get_diverse_paths(
         tree_end_nodes = [[] for _ in range(tree_count)]
         
         for n, node in enumerate(trees[i]):
-            for j in range(tree_count):
-                node_cost = cost_computation(trees[j][0], node, q_mask)
+            for j in range(100):
+                node_cost = cost_computation(trees[j][0], node, q_mask, scene_quats)
                 if i != j and node_cost < error_thresh:
                     tree_path_count[j] += 1
                     tree_end_nodes[j].append(n)
@@ -277,8 +279,7 @@ def get_diverse_paths(
                             na = -1 if n >= len(path_a) else n
                             nb = -1 if n >= len(path_b) else n
                             
-                            e = (path_a[na][1] - path_b[nb][1]) * q_mask
-                            path_diffs[i][j] += np.sqrt(e.T @ e)
+                            path_diffs[i][j] += cost_computation_on_states(path_a[na][1] - path_b[nb][1], q_mask, scene_quats)
                         
                         path_diffs[i][j] /= longest_route
         
@@ -329,7 +330,7 @@ def get_diverse_paths(
             if si != ei and len(trees_paths_idxs[si][ei]):
                 for path_idx in trees_paths_idxs[si][ei]:
                     path = full_paths[si][ei][path_idx]
-                    if len(path) >= min_len:
+                    if len(path) >= min_path_len:
                         final_paths.append(path)
                         final_paths_start_end_indices.append((si, ei))
 
@@ -355,6 +356,8 @@ def get_diverse_paths(
     
     print(f"Total config pairs found: {found_pairs_count} of {max_config_pairs}")
     print(f"Total paths found: {final_paths_count}")
+    path_lens = [len(p) for p in final_paths]
+    print("Avg. path length: ", sum(path_lens)/len(path_lens))
     return final_paths, final_paths_start_end_indices
 
 

@@ -9,7 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 from explore.env.mujoco_sim import MjSim
 from explore.utils.mj import get_model_quaternions
 from explore.utils.utils import randint_excluding, extract_balls_mask
-from explore.datasets.utils import load_trees, cost_computation_on_states
+from explore.datasets.utils import load_trees, cost_computation_on_states, get_diverse_paths
 
 
 class StableConfigsEnv(gym.Env):
@@ -51,7 +51,7 @@ class StableConfigsEnv(gym.Env):
         #     raise Exception("Using goal conditioning but only a single goal!")
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
-        self.config_count = self.stable_configs["qpos"].shape[0]
+        self.config_count = self.stable_configs["q"].shape[0]
         
         self.verbose = cfg.verbose
 
@@ -64,32 +64,30 @@ class StableConfigsEnv(gym.Env):
 
         tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
         self.trees, _, _ = load_trees(tree_dataset)
+
+        self.sim = MjSim(self.mujoco_xml, self.tau_sim,
+            interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl)
+        self.sim.setupRenderer(cfg.render_w, cfg.render_h, camera=cfg.sim.camera)
+        self.model_quats = get_model_quaternions(self.sim.model)
             
         self.guiding_path = []
         if self.guiding:
 
-            # TODO: Maybe use ExploreDataset class here instead?
-            path_dataset_dir = os.path.join(cfg.trajectory_data_path, "processed/paths_data.pkl")
-            with open(path_dataset_dir, "rb") as f:
-                self.traj_pairs, paths_pre = pickle.load(f)
-
-            self.paths = []
-            for p in paths_pre:
-                path = []
-                for sp in p:
-                    path.extend([n["state"] for n in sp])
-                self.paths.append(path)
+            self.paths, self.traj_pairs = get_diverse_paths(
+                self.trees,
+                self.min_cost,
+                self.q_mask,
+                trees_cfg.RRT.path_diff_thresh,
+                cached_folder=cfg.trajectory_data_path,
+                scene_quats=self.model_quats
+            )
+            input("Sample trajectories loaded. Press enter to continue.")
             
             if not len(self.traj_pairs):
                 raise Exception(f"Not feasible trajectories in dataset '{cfg.trajectory_data_path}'!")
             
             if self.verbose > 0:
                 print(f"Starting enviroment with guiding on {len(self.traj_pairs)} trajectories with average length {sum(len(p) for p in self.paths)/len(self.traj_pairs)}.")
-            
-        self.sim = MjSim(self.mujoco_xml, self.tau_sim,
-                         interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl)
-        self.sim.setupRenderer(cfg.render_w, cfg.render_h, camera=cfg.sim.camera)
-        self.model_quats = get_model_quaternions(self.sim.model)
         
         # Defines observation space
         state = self.sim.getState()
@@ -208,7 +206,7 @@ class StableConfigsEnv(gym.Env):
             
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
         
-        self.target_state = self.stable_configs["qpos"][e_cfg_idx]
+        self.target_state = self.stable_configs["q"][e_cfg_idx]
         
         # Load guiding trajectory
         self.guiding_path = []
