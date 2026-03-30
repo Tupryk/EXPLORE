@@ -51,7 +51,7 @@ class StableConfigsEnv(gym.Env):
         #     raise Exception("Using goal conditioning but only a single goal!")
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
-        self.config_count = self.stable_configs["q"].shape[0]
+        self.config_count = self.stable_configs["qpos"].shape[0]
         
         self.verbose = cfg.verbose
 
@@ -69,7 +69,7 @@ class StableConfigsEnv(gym.Env):
             interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl)
         self.sim.setupRenderer(cfg.render_w, cfg.render_h, camera=cfg.sim.camera)
         self.model_quats = get_model_quaternions(self.sim.model)
-            
+        
         self.guiding_path = []
         if self.guiding:
 
@@ -167,6 +167,8 @@ class StableConfigsEnv(gym.Env):
         super().reset(seed=seed)
         np.random.seed(seed)
 
+        # TODO: make this function nicer
+
         self.eval_view = "" if not "eval_view" in options else options["eval_view"]
 
         # Choose start and end configurations
@@ -206,7 +208,7 @@ class StableConfigsEnv(gym.Env):
             
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
         
-        self.target_state = self.stable_configs["q"][e_cfg_idx]
+        self.target_state = self.stable_configs["qpos"][e_cfg_idx]
         
         # Load guiding trajectory
         self.guiding_path = []
@@ -229,11 +231,12 @@ class StableConfigsEnv(gym.Env):
             self.schedule_alpha += self.schedule_alpha_update_step
             if self.schedule_alpha > 1.0:
                 self.schedule_alpha = 1.0
-        
-        print("Current alpha: ", self.schedule_alpha)
 
         if "alpha" in options:
             self.schedule_alpha = options["alpha"]
+            self.last_alpha_update = 0
+
+        print("Current alpha: ", self.schedule_alpha)
         
         if self.use_schedule:
             node_idx = int(len(self.guiding_path) * (1.0 - self.schedule_alpha))

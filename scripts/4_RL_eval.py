@@ -2,7 +2,7 @@ import os
 import hydra
 import imageio
 import matplotlib.pyplot as plt
-from stable_baselines3 import PPO, SAC
+from stable_baselines3 import PPO, SAC, TD3
 from omegaconf import DictConfig, OmegaConf
 
 from explore.utils.vis import play_path
@@ -28,16 +28,20 @@ def main(cfg: DictConfig):
 
     elif train_cfg.rl_method == "SAC":
         model = SAC.load(model_path, env=env, device=cfg.device)
+
+    elif train_cfg.rl_method == "TD3":
+        model = TD3.load(model_path, env=env, device=cfg.device)
     
     else:
         raise Exception(f"RL method '{train_cfg.rl_method}' not available.")
 
+    alpha = 0.4
     for i in range(cfg.eval_count):
         
         if cfg.start_idx != -1 and cfg.end_idx != -1:
-            options = {"traj_pair": (cfg.start_idx, cfg.end_idx), "eval_view": cfg.eval_view, "no_exist_fine": True, "alpha": 1.0}
+            options = {"traj_pair": (cfg.start_idx, cfg.end_idx), "eval_view": cfg.eval_view, "no_exist_fine": True, "alpha": alpha}
         else:
-            options = {"eval_view": cfg.eval_view, "alpha": 1.0}
+            options = {"eval_view": cfg.eval_view, "alpha": alpha}
 
         obs, init_info = env.reset(options=options)
         logger.info(init_info)

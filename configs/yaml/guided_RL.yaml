@@ -1,4 +1,4 @@
-rl_method: "SAC"
+rl_method: "TD3"
 verbose: 1
 total_timesteps: 2e6
 output_dir: ${hydra:runtime.output_dir}
@@ -6,6 +6,7 @@ device: "cpu"
 net_arch: [256, 256]
 save_freq: 25e4
 scheduler_rate: 0.01
+batch_size: 2048
 env:
   time_scaling: 1.0
   stepsize: 0.04
@@ -13,7 +14,7 @@ env:
   use_schedule: true
   schedule_alpha_update_rate: 100
   schedule_alpha_update_step: 0.001
-  schedule_alpha_init: 0.1
+  schedule_alpha_init: 0.01
   actions_noise_sigma: 0.0
   use_vel: true
   guiding: true
@@ -32,7 +33,7 @@ env:
     interpolate_actions: true
     joints_are_same_as_ctrl: true
     use_spline_ref: false
-    mujoco_xml: configs/mujoco_/twoFingersCube.xml
+    mujoco_xml: configs/mujoco_/fingerRamp.xml
     camera: fixed_cam
-  trajectory_data_path: "data/SpheresBoxMaxConfigs/2"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
-  stable_configs_path: "configs/stable/twoFingersCube.h5"
+  trajectory_data_path: "data/finger_ramp_baseline"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
+  stable_configs_path: configs/stable/fingerRamp_onRamp.h5

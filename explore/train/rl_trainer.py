@@ -1,7 +1,7 @@
 import os
 import logging
 from omegaconf import DictConfig
-from stable_baselines3 import PPO, SAC
+from stable_baselines3 import PPO, SAC, TD3
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import CheckpointCallback
 
@@ -36,7 +36,13 @@ class RL_Trainer:
 
         if self.rl_method == "PPO":
             policy_kwargs = dict(net_arch=cfg.net_arch)
-            self.model = PPO(policy, self.env, policy_kwargs=policy_kwargs, verbose=cfg.verbose, device=self.device)
+            self.model = PPO(
+                policy,
+                self.env,
+                policy_kwargs=policy_kwargs,
+                verbose=cfg.verbose,
+                device=self.device
+            )
 
         elif self.rl_method == "SAC":
             policy_kwargs = dict(
@@ -45,11 +51,34 @@ class RL_Trainer:
                     qf=cfg.net_arch
                 )
             )
-            self.model = SAC(policy, self.env, policy_kwargs=policy_kwargs, verbose=cfg.verbose, device=self.device)
-        
+            self.model = SAC(
+                policy,
+                self.env,
+                policy_kwargs=policy_kwargs,
+                verbose=cfg.verbose,
+                device=self.device,
+                batch_size=cfg.batch_size
+            )
+
+        elif self.rl_method == "TD3":
+            policy_kwargs = dict(
+                net_arch=dict(
+                    pi=cfg.net_arch,
+                    qf=cfg.net_arch
+                )
+            )
+            self.model = TD3(
+                policy,
+                self.env,
+                policy_kwargs=policy_kwargs,
+                verbose=cfg.verbose,
+                device=self.device,
+                batch_size=cfg.batch_size
+            )
+
         else:
             raise Exception(f"RL method '{self.rl_method}' not available.")
-        
+                
         self.model.set_logger(sb3_logger)
     
     def train(self):
