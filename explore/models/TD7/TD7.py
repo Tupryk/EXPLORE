@@ -16,9 +16,7 @@ class TD7:
         max_action = float(np.max(env.action_space.high))
         self.agent = TD7_Agent(state_dim, action_dim, max_action, offline=False, hp=cfg)
 
-        self.num_envs = self.env.num_scenes
-        if self.num_envs>1:
-            assert self.num_envs==env.observation_space.shape[0]
+        self.num_envs = 1
 
         self.clone_buffer = None
         self.start_time = time.time()
@@ -39,6 +37,8 @@ class TD7:
     def learn(self, total_timesteps, reset_num_timesteps=None, log_interval=None, tb_log_name=None):
         
         t_stop = self.t+total_timesteps
+        terminated = False
+        state, info = self.env.reset()
         while self.t < t_stop:
             allow_train = self.agent.replay_buffer.size >= self.agent.hp.timesteps_before_training
 
@@ -46,13 +46,14 @@ class TD7:
             self.report_callback(self.env)
 
             # -- multiple threads: auto_reset
-            state, info = self.env.auto_reset()
+            if terminated:
+                state, info = self.env.reset()
 
             # -- select action
             if allow_train:
                 action = self.agent.select_action(np.atleast_2d(state))
             else:
-                action = self.env.action_space.sample().reshape(state.shape[0], -1)
+                action = self.env.action_space.sample().reshape(1, -1)
 
             # -- single step
             next_state, reward, terminated, truncated, info = self.env.step(action)
@@ -79,19 +80,17 @@ class TD7:
             self.ep_steps += 1.0
 
             # -- if truncated, evaluate Q function
-            for e in range(self.num_envs):
-                if truncated[e]:
-                    self.ep_Q[e] += self.agent.evaluate_critic(np.atleast_2d(state[e])).item()
+            if truncated:
+                self.ep_Q[0] += self.agent.evaluate_critic(np.atleast_2d(state)).item()
 
             # -- write data
-            for e in range(self.num_envs):
-                if ep_finished[e]:
-                    self.writer.add("reward_sum_ep", self.ep_reward[e])
-                    self.writer.add("steps_ep", self.ep_steps[e])
-                    self.writer.add("reward_Q_ep", self.ep_reward[e]+self.ep_Q[e])
-                    self.ep_reward[e] = 0.0
-                    self.ep_steps[e] = 0.0
-                    self.ep_Q[e] = 0.0
+            if ep_finished:
+                self.writer.add("reward_sum_ep", self.ep_reward[0])
+                self.writer.add("steps_ep", self.ep_steps[0])
+                self.writer.add("reward_Q_ep", self.ep_reward[0]+self.ep_Q[0])
+                self.ep_reward[0] = 0.0
+                self.ep_steps[0] = 0.0
+                self.ep_Q[0] = 0.0
 
             # -- increment step
             self.t += self.agent.hp.training_steps
@@ -120,6 +119,7 @@ class TD7:
                 self.act_hist = np.zeros((20))
                 self.obs_hist = np.zeros((20))
                 self.hist_count = 0.
+                print("Current alpha: ", self.env.schedule_alpha)
 
             if self.writer is not None:
 

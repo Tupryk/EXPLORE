@@ -81,7 +81,8 @@ class StableConfigsEnv(gym.Env):
                 cached_folder=cfg.trajectory_data_path,
                 scene_quats=self.model_quats
             )
-            input("Sample trajectories loaded. Press enter to continue.")
+            if self.verbose > 2:
+                input("Sample trajectories loaded. Press enter to continue.")
             
             if not len(self.traj_pairs):
                 raise Exception(f"Not feasible trajectories in dataset '{cfg.trajectory_data_path}'!")
@@ -236,7 +237,8 @@ class StableConfigsEnv(gym.Env):
             self.schedule_alpha = options["alpha"]
             self.last_alpha_update = 0
 
-        print("Current alpha: ", self.schedule_alpha)
+        if self.verbose > 1:
+            print("Current alpha: ", self.schedule_alpha)
         
         if self.use_schedule:
             node_idx = int(len(self.guiding_path) * (1.0 - self.schedule_alpha))

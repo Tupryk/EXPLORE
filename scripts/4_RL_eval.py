@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from stable_baselines3 import PPO, SAC, TD3
 from omegaconf import DictConfig, OmegaConf
 
+from explore.models.TD7.TD7 import TD7
 from explore.utils.vis import play_path
 from explore.utils.logger import get_logger
 from explore.env.SGRL_env import StableConfigsEnv
@@ -31,7 +32,11 @@ def main(cfg: DictConfig):
 
     elif train_cfg.rl_method == "TD3":
         model = TD3.load(model_path, env=env, device=cfg.device)
-    
+
+    elif train_cfg.rl_method == "TD7":
+        model = TD7(env, train_cfg.TD7)
+        model.agent.load("data/tmp/TD7_nil.torch")
+
     else:
         raise Exception(f"RL method '{train_cfg.rl_method}' not available.")
 
@@ -50,7 +55,11 @@ def main(cfg: DictConfig):
         done = False
 
         while not done:
-            action, _ = model.predict(obs, deterministic=True)
+            if train_cfg.rl_method != "TD7":
+                action, _ = model.predict(obs, deterministic=True)
+            else:
+                action = model.agent.select_action(obs.reshape(1, -1), False, use_exploration=False)
+
             obs, reward, terminated, truncated, info = env.step(action)
             frames = info["frames"]
             imgs.extend(frames)

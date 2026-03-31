@@ -5,6 +5,7 @@ from stable_baselines3 import PPO, SAC, TD3
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import CheckpointCallback
 
+from explore.models.TD7.TD7 import TD7
 from explore.env.SGRL_env import StableConfigsEnv
 
 
@@ -76,10 +77,17 @@ class RL_Trainer:
                 batch_size=cfg.batch_size
             )
 
+        elif self.rl_method == "TD7":
+            self.model = TD7(
+                self.env,
+                cfg.TD7
+            )
+
         else:
             raise Exception(f"RL method '{self.rl_method}' not available.")
-                
-        self.model.set_logger(sb3_logger)
+        
+        if self.rl_method != "TD7":
+            self.model.set_logger(sb3_logger)
     
     def train(self):
         self.logger.info("Starting training...")
@@ -90,10 +98,15 @@ class RL_Trainer:
             name_prefix=self.rl_method
         )
         
-        self.model.learn(
-            total_timesteps=self.total_timesteps,
-            callback=checkpoint_callback
-        )
+        if self.rl_method != "TD7":
+            self.model.learn(
+                total_timesteps=self.total_timesteps,
+                callback=checkpoint_callback
+            )
+        else:
+            self.model.learn(
+                total_timesteps=self.total_timesteps,
+            )
 
         self.model.save(self.save_as)
         self.logger.info(f"Model saved as {self.save_as}")
