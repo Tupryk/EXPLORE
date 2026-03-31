@@ -39,8 +39,9 @@ def main(cfg: DictConfig):
 
     else:
         raise Exception(f"RL method '{train_cfg.rl_method}' not available.")
+    
+    alpha = cfg.alpha
 
-    alpha = 0.4
     for i in range(cfg.eval_count):
         
         if cfg.start_idx != -1 and cfg.end_idx != -1:
