@@ -108,5 +108,8 @@ class RL_Trainer:
                 total_timesteps=self.total_timesteps,
             )
 
-        self.model.save(self.save_as)
+        if self.rl_method != "TD7":
+            self.model.save(self.save_as)
+        else:
+            self.model.agent.save(filename=self.save_as)
         self.logger.info(f"Model saved as {self.save_as}")

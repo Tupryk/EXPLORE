@@ -226,13 +226,6 @@ class StableConfigsEnv(gym.Env):
             self.max_steps = self.max_steps_default
         
         # Reset simulation state
-        self.last_alpha_update += 1
-        if self.last_alpha_update >= self.schedule_alpha_update_rate:
-            self.last_alpha_update = 0
-            self.schedule_alpha += self.schedule_alpha_update_step
-            if self.schedule_alpha > 1.0:
-                self.schedule_alpha = 1.0
-
         if "alpha" in options:
             self.schedule_alpha = options["alpha"]
             self.last_alpha_update = 0
@@ -241,8 +234,8 @@ class StableConfigsEnv(gym.Env):
             print("Current alpha: ", self.schedule_alpha)
         
         if self.use_schedule:
-            node_idx = int(len(self.guiding_path) * (1.0 - self.schedule_alpha))
-            if node_idx == len(self.guiding_path): node_idx = len(self.guiding_path)-1
+            node_idx = int((len(self.guiding_path)-1) * (1.0 - self.schedule_alpha))
+            if node_idx >= len(self.guiding_path)-1: node_idx = len(self.guiding_path)-2
             self.max_steps = max(int(len(self.guiding_path[node_idx:]) * 1.5) * self.time_scaling, 20)
             self.sim.setState(*self.guiding_path[node_idx])
         else:
@@ -299,6 +292,13 @@ class StableConfigsEnv(gym.Env):
             "ctrls": cs,
             "reward": self.reward
         }
+
+        self.last_alpha_update += 1
+        if self.last_alpha_update >= self.schedule_alpha_update_rate:
+            self.last_alpha_update = 0
+            self.schedule_alpha += self.schedule_alpha_update_step
+            if self.schedule_alpha > 1.0:
+                self.schedule_alpha = 1.0
 
         return self.state, self.reward, terminated, truncated, info
 

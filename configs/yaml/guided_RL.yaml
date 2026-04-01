@@ -60,8 +60,8 @@ env:
   max_steps: 125
   use_schedule: true
   schedule_alpha_update_rate: 100
-  schedule_alpha_update_step: 0.0015
-  schedule_alpha_init: 0.01
+  schedule_alpha_update_step: 0.0001
+  schedule_alpha_init: 0.001
   actions_noise_sigma: 0.0
   use_vel: true
   guiding: true
@@ -74,23 +74,33 @@ env:
   render_h: 480
   camera_filter: "balls_mask"
   verbose: 1
-  sim:
-    tau_sim: 0.005
-    tau_action: 0.1
-    interpolate_actions: true
-    joints_are_same_as_ctrl: true
-    use_spline_ref: false
-    mujoco_xml: configs/mujoco_/fingerRamp.xml
-    camera: fixed_cam
-  trajectory_data_path: "data/finger_ramp_baseline"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
-  stable_configs_path: configs/stable/fingerRamp_onRamp.h5
   # sim:
   #   tau_sim: 0.005
   #   tau_action: 0.1
   #   interpolate_actions: true
-  #   joints_are_same_as_ctrl: false
+  #   joints_are_same_as_ctrl: true
   #   use_spline_ref: false
-  #   mujoco_xml: configs/mujoco_/franka_emika_panda/pandas_table.xml
+  #   mujoco_xml: configs/mujoco_/fingerRamp.xml
   #   camera: fixed_cam
-  # trajectory_data_path: "data/pandasBox_halffull"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
-  # stable_configs_path: "configs/stable/pandasTableConfigs.h5"
+  # trajectory_data_path: "data/finger_ramp_baseline"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
+  # stable_configs_path: configs/stable/fingerRamp_onRamp.h5
+  # sim:
+  #   tau_sim: 0.005
+  #   tau_action: 0.1
+  #   interpolate_actions: true
+  #   joints_are_same_as_ctrl: true
+  #   use_spline_ref: false
+  #   mujoco_xml: configs/mujoco_/twoFingersCube.xml
+  #   camera: fixed_cam
+  # trajectory_data_path: "data/SpheresBoxMaxConfigs/2"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
+  # stable_configs_path: configs/stable/twoFingersCube.h5
+  sim:
+    tau_sim: 0.005
+    tau_action: 0.1
+    interpolate_actions: true
+    joints_are_same_as_ctrl: false
+    use_spline_ref: false
+    mujoco_xml: configs/mujoco_/franka_emika_panda/pandas_table.xml
+    camera: fixed_cam
+  trajectory_data_path: "data/pandasTable_halffull"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
+  stable_configs_path: "configs/stable/pandasTableConfigs.h5"
