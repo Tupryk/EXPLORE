@@ -1,10 +1,9 @@
 import os
 import h5py
-import pickle
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, OmegaConf, ListConfig
 
 from explore.env.mujoco_sim import MjSim
 from explore.utils.mj import get_model_quaternions
@@ -19,10 +18,8 @@ class StableConfigsEnv(gym.Env):
         super().__init__()
 
         self.use_schedule = cfg.use_schedule
-        self.schedule_alpha_update_rate = cfg.schedule_alpha_update_rate
-        self.schedule_alpha_update_step = cfg.schedule_alpha_update_step
-        self.schedule_alpha = cfg.schedule_alpha_init
-        self.last_alpha_update = 0
+        self.schedule_alpha_step = 1. / cfg.schedule_alpha_end_step
+        self.schedule_alpha = 0.
         self.tau_sim = cfg.sim.tau_sim
         self.tau_action = cfg.sim.tau_action
         self.interpolate_actions = cfg.sim.interpolate_actions
@@ -30,6 +27,8 @@ class StableConfigsEnv(gym.Env):
         self.mujoco_xml = cfg.sim.mujoco_xml
         
         self.stepsize = cfg.stepsize
+        if isinstance(self.stepsize, ListConfig):
+            self.stepsize = np.array(self.stepsize, dtype=np.float32)
         self.max_steps_default = cfg.max_steps  # Gets overwriten if use_guiding = True
         
         self.actions_noise_sigma = cfg.actions_noise_sigma
@@ -112,7 +111,7 @@ class StableConfigsEnv(gym.Env):
             self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_n,), dtype=np.float32)
         
         # Defines action space
-        if self.stepsize != -1:
+        if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
             min_ctrl = -1.0 * self.stepsize
             max_ctrl = self.stepsize
         else:
@@ -228,7 +227,6 @@ class StableConfigsEnv(gym.Env):
         # Reset simulation state
         if "alpha" in options:
             self.schedule_alpha = options["alpha"]
-            self.last_alpha_update = 0
 
         if self.verbose > 1:
             print("Current alpha: ", self.schedule_alpha)
@@ -256,8 +254,9 @@ class StableConfigsEnv(gym.Env):
         if self.actions_noise_sigma != -1:
             action += np.random.randn(action.shape[-1]) * self.actions_noise_sigma
         
-        if self.stepsize != -1:
+        if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
             action += self.last_ctrl
+            self.last_ctrl = action
         
         frames, ss, cs = self.sim.step(
             self.tau_action,
@@ -293,12 +292,9 @@ class StableConfigsEnv(gym.Env):
             "reward": self.reward
         }
 
-        self.last_alpha_update += 1
-        if self.last_alpha_update >= self.schedule_alpha_update_rate:
-            self.last_alpha_update = 0
-            self.schedule_alpha += self.schedule_alpha_update_step
-            if self.schedule_alpha > 1.0:
-                self.schedule_alpha = 1.0
+        self.schedule_alpha += self.schedule_alpha_step
+        if self.schedule_alpha > 1.0:
+            self.schedule_alpha = 1.0
 
         return self.state, self.reward, terminated, truncated, info
 

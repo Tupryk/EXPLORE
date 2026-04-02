@@ -206,7 +206,8 @@ def get_diverse_paths(
             final_paths = []
             final_paths_start_end_indices = []
             ns = sorted(os.listdir(traj_path))
-            for n in ns:
+            print("Loading trajectories...")
+            for n in tqdm(ns):
                 cached_file_path = os.path.join(traj_path, n)
                 with open(cached_file_path, "rb") as f:
                     a, b = pickle.load(f)
