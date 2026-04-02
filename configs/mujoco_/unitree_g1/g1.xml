@@ -63,7 +63,7 @@
 
   <worldbody>
     <light pos="1 0 3.5" dir="0 0 -1" directional="true"/>
-    <body name="pelvis" pos="0 0 0.793" childclass="g1">
+    <body name="pelvis" pos="0 0 0.79" childclass="g1">
       <freejoint name="floating_base_joint"/>
       <inertial pos="0 0 -0.07605" quat="1 0 -0.000399148 0" mass="3.813" diaginertia="0.010549 0.0093089 0.0079184"/>
       <!-- <freejoint name="floating_base_joint"/> -->
@@ -230,7 +230,8 @@
                             actuatorfrcrange="-5 5"/>
                           <geom class="visual" mesh="left_wrist_yaw_link"/>
                           <geom class="collision" mesh="left_wrist_yaw_link"/>
-                          <geom pos="0.0415 0.003 0" quat="1 0 0 0" class="visual" mesh="left_rubber_hand"/>
+                          <!-- <geom pos="0.0415 0.003 0" quat="1 0 0 0" class="visual" mesh="left_rubber_hand"/> -->
+                          <geom pos="0.0415 0.003 0" quat="1 0 0 0" class="visual" type="sphere" size=".04" rgba=".25 .25 .25 1"/>
                         </body>
                       </body>
                     </body>
@@ -286,7 +287,8 @@
                             actuatorfrcrange="-5 5"/>
                           <geom class="visual" mesh="right_wrist_yaw_link"/>
                           <geom class="collision" mesh="right_wrist_yaw_link"/>
-                          <geom pos="0.0415 -0.003 0" quat="1 0 0 0" class="visual" mesh="right_rubber_hand"/>
+                          <!-- <geom pos="0.0415 -0.003 0" quat="1 0 0 0" class="visual" mesh="right_rubber_hand"/> -->
+                          <geom pos="0.0415 -0.003 0" quat="1 0 0 0" class="visual" type="sphere" size=".04" rgba=".25 .25 .25 1"/>
                         </body>
                       </body>
                     </body>

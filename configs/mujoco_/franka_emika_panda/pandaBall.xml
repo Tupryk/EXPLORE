@@ -1,0 +1,42 @@
+<mujoco model="panda scene">
+  <statistic center="0.3 0 0.4" extent="1"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+      markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    <model name="panda_model" file="panda.xml"/>
+  </asset>
+
+  <worldbody>
+    <camera name="fixed_cam" pos="-0.783 1.886 1.319" xyaxes="-0.913 -0.408 0.000 0.196 -0.438 0.877"/>
+
+    <body name="l_panda_base" pos="-0.34 0.4 0.15" >
+      <attach model="panda_model" body="link0" prefix="l_"/>
+    </body>
+    
+    <body name="table" pos="0.0 0.0 0.1">
+      <geom type="box" size="0.5 0.5 0.05" rgba="0.6 0.6 0.6 1.0" friction=".8 0.1 0.1" />
+      <body name="wall" pos="0.45 0.0 0.3">
+        <geom type="box" size="0.05 0.5 0.25" rgba="0.6 0.6 0.6 1.0" friction=".8 0.1 0.1" />
+      </body>
+      <body name="box" pos="-0.05 -0.35 0.25">
+        <geom type="box" size="0.45 0.15 0.2" rgba="0.6 0.6 0.6 1.0" friction=".8 0.1 0.1" />
+      </body>
+    </body>
+    <body name="obj_base" />
+    <body name="obj" pos="0.0 0.0 0.3">
+      <freejoint />
+      <geom type="sphere" size="0.1" rgba="1.0 0.5 0.0 1" mass="0.2" friction=".8 0.1 0.1" />
+    </body>
+    <body name="camera_init" pos="-0.285441 1.5997 0.7643" quat="0.05155251630358149 -0.06594522085530172 0.7850692482796453 -0.6137261940920781" />
+    <camera name="cam0" pos="-0.992 1.956 1.209" xyaxes="-0.886 -0.463 -0.000 0.167 -0.320 0.933"/>
+  </worldbody>
+</mujoco>

@@ -6,14 +6,17 @@ import matplotlib.pyplot as plt
 from explore.env.mujoco_sim import MjSim
 
 
+h5_file = "configs/stable/humanoid_box_grasps.h5"
+mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
+
 # h5_file = "configs/stable/pandasTableConfigs.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
 
 # h5_file = "configs/stable/pandaHook_balanced.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/panda_single.xml"
 
-h5_file = "experiments/stable_configs_copy.h5"
-mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
+# h5_file = "experiments/stable_configs_copy.h5"
+# mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
 
 # h5_file = "configs/stable/g1.h5"
 # mujoco_xml = "configs/mujoco_/unitree_g1/g1_single.xml"
@@ -60,6 +63,7 @@ for i, sc in enumerate(stable_configs):
     q = stable_configs_ctrl[i].copy()
     # q[7] = 0
     # q[15] = 0
+    print(sc)
     sim.pushConfig(sc, q)
     input()
     # time.sleep(10.)
