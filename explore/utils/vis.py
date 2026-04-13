@@ -33,13 +33,13 @@ def AdjMap(costs: np.ndarray, min_value: float=0.0, max_value: float=0.1, save_a
 def play_path(path: list[dict], sim: MjSim,
               start_state: np.ndarray, target_state: np.ndarray,
               playback_time: float=1., tau_action: float=.1, save_intro_as: str="",
-              camera: str="", save_as: str="path.gif", reset_state: bool=False) -> list[np.ndarray]:
+              camera: str="", save_as: str="path.gif", reset_state: bool=False,
+              config_geom_terms: int=-1) -> list[np.ndarray]:
     
     play_path = path.copy()
     
     print(f"Playing path with length {len(play_path)}")
     sim.setupRenderer(camera=camera)
-
     
     if len(start_state) and len(target_state):
         sim.pushConfig(start_state, ignore_warn=True)
@@ -75,7 +75,17 @@ def play_path(path: list[dict], sim: MjSim,
     for node in play_path[1:]:
         
         if reset_state:
-            sim.setState(*prev_node["state"])
+            origin = prev_node["state"]
+            
+            if config_geom_terms != -1:
+                origin = [*origin]
+                original_state = np.copy(origin[1])
+                origin[1] = origin[1][:-config_geom_terms]
+
+            sim.setState(*origin)
+            
+            if config_geom_terms != -1:
+                origin[1] = original_state
         
         # TODO: Make this nicer
         # if "q_sequence" not in node.keys():

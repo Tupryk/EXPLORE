@@ -15,6 +15,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from explore.utils.utils import signum
 from explore.env.mujoco_sim import MjSim
+from explore.utils.mj import get_model_quaternions
+from explore.datasets.utils import expand_qpos_with_geoms
 
 
 class MultiSearchNode:
@@ -122,26 +124,37 @@ class Search:
                 use_spline_ref=cfg.sim.use_spline_ref) for _ in range(self.sim_count)
         ]
         assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
+
+        self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
+        self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
+        self.state_dim = self.sim[0].data.qpos.shape[0]
         
         if self.use_gpu:
             self.warp_model = mjw.put_model(self.sim[0].model)
             mujoco.mj_forward(self.sim[0].model, self.sim[0].data)
             self.warp_data = mjw.put_data(self.sim[0].model, self.sim[0].data, nworld=self.sample_count, njmax=500, nconmax=500)
 
-        self.scene_quat_indices = []
-        for j in range(self.sim[0].model.njnt):
-            joint_type = self.sim[0].model.jnt_type[j]
-            qpos_adr = self.sim[0].model.jnt_qposadr[j]
+        self.geoms_in_cost = []
+        self.geoms_in_cost_weights = np.array(cfg.geoms_in_cost_weights)
+        for geom_name in cfg.geoms_in_cost:
+            geom_id = mujoco.mj_name2id(self.sim[0].model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            self.geoms_in_cost.append(geom_id)
 
-            if joint_type == mujoco.mjtJoint.mjJNT_FREE:
-                self.scene_quat_indices.append(int(qpos_adr+3))
+        self.scene_quat_indices = get_model_quaternions(self.sim[0].model)
+        
+        self.config_geom_terms = -1
+        if len(self.geoms_in_cost):
+            for i in range(len(self.geoms_in_cost)):
+                self.scene_quat_indices.append(i * 7 + 3 + self.state_dim)
+
+            self.q_mask = np.concatenate([self.q_mask, self.geoms_in_cost_weights])
+
+            self.configs = expand_qpos_with_geoms(self.configs, self.sim[0], self.geoms_in_cost)
+
+            self.config_geom_terms = len(self.geoms_in_cost_weights)
 
         if self.verbose > 2:
             print("Quaternions in scene: ", self.scene_quat_indices)
-
-        self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
-        self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
-        self.state_dim = self.sim[0].data.qpos.shape[0]
         
         if self.sampling_strategy == "rs":
             self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
@@ -171,8 +184,11 @@ class Search:
             
         for i in pbar:
             
-            self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
-            state = self.sim[0].getState()
+            if self.config_geom_terms != -1:
+                self.sim[0].pushConfig(self.configs[i, :-self.config_geom_terms], self.configs_ctrl[i])
+            else:
+                self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
+            state = self.sim[0].getState(self.geoms_in_cost)
         
             root = MultiSearchNode(-1, np.zeros_like(self.configs_ctrl[0]), state, 0.)
             trees.append([root])
@@ -380,12 +396,20 @@ class Search:
                   target: np.ndarray, sim_idx: int=0
                   ) -> tuple[float, np.ndarray, np.ndarray]:
         
+        if self.config_geom_terms != -1:
+            origin = [*origin]
+            original_state = np.copy(origin[1])
+            origin[1] = origin[1][:-self.config_geom_terms]
+        
         self.sim[sim_idx].setState(*origin)
+        
+        if self.config_geom_terms != -1:
+            origin[1] = original_state
         
         for c in ctrl:
             self.sim[sim_idx].step(self.tau_action, c)
         
-        state = self.sim[sim_idx].getState()
+        state = self.sim[sim_idx].getState(self.geoms_in_cost)
 
         cost2target = self.compute_cost(target, state[1], state[2])
         

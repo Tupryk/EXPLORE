@@ -149,10 +149,24 @@ class MjSim:
         
         return frames, states, ctrls
         
-    def getState(self):
+    def getState(self, geoms_in_cost: list[int]=None):
+
+        q = np.copy(self.data.qpos)
+
+        if geoms_in_cost:
+            for geom_id in geoms_in_cost:
+                pos = self.data.geom_xpos[geom_id]
+                mat = self.data.geom_xmat[geom_id]
+                
+                quat = np.zeros(4)
+                mujoco.mju_mat2Quat(quat, mat)
+                
+                q = np.concatenate([q, pos])
+                q = np.concatenate([q, quat])
+
         state = (
             self.data.time,
-            np.copy(self.data.qpos),
+            q,
             np.copy(self.data.qvel),
             np.copy(self.data.ctrl),
             self.last_ctrl_target,

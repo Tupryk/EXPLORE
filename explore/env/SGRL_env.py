@@ -256,7 +256,7 @@ class StableConfigsEnv(gym.Env):
         
         if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
             action += self.last_ctrl
-            self.last_ctrl = action
+        self.last_ctrl = action
         
         frames, ss, cs = self.sim.step(
             self.tau_action,

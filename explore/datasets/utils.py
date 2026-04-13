@@ -1,14 +1,14 @@
 import os
 import torch
+import mujoco
 import pickle
 import numpy as np
 from tqdm import tqdm
-import mujoco
 from itertools import combinations
-from scipy.spatial.distance import directed_hausdorff, pdist, squareform
 from scipy.special import digamma, gamma
-import networkx as nx
-from networkx.algorithms.approximation import maximum_independent_set 
+from scipy.spatial.distance import directed_hausdorff, pdist, squareform
+
+from explore.env.mujoco_sim import MjSim
 
 class Normalizer:
     def __init__(self, data: torch.Tensor):
@@ -588,3 +588,25 @@ def compute_path_entropy_modular(tree, tree_end_nodes, tree_path_count, q_mask):
         return 0.0
         
     return compute_entropy(np.array(successful_states))
+
+def expand_qpos_with_geoms(qpos: np.ndarray, sim: MjSim, geom_ids: list[int]):
+
+    new_qpos = []
+    for q in qpos:
+        
+        sim.pushConfig(q)
+        
+        for geom_id in geom_ids:
+            
+            pos = sim.data.geom_xpos[geom_id]
+            mat = sim.data.geom_xmat[geom_id]
+            
+            quat = np.zeros(4)
+            mujoco.mju_mat2Quat(quat, mat)
+            
+            q = np.concatenate([q, pos])
+            q = np.concatenate([q, quat])
+
+        new_qpos.append(q)
+
+    return np.array(new_qpos)
