@@ -242,21 +242,20 @@ class Search:
             parent_node: MultiSearchNode,
             target: np.ndarray
         ) -> list[tuple[float, np.ndarray, np.ndarray]]:
-        
         q_offset = np.tile(parent_node.state[3], self.horizon).reshape(self.horizon, self.ctrl_dim)
-        best_result = None
+        top_results = None
         mean = np.zeros_like(parent_node.delta_q)
+
         for _ in range(self.cem_steps):
-            
             sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count, mean=mean)
-            if best_result is not None:
-                sampled_ctrls[0] = best_result[2]
-
+            if top_results is not None:
+                for i, res in enumerate(top_results):
+                    sampled_ctrls[i] = res[2]
             results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)
-            best_result = min(results)
-            mean = best_result[2] - q_offset
+            top_results = sorted(results)[:self.n_best_actions]
+            mean = np.mean([r[2] for r in top_results], axis=0) - q_offset
 
-        return [best_result]
+        return top_results
     
     def eval_multiple_ctrls_seq(self, ctrls: np.ndarray, origin: tuple,
                                 target: tuple, sim_idx: int=0) -> list[tuple[float, np.ndarray, np.ndarray]]:
