@@ -237,4 +237,4 @@ with h5py.File(h5_file, "w") as f:
 
 print(f"Success: Data saved to {h5_file}.")
 
-# AdjMap(costs, SAME_THRESH, costs.max())
+AdjMap(costs, SAME_THRESH, costs.max())

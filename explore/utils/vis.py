@@ -96,6 +96,7 @@ def play_path(path: list[dict], sim: MjSim,
     if sim.viewer != None:
         time.sleep(3)
     if save_as:
+        frames = [(im.astype(float)*0.8 + im_end.astype(float)*0.2).astype(im.dtype) for im in frames]
         imageio.mimsave(save_as, frames, fps=24 * playback_time, loop=0)
     
     return frames, states

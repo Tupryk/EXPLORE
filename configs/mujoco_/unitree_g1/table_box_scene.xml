@@ -17,6 +17,8 @@
   </asset>
 
   <worldbody>
+    <camera name="fixed_cam" pos="3.425 -1.981 3.574" xyaxes="0.679 0.734 -0.000 -0.467 0.432 0.771"/>
+    
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
     <body name="table" pos="1.0 1.5 0.5">

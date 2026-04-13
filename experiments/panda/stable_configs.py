@@ -55,7 +55,7 @@ print(stable_configs.shape)
 # for i, sc in enumerate(sampled_configs):
 for i, sc in enumerate(stable_configs):
     print(i)
-    # if i < 50 or i> 60:
+    # if i != 8:
     #     continue
     # sim.pushConfig(sc)
     # print(sc)
@@ -63,9 +63,9 @@ for i, sc in enumerate(stable_configs):
     q = stable_configs_ctrl[i].copy()
     # q[7] = 0
     # q[15] = 0
-    print(sc)
+    # print(sc)
     sim.pushConfig(sc, q)
     input()
     # time.sleep(10.)
-    sim.step(.1, view=.1)
+    # sim.step(1., view=.1)
     print("sum: ", sum([float(i) for i in sim.getContacts()]))

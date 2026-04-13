@@ -5,10 +5,10 @@ import mujoco
 import psutil
 import pickle
 import hnswlib
-import warp as wp
+# import warp as wp
 import numpy as np
 from tqdm import trange
-import mujoco_warp as mjw
+# import mujoco_warp as mjw
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
