@@ -51,6 +51,7 @@ class StableConfigsEnv(gym.Env):
         
         self.original_stable_configs = h5py.File(cfg.stable_configs_path, 'r')
         self.config_count = self.original_stable_configs["q"].shape[0]
+        print("Total configs in h5: ", self.config_count)
         
         self.verbose = cfg.verbose
 
@@ -89,7 +90,7 @@ class StableConfigsEnv(gym.Env):
                 print(f"Starting enviroment with guiding on {len(self.traj_pairs)} trajectories with average length {sum(len(p) for p in self.paths)/len(self.traj_pairs)}.")
 
         elif self.guiding == "SGRL":
-            self.originals_kd_tree = KDTree(self.original_stable_configs["q"])
+            self.originals_kd_tree = KDTree(self.original_stable_configs["q"] * self.q_mask)
         
         # Defines observation space
         state = self.sim.getState()
@@ -212,6 +213,7 @@ class StableConfigsEnv(gym.Env):
                     self.original_stable_configs["q"][s_cfg_idx] * self.schedule_alpha +
                     self.original_stable_configs["q"][e_cfg_idx] * (1. - self.schedule_alpha)
                 )
+                query *= self.q_mask
                 query = query.reshape(1, -1)
                 _, ind = self.originals_kd_tree.query(query, k=1)
                 s_cfg_idx = ind[0][0]
