@@ -3,6 +3,7 @@ import h5py
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
+from sklearn.neighbors import KDTree
 from omegaconf import DictConfig, OmegaConf, ListConfig
 
 from explore.env.mujoco_sim import MjSim
@@ -34,7 +35,6 @@ class StableConfigsEnv(gym.Env):
         self.actions_noise_sigma = cfg.actions_noise_sigma
         self.use_vel = cfg.use_vel
         self.guiding = cfg.guiding
-        self.guiding_prob = cfg.guiding_prob
         self.reward = None
         
         self.use_vision = cfg.use_vision
@@ -49,8 +49,8 @@ class StableConfigsEnv(gym.Env):
         # if self.goal_conditioning and cfg.target_config_idx != -1:
         #     raise Exception("Using goal conditioning but only a single goal!")
         
-        self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
-        self.config_count = self.stable_configs["qpos"].shape[0]
+        self.original_stable_configs = h5py.File(cfg.stable_configs_path, 'r')
+        self.config_count = self.original_stable_configs["q"].shape[0]
         
         self.verbose = cfg.verbose
 
@@ -69,8 +69,7 @@ class StableConfigsEnv(gym.Env):
         self.sim.setupRenderer(cfg.render_w, cfg.render_h, camera=cfg.sim.camera)
         self.model_quats = get_model_quaternions(self.sim.model)
         
-        self.guiding_path = []
-        if self.guiding:
+        if self.guiding == "StaGE":
 
             self.paths, self.traj_pairs = get_diverse_paths(
                 self.trees,
@@ -88,6 +87,9 @@ class StableConfigsEnv(gym.Env):
             
             if self.verbose > 0:
                 print(f"Starting enviroment with guiding on {len(self.traj_pairs)} trajectories with average length {sum(len(p) for p in self.paths)/len(self.traj_pairs)}.")
+
+        elif self.guiding == "SGRL":
+            self.originals_kd_tree = KDTree(self.original_stable_configs["q"])
         
         # Defines observation space
         state = self.sim.getState()
@@ -167,80 +169,62 @@ class StableConfigsEnv(gym.Env):
         super().reset(seed=seed)
         np.random.seed(seed)
 
-        # TODO: make this function nicer
-
         self.eval_view = "" if not "eval_view" in options else options["eval_view"]
 
-        # Choose start and end configurations
-        self.unknown_path = False
-        self.currently_guiding = (self.guiding > 0 and np.random.random() < self.guiding_prob) or "traj_pair" in options
-        if self.currently_guiding:
-            
-            if "no_exist_fine" in options and options["no_exist_fine"]:
-                s_cfg_idx = options["traj_pair"][0]
-                e_cfg_idx = options["traj_pair"][1]
-                
-                tp = options["traj_pair"]
-                if not (tp in self.traj_pairs):
-                    self.unknown_path = True
-                    print("Running unknown trajectory. Very scary!!")
-                else:
-                    traj_idx = self.traj_pairs.index(tp)
-
-            else:
-                if "traj_pair" in options and options["traj_pair"] != (-1, -1):
-
-                    tp = options["traj_pair"]
-                    if tp in self.traj_pairs:
-                        traj_idx = self.traj_pairs.index(tp)
-                    else:
-                        raise Exception(f"Trajectory pair '{options['traj_pair']}' not in list! Availible pairs: {self.traj_pairs}")
-                
-                else:
-                    traj_idx = np.random.randint(0, len(self.traj_pairs))
-                
-                s_cfg_idx = self.traj_pairs[traj_idx][0]
-                e_cfg_idx = self.traj_pairs[traj_idx][1]
-        
-        else:
-            s_cfg_idx = self.start_config_idx if self.start_config_idx != -1 else np.random.randint(0, self.config_count)
-            e_cfg_idx = self.end_config_idx if self.end_config_idx != -1 else randint_excluding(0, self.config_count, s_cfg_idx)
-            
-        info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
-        
-        self.target_state = self.stable_configs["qpos"][e_cfg_idx]
-        
-        # Load guiding trajectory
-        self.guiding_path = []
-        # TODO: Checkout this line, and make things nicer
-        # if self.currently_guiding and not self.unknown_path and (not len(self.guiding_path) or self.end_config_idx == -1):
-        if self.currently_guiding and not self.unknown_path:
-            
-            self.guiding_path = self.paths[traj_idx]
-
-            self.max_steps = int(len(self.guiding_path) * 1.5) * self.time_scaling
-            info["guiding_traj_len"] = len(self.guiding_path)
-        
-        else:
-            self.max_steps = self.max_steps_default
-        
-        # Reset simulation state
         if "alpha" in options:
             self.schedule_alpha = options["alpha"]
 
         if self.verbose > 1:
             print("Current alpha: ", self.schedule_alpha)
-        
-        if self.use_schedule:
-            node_idx = int((len(self.guiding_path)-1) * (1.0 - self.schedule_alpha))
-            if node_idx >= len(self.guiding_path)-1: node_idx = len(self.guiding_path)-2
-            self.max_steps = max(int(len(self.guiding_path[node_idx:]) * 1.5) * self.time_scaling, 20)
-            self.sim.setState(*self.guiding_path[node_idx])
-        else:
-            start_qpos = self.trees[s_cfg_idx][0]["state"][1]
-            start_ctrl = self.trees[s_cfg_idx][0]["state"][3]
-            self.sim.pushConfig(start_qpos, start_ctrl)
+
+        # Choose start and end configurations
+        if self.guiding == "StaGE":
             
+            if "traj_pair" in options and options["traj_pair"] != (-1, -1):  # Only for eval!!!
+
+                tp = options["traj_pair"]
+                if tp in self.traj_pairs:
+                    traj_idx = self.traj_pairs.index(tp)
+                else:
+                    print("Running unknown trajectory. Very scary!!")
+            
+            else:
+                traj_idx = np.random.randint(0, len(self.traj_pairs))
+            
+            s_cfg_idx = self.traj_pairs[traj_idx][0]
+            e_cfg_idx = self.traj_pairs[traj_idx][1]
+
+            guiding_path = self.paths[traj_idx]
+            guiding_path_len = len(guiding_path)
+            self.max_steps = int(len(guiding_path) * 1.5) * self.time_scaling
+
+            node_idx = int((guiding_path_len-1) * (1.0 - self.schedule_alpha))
+            if node_idx >= guiding_path_len-1: node_idx = guiding_path_len-2
+            self.max_steps = max(int(len(guiding_path[node_idx:]) * 1.5) * self.time_scaling, 20)
+            self.sim.setState(*guiding_path[node_idx])
+
+        else:
+            s_cfg_idx = self.start_config_idx if self.start_config_idx != -1 else np.random.randint(0, self.config_count)
+            e_cfg_idx = self.end_config_idx if self.end_config_idx != -1 else randint_excluding(0, self.config_count, s_cfg_idx)
+            
+            if self.guiding == "SGRL":
+                query = (
+                    self.original_stable_configs["q"][s_cfg_idx] * self.schedule_alpha +
+                    self.original_stable_configs["q"][e_cfg_idx] * (1. - self.schedule_alpha)
+                )
+                query = query.reshape(1, -1)
+                _, ind = self.originals_kd_tree.query(query, k=1)
+                s_cfg_idx = ind[0][0]
+        
+            start_qpos = self.original_stable_configs["q"][s_cfg_idx]
+            start_ctrl = self.original_stable_configs["ctrl"][s_cfg_idx]
+
+            self.sim.pushConfig(start_qpos, start_ctrl)
+            self.max_steps = self.max_steps_default
+            
+        info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
+        self.target_state = self.original_stable_configs["q"][e_cfg_idx]
+        
         self.iter = 0
         
         if self.verbose > 1:
