@@ -46,7 +46,12 @@ def play_path(path: list[dict], sim: MjSim,
         im_start = sim.renderImg()
         sim.pushConfig(target_state, ignore_warn=True)
         im_end = sim.renderImg()
-        sim.pushConfig(play_path[-1]["state"][1], ignore_warn=True)
+        
+        s = play_path[-1]["state"][1]
+        if config_geom_terms != -1:
+            s = s[:-config_geom_terms]
+        
+        sim.pushConfig(s, ignore_warn=True)
         im_reached = sim.renderImg()
         
         fig, axes = plt.subplots(1, 3, figsize=(30, 20))
@@ -70,23 +75,25 @@ def play_path(path: list[dict], sim: MjSim,
     states = []
 
     prev_node = play_path[0]
-    sim.setState(*prev_node["state"])
+     
+    origin = prev_node["state"]
+    if config_geom_terms != -1:
+        origin = [*origin]
+        origin[1] = origin[1][:-config_geom_terms]
+        
+    sim.setState(*origin)
 
     for node in play_path[1:]:
         
         if reset_state:
             origin = prev_node["state"]
-            
+
             if config_geom_terms != -1:
                 origin = [*origin]
-                original_state = np.copy(origin[1])
                 origin[1] = origin[1][:-config_geom_terms]
 
             sim.setState(*origin)
             
-            if config_geom_terms != -1:
-                origin[1] = original_state
-        
         # TODO: Make this nicer
         # if "q_sequence" not in node.keys():
         q_target = node["state"][4] if sim.use_spline_ref else node["state"][3]

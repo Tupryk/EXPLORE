@@ -5,10 +5,10 @@ import mujoco
 import psutil
 import pickle
 import hnswlib
-# import warp as wp
+import warp as wp
 import numpy as np
 from tqdm import trange
-# import mujoco_warp as mjw
+import mujoco_warp as mjw
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -291,6 +291,8 @@ class Search:
         
         elif self.use_gpu:
             self.warp_data.time.fill_(origin[0])
+            if self.config_geom_terms != -1:
+                wp.copy(self.warp_data.qpos, wp.array(origin[1][:-self.config_geom_terms], dtype=wp.float32))
             wp.copy(self.warp_data.qpos, wp.array(origin[1], dtype=wp.float32))
             wp.copy(self.warp_data.qvel, wp.array(origin[2], dtype=wp.float32))
             wp.copy(self.warp_data.ctrl, wp.array(origin[3], dtype=wp.float32))
