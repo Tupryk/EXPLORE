@@ -48,11 +48,8 @@ def signum(q1, q2):
     else:
         return -1
 
-def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=False, scene_quat_indices: list=[]) -> float:
+def cost_computation(state1: np.ndarray, state2: np.ndarray, q_mask, scene_quat_indices: list=[]) -> float:
     
-    state1 = node1["state"][1]
-    state2 = node2["state"][1]
-
     e = (state1 - state2)
     
     for i in scene_quat_indices:
@@ -60,28 +57,23 @@ def cost_computation(node1: dict, node2: dict, q_mask, cost_max_method: bool=Fal
         e[i:i0] = state1[i:i0] - signum(state1[i:i0], state2[i:i0]) * state2[i:i0]
 
     e *= q_mask
-
-    if cost_max_method:
-        cost = np.abs(e).max()
-    else:
-        cost = e.T @ e
+    cost = e.T @ e
 
     return cost
 
-def cost_computation_on_states(state1: np.ndarray, state2: np.ndarray, q_mask, cost_max_method: bool=False, scene_quat_indices: list=[]) -> float:
+def contacts_cost_computation(
+        obj_ids: list[int],
+        contacts_ids: list[int],
+        model: mujoco.MjModel,
+        data: mujoco.MjData,
+        max_dist: float) -> float:
     
-    e = (state1 - state2)
-    
-    for i in scene_quat_indices:
-        i0 = i + 4
-        e[i:i0] = state1[i:i0] - signum(state1[i:i0], state2[i:i0]) * state2[i:i0]
-
-    e *= q_mask
-
-    if cost_max_method:
-        cost = np.abs(e).max()
-    else:
-        cost = e.T @ e
+    fromto = np.zeros(6)
+    cost = 0
+    for oi in obj_ids:
+        for ci in contacts_ids:
+            dist = mujoco.mj_geomDistance(model, data, ci, oi, max_dist, fromto)
+            cost += 1 - np.clip(dist / max_dist, 0., 1.)
 
     return cost
 
@@ -127,7 +119,7 @@ def build_path(tree: list[dict], node_idx: int,
     return path
 
 def generate_adj_map( trees: list[list[dict]], q_mask: np.ndarray=np.array([]),
-    check_cached: str="", cost_max_method: bool=False, verbose: int=1) -> tuple[list[list[float]], list[list[int]]]:
+    check_cached: str="", scene_quat_indices: list=[], verbose: int=1) -> tuple[list[list[float]], list[list[int]]]:
     
     if check_cached:
         cached_file_path = os.path.join(check_cached, "adj_map.pkl")
@@ -151,7 +143,7 @@ def generate_adj_map( trees: list[list[dict]], q_mask: np.ndarray=np.array([]),
         
         for n, node in enumerate(trees[i]):
             for j in range(tree_count):
-                node_cost = cost_computation(trees[j][0], node, q_mask, cost_max_method)
+                node_cost = cost_computation(trees[j][0], node, q_mask, scene_quat_indices)
                 if node_cost < tree_min_costs[j]:
                     tree_min_costs[j] = node_cost
                     tree_top_nodes[j] = n

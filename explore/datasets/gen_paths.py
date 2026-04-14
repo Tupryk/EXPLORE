@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from explore.utils.utils import signum
 from explore.env.mujoco_sim import MjSim
 from explore.utils.mj import get_model_quaternions
-from explore.datasets.utils import expand_qpos_with_geoms
+from explore.datasets.utils import expand_qpos_with_geoms, cost_computation
 
 
 class MultiSearchNode:
@@ -72,7 +72,6 @@ class Search:
         
         self.horizon = cfg.horizon
         self.sample_count = cfg.sample_count
-        self.cost_method = cfg.cost_method # "se" for squared error, "max" for max error, sefo for se with derivates
         self.warm_start = cfg.warm_start
         self.sampling_strategy = cfg.sampling_strategy
         self.q_mask = np.array(cfg.q_mask)
@@ -197,7 +196,7 @@ class Search:
             self.trees_closest_nodes_costs.append(np.full((self.config_count, self.knnK), np.nan))
             
             for ci in range(self.config_count):
-                cost = self.compute_cost(self.configs[i], self.configs[ci])
+                cost = cost_computation(self.configs[i], self.configs[ci], self.q_mask, self.scene_quat_indices)
                 self.trees_closest_nodes_costs[i][ci, 0] = cost
                 self.trees_closest_nodes_idxs[i][ci, 0] = 0
 
@@ -321,7 +320,7 @@ class Search:
                 state = (
                     time_[i], qpos[i], qvel[i], ctrl[i]
                 )
-                cost2target = self.compute_cost(target, state[1], state[2])
+                cost2target = cost_computation(target, state[1], self.q_mask, self.scene_quat_indices)
                 
                 reg_e = ctrls[i][0] - prev_ctrl
                 cost2target += self.regularization_weight * (reg_e.T @ reg_e)
@@ -348,51 +347,6 @@ class Search:
         
         return results
     
-    def compute_cost(self, state1: np.ndarray, state2: np.ndarray, vel_state2: np.ndarray = None) -> float:
-        
-        e = (state1 - state2)
-        for i in self.scene_quat_indices:
-            i0 = i + 4
-            e[i:i0] = state1[i:i0] - signum(state1[i:i0], state2[i:i0]) * state2[i:i0]
-        
-        e *= self.q_mask
-        
-        if self.cost_method == "max":
-            cost = np.abs(e).max()
-        
-        elif self.cost_method == "se":
-            cost = e.T @ e
-
-        elif self.cost_method == "sefo" and vel_state2 is not None:
-
-            raise Exception("Sefo is currently out of service, we apologise for any inconvenience.")
-            e_linear = e[:-4]
-            v_linear = vel_state2[:-3]
-            
-
-            delta_theta = np.zeros(3)
-            mujoco.mju_subQuat(delta_theta, state2[-4:], state1[-4:])
-            
-            E_total = np.concatenate([e_linear, delta_theta])
-
-            E_total *= self.q_mask
-
-            V_total = np.concatenate([v_linear, vel_state2[-3:]]) 
-            V_total *= self.q_mask
-            
-            v_max = 1
-            alpha = (1 - 1e-3) / v_max
-            
-            dist = np.linalg.norm(E_total)
-            alignment = np.inner(V_total, E_total)
-            
-            cost = (dist - alpha * alignment)**2
-        
-        else:
-            raise Exception("Cost method '{}' not implemented yet!")
-        
-        return cost
-    
     def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
                   target: np.ndarray, sim_idx: int=0
                   ) -> tuple[float, np.ndarray, np.ndarray]:
@@ -412,7 +366,7 @@ class Search:
         
         state = self.sim[sim_idx].getState(self.geoms_in_cost)
 
-        cost2target = self.compute_cost(target, state[1], state[2])
+        cost2target = cost_computation(target, state[1], self.q_mask, self.scene_quat_indices)
         
         reg_e = state[3] - origin[3]
         cost2target += self.regularization_weight * (reg_e.T @ reg_e)
@@ -573,7 +527,7 @@ class Search:
                     
                     store_node = False
                     for ci in range(self.config_count):
-                        new_cost = self.compute_cost(best_state[1], self.configs[ci])
+                        new_cost = cost_computation(best_state[1], self.configs[ci], self.q_mask, self.scene_quat_indices)
                         for k in range(self.knnK):
                             stored_cost = self.trees_closest_nodes_costs[start_idx][ci][k]
                             if new_cost < self.target_min_dist and stored_cost >= new_cost:
@@ -630,7 +584,13 @@ class Search:
                                     break
                             
                             if np.isnan(self.trees_closest_nodes_costs[start_idx][ci, 0]):
-                                self.trees_closest_nodes_costs[start_idx][ci, 0] = self.compute_cost(self.trees[start_idx][0].state[1], self.configs[ci])
+
+                                self.trees_closest_nodes_costs[start_idx][ci, 0] = cost_computation(
+                                    self.trees[start_idx][0].state[1],
+                                    self.configs[ci],
+                                    self.q_mask,
+                                    self.scene_quat_indices
+                                )
                                 self.trees_closest_nodes_idxs[start_idx][ci, 0] = 0
 
                     elif self.verbose > 2:

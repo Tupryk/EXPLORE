@@ -317,39 +317,24 @@ RRT:
   start_idx: 8
   end_idx: -1
   bidirectional: false
-  cost_method: "se"
   sample_count: 5000
   sampling_strategy: rs
   n_best_actions: 16
   cem_steps: 10  # Only for CEM
   regularization_weight: .001
   output_dir: ${hydra:runtime.output_dir}
-  # q_mask: [
-  #   .2, .2, 2., 1., 1., 1., 1.,
-  #   1., 1., 1.,  # hip
-  #   .75, .25, .25,  # knee, ankle, ankle
-  #   1., 1., 1.,  # hip
-  #   .5, .25, .25,  # knee, ankle, ankle
-  #   1.25, 1.25, 1.25,  # waist
-  #   .75, .75, .75,  # shoulder
-  #   .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
-  #   .75, .75, .75,  # shoulder
-  #   .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
-  #   7., 7., 7., .1, .1, .1, .1,
-  # ]
   q_mask: [
-    1., 1., 2., .2, .2, .2, .2,
-    .01, .01, .01,  # hip
-    .01, .01, .01,  # knee, ankle, ankle
-    .01, .01, .01,  # hip
-    .01, .01, .01,  # knee, ankle, ankle
-    .01, .01, .01,  # waist
-    .01, .01, .01,  # shoulder
-    .01, .01, .01, .01,  # elbow, wrist, wrist, wrist
-    .01, .01, .01,  # shoulder
-    .01, .01, .01, .01,  # elbow, wrist, wrist, wrist
-    # 5., 5., 5., .1, .1, .1, .1,
-    .0, .0, .0, .0, .0, .0, .0,
+    .2, .2, 2., 1., 1., 1., 1.,
+    1., 1., 1.,  # hip
+    .75, .25, .25,  # knee, ankle, ankle
+    1., 1., 1.,  # hip
+    .5, .25, .25,  # knee, ankle, ankle
+    1.25, 1.25, 1.25,  # waist
+    .75, .75, .75,  # shoulder
+    .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+    .75, .75, .75,  # shoulder
+    .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+    7., 7., 7., .1, .1, .1, .1,
   ]
   geoms_in_cost: [
     "left_ankle_roll_joint", "right_ankle_roll_joint",
@@ -361,6 +346,14 @@ RRT:
     2., 2., 2., .0, .0, .0, .0,
     2., 2., 2., .0, .0, .0, .0
   ]
+  objs: [
+    obj_col
+  ]
+  contacts: [
+    "left_rubber_hand_0", "right_rubber_hand_0"
+  ]
+  contact_dists_cost: 0.1
+  contact_max_dist: 0.2
   knnK: 16
   sim:
     tau_sim: 0.005

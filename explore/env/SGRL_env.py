@@ -9,7 +9,7 @@ from omegaconf import DictConfig, OmegaConf, ListConfig
 from explore.env.mujoco_sim import MjSim
 from explore.utils.mj import get_model_quaternions
 from explore.utils.utils import randint_excluding, extract_balls_mask
-from explore.datasets.utils import load_trees, cost_computation_on_states, get_diverse_paths
+from explore.datasets.utils import load_trees, cost_computation, get_diverse_paths
 
 
 class StableConfigsEnv(gym.Env):
@@ -256,7 +256,7 @@ class StableConfigsEnv(gym.Env):
         ### Reward Computation ###
         eval_state = self.sim_state[1]
         
-        cost = cost_computation_on_states(eval_state, self.target_state, self.q_mask, scene_quat_indices=self.model_quats)
+        cost = cost_computation(eval_state, self.target_state, self.q_mask, scene_quat_indices=self.model_quats)
         
         if cost < self.min_cost:
             goal_reached_reward = 1.0 
