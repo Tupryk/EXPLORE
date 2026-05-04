@@ -105,7 +105,7 @@ class RL_Trainer:
             )
         else:
             self.model.learn(
-                total_timesteps=self.total_timesteps,
+                total_timesteps=self.total_timesteps
             )
 
         if self.rl_method != "TD7":

@@ -12,7 +12,7 @@ def main(cfg: DictConfig):
     
     file = h5py.File(cfg.configs_path, 'r')
 
-    S = Search(file["qpos"], file["ctrl"], cfg.RRT)
+    S = Search(file["q"], file["ctrl"], cfg.RRT)
 
     S.run()
 

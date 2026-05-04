@@ -5,7 +5,6 @@ output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 net_arch: [256, 256]
 save_freq: 25e4
-scheduler_rate: 0.01
 batch_size: 2048
 TD7:
   tag: nil
@@ -43,8 +42,8 @@ TD7:
   reset_weight: 0.9
   
   # Encoder Model
-  zs_dim: 512 #256 512
-  enc_hdim: 512 #256 512
+  zs_dim: 512
+  enc_hdim: 512
   enc_activ: Callable = F.elu
   
   # Critic Model
@@ -81,7 +80,7 @@ env:
     use_spline_ref: false
     mujoco_xml: configs/mujoco_/fingerRamp.xml
     camera: fixed_cam
-  trajectory_data_path: "data/finger_ramp_baseline"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
+  trajectory_data_path: "data/finger_ramp_new_cost"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
   stable_configs_path: configs/stable/fingerRamp_onRamp.h5
 
   # stepsize: 0.05

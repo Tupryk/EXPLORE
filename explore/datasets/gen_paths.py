@@ -1,5 +1,6 @@
 import os
 import time
+import torch
 import mujoco
 import psutil
 import pickle
@@ -13,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from explore.env.mujoco_sim import MjSim
 from explore.utils.mj import get_model_quaternions
 from explore.datasets.utils import cost_computation
+from explore.models.basic_flow_matching import Net, ActionSamplerDataset, sample, train
 
 
 class MultiSearchNode:
@@ -174,14 +176,32 @@ class Search:
             self.action_sampler = lambda o, t: self.cem_sample_ctrls(o, t)
         else:
             raise Exception(f"Sampling strategy '{self.sampling_strategy}' not implemented yet!")
+        
+        ### FLOW MODEL ###
+        self.use_flow = cfg.use_flow
+        if self.use_flow:
+            self.flow_input_dim = 1 + self.ctrl_dim + len(self.configs_full[0]) * 2
+            self.flow_model_arch = cfg.flow_model.arch
             
+            self.learned_action_sampler = Net(self.flow_input_dim, self.ctrl_dim, self.flow_model_arch)
+            
+            self.flow_steps = cfg.flow_model.steps
+            self.learn_every = cfg.flow_model.learn_every
+            self.batch_size = cfg.flow_model.batch_size
+            self.nepochs = cfg.flow_model.nepochs
+            self.device = cfg.flow_model.device
+            self.as_dataset = ActionSamplerDataset(cfg.flow_model.dataset_max_size)
+            self.max_training_runs = cfg.flow_model.max_training_runs
+            self.current_training_run = 0
+
+        assert not (self.sample_uniform_prob and self.self.use_flow)
+        assert not (self.sampling_strategy != "rs" and self.use_flow)
+
         if self.verbose:
             print(f"Starting search across {self.config_count} configs!")
 
-    def init_trees(self) -> tuple:
+    def init_trees(self) -> list[list[MultiSearchNode]]:
         
-        # TODO: It does not make sense to have a list with all trees if we only use one at a time
-
         trees: list[list[MultiSearchNode]] = []
         self.trees_closest_nodes_idxs = []
         self.trees_closest_nodes_costs = []
@@ -244,7 +264,23 @@ class Search:
             target: np.ndarray
         ) -> list[tuple[float, np.ndarray, np.ndarray]]:
 
-        sampled_ctrls = self.gauss_sample_ctrl(parent_node, self.sample_count)
+        learned_perc = self.current_training_run / self.max_training_runs if self.use_flow else 0
+
+        sampled_ctrls = self.gauss_sample_ctrl(parent_node, int(self.sample_count * (1-learned_perc)))
+
+        if self.use_flow and learned_perc != 0:
+            
+            learned_sampled_ctrls, _ = sample(
+                self.learned_action_sampler,
+                torch.tensor(parent_node.phi, dtype=torch.float32),
+                torch.tensor(target, dtype=torch.float32),
+                int(self.sample_count * learned_perc),
+                self.flow_steps,
+                self.device
+            )
+            learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :]
+
+            sampled_ctrls = np.vstack([sampled_ctrls, learned_sampled_ctrls])
 
         results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)
         
@@ -451,165 +487,190 @@ class Search:
         [self.store_tree(i, folder_path, self.trees) for i in range(self.config_count)]
         
         start_time = time.time()
-        
-        for i, start_idx in enumerate(self.start_ids):
 
-            if self.sample_uniform_prob:
-                max_elems = self.n_best_actions * self.max_nodes_per_tree
-                kNN_tree = hnswlib.Index(space="l2", dim=self.state_dim)
-                kNN_tree.init_index(max_elements=max_elems, ef_construction=200, M=16)
-                kNN_tree.add_items(self.configs_full[start_idx], ids=[0])
-                kNN_tree_size = 1
+        # TODO: rename max_nodes_per_tree to max_expansions_per_tree
 
-            if self.verbose > 0:
-                pbar = trange(self.max_nodes_per_tree, desc=f"Tree {i+1}/{len(self.start_ids)}", unit="nodes")
-            else:
-                pbar = range(self.max_nodes_per_tree)
-            
-            for _ in pbar:
+        if not self.use_flow:
+            self.train_runs = 1
+        else:
+            self.train_runs = self.max_nodes_per_tree // self.learn_every
+            self.max_nodes_per_tree = self.learn_every
 
-                # Sample random sim state
-                exploring = not (np.random.uniform() < self.target_prob) or not len(self.end_ids)
-                
-                if not exploring:
-                    target_config_idx = np.random.choice(self.end_ids)
-                    sim_sample = self.configs_full[target_config_idx]
-                
+        for _ in range(self.train_runs):
+
+            for i, start_idx in enumerate(self.start_ids):
+
+                if self.sample_uniform_prob:
+                    max_elems = self.n_best_actions * self.max_nodes_per_tree
+                    kNN_tree = hnswlib.Index(space="l2", dim=self.state_dim)
+                    kNN_tree.init_index(max_elements=max_elems, ef_construction=200, M=16)
+                    kNN_tree.add_items(self.configs_full[start_idx], ids=[0])
+                    kNN_tree_size = 1
+
+                if self.verbose > 0:
+                    pbar = trange(self.max_nodes_per_tree, desc=f"Tree {i+1}/{len(self.start_ids)}", unit="nodes")
                 else:
-                    sim_sample, target_config_idx = self.sample_state(start_idx)
+                    pbar = range(self.max_nodes_per_tree)
                 
-                # Pick closest node
-                if self.sample_uniform_prob and exploring and (np.random.uniform() <  self.sample_uniform_prob):
+                for _ in pbar:
 
-                    target_config_idx = -1
+                    # Sample random sim state
+                    exploring = not (np.random.uniform() < self.target_prob) or not len(self.end_ids)
                     
-                    sim_sample = np.random.uniform(low=self.mins_uniform_sample, high=self.maxs_uniform_sample)
-
-                    k = min(self.knnK, kNN_tree_size)
-                    node_id, _ = kNN_tree.knn_query(sim_sample * self.q_mask, k=k)
-                    node_id = np.random.choice(node_id[0])
-
-                else:
-                    node_ids = self.trees_closest_nodes_idxs[start_idx][target_config_idx]
-                    valid_ids = node_ids[node_ids != -1]
-                    if len(valid_ids):
-                        node_id = np.random.choice(valid_ids)
+                    if not exploring:
+                        target_config_idx = np.random.choice(self.end_ids)
+                        sim_sample = self.configs_full[target_config_idx]
+                    
                     else:
-                        node_id = 0
-                    assert node_id != -1
-
-                node: MultiSearchNode = self.trees[start_idx][node_id]
-
-                # Expand node
-                expanded = False
-                best_expansions = self.action_sampler(node, sim_sample)
-                for best_node_cost, best_phi, best_state, best_q in best_expansions:
+                        sim_sample, target_config_idx = self.sample_state(start_idx)
                     
-                    store_node = False
-                    for ci in range(self.config_count):
-                        new_cost = cost_computation(best_phi, self.configs_full[ci], self.scene_quat_indices)
-                        for k in range(self.knnK):
-                            stored_cost = self.trees_closest_nodes_costs[start_idx][ci][k]
-                            if new_cost < self.target_min_dist and stored_cost >= new_cost:
-                                expanded = True
-                                store_node = True
-                                
-                                # Shift values
-                                self.trees_closest_nodes_costs[start_idx][ci, k+1:] = self.trees_closest_nodes_costs[start_idx][ci, k:-1]
-                                self.trees_closest_nodes_idxs[start_idx][ci, k+1:] = self.trees_closest_nodes_idxs[start_idx][ci, k:-1]
-                                
-                                self.trees_closest_nodes_costs[start_idx][ci][k] = new_cost
-                                self.trees_closest_nodes_idxs[start_idx][ci][k] = len(self.trees[start_idx]) - 1
-                                break
-                    
-                    if store_node:
-                        delta_q = (best_q - node.state[3]).copy()
-                        best_node = MultiSearchNode(
-                            best_phi, node_id, delta_q, best_state,
-                            explore_node=exploring,
-                            target_config_idx=target_config_idx,
-                            q_sequence=best_q)
-                        self.trees[start_idx].append(best_node)
+                    # Pick closest node
+                    if self.sample_uniform_prob and exploring and (np.random.uniform() <  self.sample_uniform_prob):
+
+                        target_config_idx = -1
                         
-                        if self.sample_uniform_prob:
-                            kNN_tree.add_items(best_phi, ids=[kNN_tree_size])
-                            kNN_tree_size += 1
+                        sim_sample = np.random.uniform(low=self.mins_uniform_sample, high=self.maxs_uniform_sample)
 
-                if not expanded:
+                        k = min(self.knnK, kNN_tree_size)
+                        node_id, _ = kNN_tree.knn_query(sim_sample * self.q_mask, k=k)
+                        node_id = np.random.choice(node_id[0])
 
-                    self.trees[start_idx][node_id].failed_expansion_count += 1
-                    
-                    if (
-                        self.disable_node_max_strikes != -1 and
-                        self.trees[start_idx][node_id].failed_expansion_count >= self.disable_node_max_strikes
-                        ):
+                    else:
+                        node_ids = self.trees_closest_nodes_idxs[start_idx][target_config_idx]
+                        valid_ids = node_ids[node_ids != -1]
+                        if len(valid_ids):
+                            node_id = np.random.choice(valid_ids)
+                        else:
+                            node_id = 0
+                        assert node_id != -1
 
-                        if self.verbose > 2:
-                            print(f"Node #{node_id} attempt at expansion failed {self.disable_node_max_strikes} time(s)! Killing it >:(")
+                    node: MultiSearchNode = self.trees[start_idx][node_id]
+
+                    # Expand node
+                    expanded = False
+                    best_expansions = self.action_sampler(node, sim_sample)
+                    for best_node_cost, best_phi, best_state, best_q in best_expansions:
                         
+                        store_node = False
                         for ci in range(self.config_count):
+                            new_cost = cost_computation(best_phi, self.configs_full[ci], self.scene_quat_indices)
                             for k in range(self.knnK):
-                                
-                                if self.trees_closest_nodes_idxs[start_idx][ci, k] == node_id:
-
-                                    self.trees_closest_nodes_costs[start_idx][ci, k:-2] = self.trees_closest_nodes_costs[start_idx][ci, k+1:-1]
-                                    self.trees_closest_nodes_idxs[start_idx][ci, k:-2] = self.trees_closest_nodes_idxs[start_idx][ci, k+1:-1]
+                                stored_cost = self.trees_closest_nodes_costs[start_idx][ci][k]
+                                if new_cost < self.target_min_dist and stored_cost >= new_cost:
+                                    expanded = True
+                                    store_node = True
                                     
-                                    self.trees_closest_nodes_costs[start_idx][ci, -1] = np.nan
-                                    self.trees_closest_nodes_idxs[start_idx][ci, -1] = -1
+                                    # Shift values
+                                    self.trees_closest_nodes_costs[start_idx][ci, k+1:] = self.trees_closest_nodes_costs[start_idx][ci, k:-1]
+                                    self.trees_closest_nodes_idxs[start_idx][ci, k+1:] = self.trees_closest_nodes_idxs[start_idx][ci, k:-1]
+                                    
+                                    self.trees_closest_nodes_costs[start_idx][ci][k] = new_cost
+                                    self.trees_closest_nodes_idxs[start_idx][ci][k] = len(self.trees[start_idx]) - 1
+
+                                    if self.use_flow:
+                                        self.as_dataset.add_data(best_phi, self.configs_full[ci], (best_q - node.state[3]).copy().squeeze(0))
 
                                     break
-                                
-                                elif self.trees_closest_nodes_idxs[start_idx][ci, k] == -1:
-                                    break
+                        
+                        if store_node:
+                            delta_q = (best_q - node.state[3]).copy()
+                            best_node = MultiSearchNode(
+                                best_phi, node_id, delta_q, best_state,
+                                explore_node=exploring,
+                                target_config_idx=target_config_idx,
+                                q_sequence=best_q)
+                            self.trees[start_idx].append(best_node)
                             
-                            if np.isnan(self.trees_closest_nodes_costs[start_idx][ci, 0]):
+                            if self.sample_uniform_prob:
+                                kNN_tree.add_items(best_phi, ids=[kNN_tree_size])
+                                kNN_tree_size += 1
 
-                                self.trees_closest_nodes_costs[start_idx][ci, 0] = cost_computation(
-                                    self.trees[start_idx][0].phi,
-                                    self.configs_full[ci],
-                                    self.scene_quat_indices
-                                )
-                                self.trees_closest_nodes_idxs[start_idx][ci, 0] = 0
+                    if not expanded:
 
-                    elif self.verbose > 2:
-                        print(f"Node #{node_id} did not expand the tree and got a strike (total strikes for this node: {self.trees[start_idx][node_id].failed_expansion_count}/{self.disable_node_max_strikes}).")
-                    
-                if self.verbose > 1:
-                    costs = self.trees_closest_nodes_costs[start_idx][:, 0]
+                        self.trees[start_idx][node_id].failed_expansion_count += 1
+                        
+                        if (
+                            self.disable_node_max_strikes != -1 and
+                            self.trees[start_idx][node_id].failed_expansion_count >= self.disable_node_max_strikes
+                            ):
 
-                    if 0 <= start_idx < len(costs):
-                        costs = costs[np.arange(len(costs)) != start_idx]
+                            if self.verbose > 2:
+                                print(f"Node #{node_id} attempt at expansion failed {self.disable_node_max_strikes} time(s)! Killing it >:(")
+                            
+                            for ci in range(self.config_count):
+                                for k in range(self.knnK):
+                                    
+                                    if self.trees_closest_nodes_idxs[start_idx][ci, k] == node_id:
 
-                    mean_cost = costs.mean()
-                    min_cost = costs.min()
+                                        self.trees_closest_nodes_costs[start_idx][ci, k:-2] = self.trees_closest_nodes_costs[start_idx][ci, k+1:-1]
+                                        self.trees_closest_nodes_idxs[start_idx][ci, k:-2] = self.trees_closest_nodes_idxs[start_idx][ci, k+1:-1]
+                                        
+                                        self.trees_closest_nodes_costs[start_idx][ci, -1] = np.nan
+                                        self.trees_closest_nodes_idxs[start_idx][ci, -1] = -1
 
-                    print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost}", end="")
-                    if len(self.end_ids) == 1:
-                        print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
-                    else:
-                        print()
+                                        break
+                                    
+                                    elif self.trees_closest_nodes_idxs[start_idx][ci, k] == -1:
+                                        break
+                                
+                                if np.isnan(self.trees_closest_nodes_costs[start_idx][ci, 0]):
 
-            # Store information when appropriate
-            if self.verbose > 3:
-                print(f"Storing tree {start_idx}")
-            
-            self.store_tree(start_idx, folder_path, self.trees)
-            
-            # Free memory
-            self.trees = self.init_trees()
+                                    self.trees_closest_nodes_costs[start_idx][ci, 0] = cost_computation(
+                                        self.trees[start_idx][0].phi,
+                                        self.configs_full[ci],
+                                        self.scene_quat_indices
+                                    )
+                                    self.trees_closest_nodes_idxs[start_idx][ci, 0] = 0
 
-            if self.verbose > 6:
-                process = psutil.Process(os.getpid())
-                print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
-                print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
-            
+                        elif self.verbose > 2:
+                            print(f"Node #{node_id} did not expand the tree and got a strike (total strikes for this node: {self.trees[start_idx][node_id].failed_expansion_count}/{self.disable_node_max_strikes}).")
+                        
+                    if self.verbose > 1:
+                        costs = self.trees_closest_nodes_costs[start_idx][:, 0]
+
+                        if 0 <= start_idx < len(costs):
+                            costs = costs[np.arange(len(costs)) != start_idx]
+
+                        mean_cost = costs.mean()
+                        min_cost = costs.min()
+
+                        print(f"Mean Cost: {mean_cost} | Lowest Cost: {min_cost}", end="")
+                        if len(self.end_ids) == 1:
+                            print(f" | Cost to end_idx {self.trees_closest_nodes_costs[start_idx][self.end_ids[0], 0]}")
+                        else:
+                            print()
+
+                # Store information when appropriate
+                if self.verbose > 3:
+                    print(f"Storing tree {start_idx}")
+                
+                self.store_tree(start_idx, folder_path, self.trees)
+                
+                # Free memory
+                if not self.use_flow:
+                    self.trees = self.init_trees()
+
+                if self.verbose > 6:
+                    process = psutil.Process(os.getpid())
+                    print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
+                    print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
+                
+            ### TRAIN SAMPLER ###
+            if self.use_flow:
+                self.learned_action_sampler = Net(self.flow_input_dim, self.ctrl_dim, self.flow_model_arch)
+                self.learned_action_sampler = train(self.learned_action_sampler, self.as_dataset, self.batch_size, self.nepochs, self.device, self.verbose)
+                self.current_training_run += 1
+        
+        if self.use_flow:
+            model_path = os.path.join(self.output_dir, "action_predictor.pth")
+            torch.save(self.learned_action_sampler.state_dict(), model_path)
+
         end_time = time.time()
         total_time = end_time - start_time
         
         if self.verbose > 1:
             print(f"Total time taken: {total_time:.2f} seconds")
 
-        time_data_path = os.path.join(self.output_dir, f"time_taken.txt")
+        time_data_path = os.path.join(self.output_dir, "time_taken.txt")
         with open(time_data_path, "w") as f:
             f.write(f"{total_time}\n")

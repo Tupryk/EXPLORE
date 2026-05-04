@@ -34,7 +34,7 @@ class TD7:
         self.ep_Q = np.zeros((self.num_envs))
         self.ep_steps = np.zeros((self.num_envs))
 
-    def learn(self, total_timesteps, reset_num_timesteps=None, log_interval=None, tb_log_name=None):
+    def learn(self, total_timesteps):
         
         t_stop = self.t+total_timesteps
         terminated = False
@@ -45,7 +45,7 @@ class TD7:
             # -- print info, log model
             self.report_callback(self.env)
 
-            # -- multiple threads: auto_reset
+            # -- reset
             if terminated:
                 state, info = self.env.reset()
 
