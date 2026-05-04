@@ -65,7 +65,7 @@ for i, sc in enumerate(stable_configs):
     # q[15] = 0
     # print(sc)
     sim.pushConfig(sc, q)
-    input()
+    # input()
     # time.sleep(10.)
-    # sim.step(1., view=.1)
+    sim.step(.1, view=1.)
     print("sum: ", sum([float(i) for i in sim.getContacts()]))

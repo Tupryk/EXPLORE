@@ -48,7 +48,7 @@ def signum(q1, q2):
     else:
         return -1
 
-def cost_computation(state1: np.ndarray, state2: np.ndarray, q_mask, scene_quat_indices: list=[]) -> float:
+def cost_computation(state1: np.ndarray, state2: np.ndarray, scene_quat_indices: list=[]) -> float:
     
     e = (state1 - state2)
     
@@ -56,7 +56,6 @@ def cost_computation(state1: np.ndarray, state2: np.ndarray, q_mask, scene_quat_
         i0 = i + 4
         e[i:i0] = state1[i:i0] - signum(state1[i:i0], state2[i:i0]) * state2[i:i0]
 
-    e *= q_mask
     cost = e.T @ e
 
     return cost
@@ -118,7 +117,7 @@ def build_path(tree: list[dict], node_idx: int,
         path = [node["state"] for node in path]
     return path
 
-def generate_adj_map( trees: list[list[dict]], q_mask: np.ndarray=np.array([]),
+def generate_adj_map( trees: list[list[dict]],
     check_cached: str="", scene_quat_indices: list=[], verbose: int=1) -> tuple[list[list[float]], list[list[int]]]:
     
     if check_cached:
@@ -143,7 +142,7 @@ def generate_adj_map( trees: list[list[dict]], q_mask: np.ndarray=np.array([]),
         
         for n, node in enumerate(trees[i]):
             for j in range(tree_count):
-                node_cost = cost_computation(trees[j][0], node, q_mask, scene_quat_indices)
+                node_cost = cost_computation(trees[j][0]["phi"], node["phi"], scene_quat_indices)
                 if node_cost < tree_min_costs[j]:
                     tree_min_costs[j] = node_cost
                     tree_top_nodes[j] = n

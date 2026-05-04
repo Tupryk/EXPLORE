@@ -33,8 +33,7 @@ def AdjMap(costs: np.ndarray, min_value: float=0.0, max_value: float=0.1, save_a
 def play_path(path: list[dict], sim: MjSim,
               start_state: np.ndarray, target_state: np.ndarray,
               playback_time: float=1., tau_action: float=.1, save_intro_as: str="",
-              camera: str="", save_as: str="path.gif", reset_state: bool=False,
-              config_geom_terms: int=-1) -> list[np.ndarray]:
+              camera: str="", save_as: str="path.gif", reset_state: bool=False) -> list[np.ndarray]:
     
     play_path = path.copy()
     
@@ -48,8 +47,6 @@ def play_path(path: list[dict], sim: MjSim,
         im_end = sim.renderImg()
         
         s = play_path[-1]["state"][1]
-        if config_geom_terms != -1:
-            s = s[:-config_geom_terms]
         
         sim.pushConfig(s, ignore_warn=True)
         im_reached = sim.renderImg()
@@ -77,9 +74,6 @@ def play_path(path: list[dict], sim: MjSim,
     prev_node = play_path[0]
      
     origin = prev_node["state"]
-    if config_geom_terms != -1:
-        origin = [*origin]
-        origin[1] = origin[1][:-config_geom_terms]
         
     sim.setState(*origin)
 
@@ -87,11 +81,6 @@ def play_path(path: list[dict], sim: MjSim,
         
         if reset_state:
             origin = prev_node["state"]
-
-            if config_geom_terms != -1:
-                origin = [*origin]
-                origin[1] = origin[1][:-config_geom_terms]
-
             sim.setState(*origin)
             
         # TODO: Make this nicer

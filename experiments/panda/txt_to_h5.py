@@ -1,4 +1,5 @@
 import h5py
+from tqdm import tqdm
 import numpy as np
 
 from explore.utils.vis import AdjMap
@@ -11,14 +12,14 @@ from explore.utils.vis import AdjMap
 # h5_file = "configs/grasp_configs.h5"
 # txt_file = "data/hook_states.txt"
 # h5_file = "configs/stable/pandaHook.h5"
-txt_file = "data/humanoid_box_grasps.txt"
+txt_file = "data/fixed_humanoid_box_grasps.txt"
 h5_file = "configs/stable/humanoid_box_grasps.h5"
 
 # SAME_THRESH = 0.07
 SAME_THRESH = 0.0
 # FAR_THRESH = 0.8
 FAR_THRESH = np.inf
-MAX_CONFIGS = 10000
+MAX_CONFIGS = 100000
 # q_mask = np.array([
 #     1., 1., 1., .1, .1, .1, .1,
 #     0.0, 0.0, 0.0,
@@ -48,7 +49,7 @@ data = np.loadtxt(txt_file, dtype=np.float64)
 
 new_data_pos = []
 new_data_ctrl = []
-for i, vec in enumerate(data):
+for i, vec in tqdm(enumerate(data)):
     if i >= MAX_CONFIGS: break
     # ### FRANKA HOOK ###
     # state_vec = np.zeros(23)
@@ -216,25 +217,25 @@ data_ctrl = np.array(new_data_ctrl)
 #     data_ctrl = data_ctrl[keep]
 #     i += 1
 
-costs = np.zeros((data_pos.shape[0], data_pos.shape[0]))
-for i in range(data_pos.shape[0]):
-    for j in range(data_pos.shape[0]):
+# costs = np.zeros((data_pos.shape[0], data_pos.shape[0]))
+# for i in tqdm(range(data_pos.shape[0])):
+#     for j in range(data_pos.shape[0]):
         
-        if i == j: continue
+#         if i == j: continue
         
-        e = data_pos[i] - data_pos[j]
-        costs[i, j] = np.abs(e).max()
+#         e = data_pos[i] - data_pos[j]
+#         costs[i, j] = np.abs(e).max()
 
-masked = costs.copy()
-np.fill_diagonal(masked, np.inf)
-print(f"Config Count: {data_pos.shape[0]}")
-print("Min cost: ", masked.min())
-print("Max cost: ", costs.max())
+# masked = costs.copy()
+# np.fill_diagonal(masked, np.inf)
+# print(f"Config Count: {data_pos.shape[0]}")
+# print("Min cost: ", masked.min())
+# print("Max cost: ", costs.max())
 
 with h5py.File(h5_file, "w") as f:
     f.create_dataset("qpos", data=data_pos)
     f.create_dataset("ctrl", data=data_ctrl)
 
-print(f"Success: Data saved to {h5_file}.")
+# print(f"Success: Data saved to {h5_file}.")
 
-AdjMap(costs, SAME_THRESH, costs.max())
+# AdjMap(costs, SAME_THRESH, costs.max())

@@ -1,26 +1,23 @@
 import os
 import time
-import math
 import mujoco
 import psutil
 import pickle
 import hnswlib
-import warp as wp
 import numpy as np
 from tqdm import trange
-import mujoco_warp as mjw
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from explore.utils.utils import signum
 from explore.env.mujoco_sim import MjSim
 from explore.utils.mj import get_model_quaternions
-from explore.datasets.utils import expand_qpos_with_geoms, cost_computation
+from explore.datasets.utils import cost_computation
 
 
 class MultiSearchNode:
     def __init__(self,
+                 phi: np.ndarray,
                  parent: int,
                  delta_q: np.ndarray,
                  state: tuple,
@@ -28,6 +25,7 @@ class MultiSearchNode:
                  path: list=None,
                  explore_node: bool=False,
                  target_config_idx: int=-1):
+        self.phi = phi
         self.parent = parent
         self.delta_q = delta_q  # TODO: Remove this
         self.state = state
@@ -93,8 +91,6 @@ class Search:
         self.verbose = cfg.verbose
         if self.threading:
             self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
-        self.use_gpu = cfg.use_gpu
-        assert not (self.threading and self.use_gpu)
         
         self.start_ids = cfg.start_idx
         self.end_ids = cfg.end_idx
@@ -113,7 +109,7 @@ class Search:
         self.disable_node_max_strikes = cfg.disable_node_max_strikes
         self.n_best_actions = cfg.n_best_actions
         self.knnK = cfg.knnK
-        self.regularization_weight = cfg.regularization_weight
+        self.vel_weight = cfg.velocity_weight
 
         self.sim = [
             MjSim(
@@ -128,11 +124,6 @@ class Search:
         self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
         self.state_dim = self.sim[0].data.qpos.shape[0]
         
-        if self.use_gpu:
-            self.warp_model = mjw.put_model(self.sim[0].model)
-            mujoco.mj_forward(self.sim[0].model, self.sim[0].data)
-            self.warp_data = mjw.put_data(self.sim[0].model, self.sim[0].data, nworld=self.sample_count, njmax=500, nconmax=500)
-
         self.geoms_in_cost = []
         self.geoms_in_cost_weights = np.array(cfg.geoms_in_cost_weights)
         for geom_name in cfg.geoms_in_cost:
@@ -141,16 +132,37 @@ class Search:
 
         self.scene_quat_indices = get_model_quaternions(self.sim[0].model)
         
-        self.config_geom_terms = -1
         if len(self.geoms_in_cost):
             for i in range(len(self.geoms_in_cost)):
                 self.scene_quat_indices.append(i * 7 + 3 + self.state_dim)
 
-            self.q_mask = np.concatenate([self.q_mask, self.geoms_in_cost_weights])
+        self.dist_weight = cfg.dist_weight
+        self.dist_max = cfg.dist_max
+        
+        self.objs = []
+        for geom_name in cfg.objs:
+            geom_id = mujoco.mj_name2id(self.sim[0].model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            self.objs.append(geom_id)
 
-            self.configs = expand_qpos_with_geoms(self.configs, self.sim[0], self.geoms_in_cost)
+        self.contacts = []
+        for geom_name in cfg.contacts:
+            geom_id = mujoco.mj_name2id(self.sim[0].model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            self.contacts.append(geom_id)
 
-            self.config_geom_terms = len(self.geoms_in_cost_weights)
+        self.configs_full = []
+        for i in range(self.config_count):
+            self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
+            state_vec = self.sim[0].getStateVector(
+                self.q_mask,
+                self.vel_weight,
+                self.objs,
+                self.contacts,
+                self.dist_weight,
+                self.dist_max,
+                self.geoms_in_cost,
+                self.geoms_in_cost_weights
+            )
+            self.configs_full.append(state_vec)
 
         if self.verbose > 2:
             print("Quaternions in scene: ", self.scene_quat_indices)
@@ -183,20 +195,27 @@ class Search:
             
         for i in pbar:
             
-            if self.config_geom_terms != -1:
-                self.sim[0].pushConfig(self.configs[i, :-self.config_geom_terms], self.configs_ctrl[i])
-            else:
-                self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
-            state = self.sim[0].getState(self.geoms_in_cost)
+            self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
+            state = self.sim[0].getState()
+            phi = self.sim[0].getStateVector(
+                self.q_mask,
+                self.vel_weight,
+                self.objs,
+                self.contacts,
+                self.dist_weight,
+                self.dist_max,
+                self.geoms_in_cost,
+                self.geoms_in_cost_weights
+            )
         
-            root = MultiSearchNode(-1, np.zeros_like(self.configs_ctrl[0]), state, 0.)
+            root = MultiSearchNode(phi, -1, np.zeros_like(self.configs_ctrl[0]), state, 0.)
             trees.append([root])
             
             self.trees_closest_nodes_idxs.append(np.full((self.config_count, self.knnK), -1))
             self.trees_closest_nodes_costs.append(np.full((self.config_count, self.knnK), np.nan))
             
             for ci in range(self.config_count):
-                cost = cost_computation(self.configs[i], self.configs[ci], self.q_mask, self.scene_quat_indices)
+                cost = cost_computation(self.configs_full[i], self.configs_full[ci], self.scene_quat_indices)
                 self.trees_closest_nodes_costs[i][ci, 0] = cost
                 self.trees_closest_nodes_idxs[i][ci, 0] = 0
 
@@ -257,7 +276,7 @@ class Search:
         return top_results
     
     def eval_multiple_ctrls_seq(self, ctrls: np.ndarray, origin: tuple,
-                                target: tuple, sim_idx: int=0) -> list[tuple[float, np.ndarray, np.ndarray]]:
+                                target: np.ndarray, sim_idx: int=0) -> list[tuple[float, np.ndarray, np.ndarray]]:
         results = []
         for ctrl in ctrls:
             res = self.eval_ctrl(ctrl, origin, target, sim_idx=sim_idx)
@@ -265,7 +284,7 @@ class Search:
         return results
     
     def eval_multiple_ctrls(self, ctrls: np.ndarray, origin: tuple,
-                            target: tuple) -> list[tuple[float, np.ndarray, np.ndarray]]:
+                            target: np.ndarray) -> list[tuple[float, np.ndarray, np.ndarray]]:
         results = []
         
         if self.threading:
@@ -287,48 +306,9 @@ class Search:
             ]
             for future in as_completed(futures):
                 results.extend(future.result())
-        
-        elif self.use_gpu:
-            self.warp_data.time.fill_(origin[0])
-            if self.config_geom_terms != -1:
-                wp.copy(self.warp_data.qpos, wp.array(origin[1][:-self.config_geom_terms], dtype=wp.float32))
-            wp.copy(self.warp_data.qpos, wp.array(origin[1], dtype=wp.float32))
-            wp.copy(self.warp_data.qvel, wp.array(origin[2], dtype=wp.float32))
-            wp.copy(self.warp_data.ctrl, wp.array(origin[3], dtype=wp.float32))
-
-            mjw.reset_data(self.warp_model, self.warp_data)
-
-            steps = math.ceil(self.tau_action / self.tau_sim)
-
-            prev_ctrl = np.copy(origin[3])
-
-            for k in range(steps):
-
-                perc = (k+1)/steps
-                ctrl_np = prev_ctrl * (1 - perc) + ctrls * perc
-                wp.copy(self.warp_data.ctrl, wp.array(ctrl_np, dtype=wp.float32))
-                
-                mjw.step(self.warp_model, self.warp_data)
-            
-            results = []
-            time_ = self.warp_data.time.numpy()
-            qpos = self.warp_data.qpos.numpy()
-            qvel = self.warp_data.qvel.numpy()
-            ctrl = self.warp_data.ctrl.numpy()
-
-            for i in range(self.sample_count):
-                state = (
-                    time_[i], qpos[i], qvel[i], ctrl[i]
-                )
-                cost2target = cost_computation(target, state[1], self.q_mask, self.scene_quat_indices)
-                
-                reg_e = ctrls[i][0] - prev_ctrl
-                cost2target += self.regularization_weight * (reg_e.T @ reg_e)
-
-                results.append((cost2target, state, ctrls[i]))
             
         else:
-            self.eval_multiple_ctrls_seq(ctrls, origin, target)
+            results = self.eval_multiple_ctrls_seq(ctrls, origin, target)
 
         
         if self.verbose > 3:
@@ -349,34 +329,34 @@ class Search:
     
     def eval_ctrl(self, ctrl: np.ndarray, origin: tuple,
                   target: np.ndarray, sim_idx: int=0
-                  ) -> tuple[float, np.ndarray, np.ndarray]:
-        
-        if self.config_geom_terms != -1:
-            origin = [*origin]
-            original_state = np.copy(origin[1])
-            origin[1] = origin[1][:-self.config_geom_terms]
+                  ) -> tuple[float, np.ndarray, tuple, np.ndarray]:
         
         self.sim[sim_idx].setState(*origin)
-        
-        if self.config_geom_terms != -1:
-            origin[1] = original_state
         
         for c in ctrl:
             self.sim[sim_idx].step(self.tau_action, c)
         
-        state = self.sim[sim_idx].getState(self.geoms_in_cost)
+        state = self.sim[sim_idx].getState()
+        phi = self.sim[sim_idx].getStateVector(
+            self.q_mask,
+            self.vel_weight,
+            self.objs,
+            self.contacts,
+            self.dist_weight,
+            self.dist_max,
+            self.geoms_in_cost,
+            self.geoms_in_cost_weights
+        )
 
-        cost2target = cost_computation(target, state[1], self.q_mask, self.scene_quat_indices)
+        cost2target = cost_computation(target, phi, self.scene_quat_indices)
         
-        reg_e = state[3] - origin[3]
-        cost2target += self.regularization_weight * (reg_e.T @ reg_e)
-        
-        return cost2target, state, ctrl
+        return cost2target, phi, state, ctrl
     
     def store_tree(self, idx: int, folder_path: str, trees: list):
         dict_tree = []
         for node in trees[idx]:
             new_node = {
+                "phi": node.phi,
                 "parent": node.parent,
                 "delta_q": node.delta_q,
                 "q_sequence": node.q_sequence,
@@ -458,7 +438,7 @@ class Search:
                 else:
                     target_config_idx = np.random.choice(valid_indices)
 
-        sim_sample = self.configs[target_config_idx]
+        sim_sample = self.configs_full[target_config_idx]
         return sim_sample, target_config_idx
 
     def run(self):
@@ -478,7 +458,7 @@ class Search:
                 max_elems = self.n_best_actions * self.max_nodes_per_tree
                 kNN_tree = hnswlib.Index(space="l2", dim=self.state_dim)
                 kNN_tree.init_index(max_elements=max_elems, ef_construction=200, M=16)
-                kNN_tree.add_items(self.configs[start_idx], ids=[0])
+                kNN_tree.add_items(self.configs_full[start_idx], ids=[0])
                 kNN_tree_size = 1
 
             if self.verbose > 0:
@@ -493,7 +473,7 @@ class Search:
                 
                 if not exploring:
                     target_config_idx = np.random.choice(self.end_ids)
-                    sim_sample = self.configs[target_config_idx]
+                    sim_sample = self.configs_full[target_config_idx]
                 
                 else:
                     sim_sample, target_config_idx = self.sample_state(start_idx)
@@ -523,11 +503,11 @@ class Search:
                 # Expand node
                 expanded = False
                 best_expansions = self.action_sampler(node, sim_sample)
-                for best_node_cost, best_state, best_q in best_expansions:
+                for best_node_cost, best_phi, best_state, best_q in best_expansions:
                     
                     store_node = False
                     for ci in range(self.config_count):
-                        new_cost = cost_computation(best_state[1], self.configs[ci], self.q_mask, self.scene_quat_indices)
+                        new_cost = cost_computation(best_phi, self.configs_full[ci], self.scene_quat_indices)
                         for k in range(self.knnK):
                             stored_cost = self.trees_closest_nodes_costs[start_idx][ci][k]
                             if new_cost < self.target_min_dist and stored_cost >= new_cost:
@@ -545,14 +525,14 @@ class Search:
                     if store_node:
                         delta_q = (best_q - node.state[3]).copy()
                         best_node = MultiSearchNode(
-                            node_id, delta_q, best_state,
+                            best_phi, node_id, delta_q, best_state,
                             explore_node=exploring,
                             target_config_idx=target_config_idx,
                             q_sequence=best_q)
                         self.trees[start_idx].append(best_node)
                         
                         if self.sample_uniform_prob:
-                            kNN_tree.add_items(best_state[1] * self.q_mask, ids=[kNN_tree_size])
+                            kNN_tree.add_items(best_phi, ids=[kNN_tree_size])
                             kNN_tree_size += 1
 
                 if not expanded:
@@ -586,9 +566,8 @@ class Search:
                             if np.isnan(self.trees_closest_nodes_costs[start_idx][ci, 0]):
 
                                 self.trees_closest_nodes_costs[start_idx][ci, 0] = cost_computation(
-                                    self.trees[start_idx][0].state[1],
-                                    self.configs[ci],
-                                    self.q_mask,
+                                    self.trees[start_idx][0].phi,
+                                    self.configs_full[ci],
                                     self.scene_quat_indices
                                 )
                                 self.trees_closest_nodes_idxs[start_idx][ci, 0] = 0

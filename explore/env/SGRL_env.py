@@ -1,5 +1,6 @@
 import os
 import h5py
+import mujoco
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
@@ -18,9 +19,14 @@ class StableConfigsEnv(gym.Env):
         
         super().__init__()
 
+        self.verbose = cfg.verbose
         self.use_schedule = cfg.use_schedule
-        self.schedule_alpha_step = 1. / cfg.schedule_alpha_end_step
+        self.schedule_alpha_step = 1. / (cfg.schedule_alpha_end_step / cfg.schedule_alpha_block)
+        if self.verbose:
+            print("Alpha step: ", self.schedule_alpha_step)
+        self.schedule_alpha_block = cfg.schedule_alpha_block
         self.schedule_alpha = 0.
+        self.schedule_buffer = 0
         self.tau_sim = cfg.sim.tau_sim
         self.tau_action = cfg.sim.tau_action
         self.interpolate_actions = cfg.sim.interpolate_actions
@@ -36,7 +42,7 @@ class StableConfigsEnv(gym.Env):
         self.use_vel = cfg.use_vel
         self.guiding = cfg.guiding
         self.reward = None
-        
+
         self.use_vision = cfg.use_vision
         assert (self.use_vision and not self.use_vel) or (not self.use_vision)
 
@@ -50,10 +56,9 @@ class StableConfigsEnv(gym.Env):
         #     raise Exception("Using goal conditioning but only a single goal!")
         
         self.original_stable_configs = h5py.File(cfg.stable_configs_path, 'r')
-        self.config_count = self.original_stable_configs["q"].shape[0]
-        print("Total configs in h5: ", self.config_count)
-        
-        self.verbose = cfg.verbose
+        self.config_count = self.original_stable_configs["qpos"].shape[0]
+        if self.verbose:
+            print("Total configs in h5: ", self.config_count)
 
         config_path = os.path.join(cfg.trajectory_data_path, ".hydra/config.yaml")
         trees_cfg = OmegaConf.load(config_path)
@@ -62,6 +67,10 @@ class StableConfigsEnv(gym.Env):
         self.dataset_tau_action = trees_cfg.RRT.sim.tau_action
         self.time_scaling = np.ceil(self.dataset_tau_action / self.tau_action) if cfg.time_scaling == -1 else cfg.time_scaling
 
+        self.dist_weight = trees_cfg.RRT.dist_weight
+        self.dist_max = trees_cfg.RRT.dist_max
+        self.vel_weight = trees_cfg.RRT.velocity_weight
+
         tree_dataset = os.path.join(cfg.trajectory_data_path, "trees")
         self.trees, _, _ = load_trees(tree_dataset)
 
@@ -69,6 +78,29 @@ class StableConfigsEnv(gym.Env):
             interpolate=self.interpolate_actions, joints_are_same_as_ctrl=self.joints_are_same_as_ctrl)
         self.sim.setupRenderer(cfg.render_w, cfg.render_h, camera=cfg.sim.camera)
         self.model_quats = get_model_quaternions(self.sim.model)
+
+        self.objs = []
+        for geom_name in trees_cfg.RRT.objs:
+            geom_id = mujoco.mj_name2id(self.sim.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            self.objs.append(geom_id)
+
+        self.contacts = []
+        for geom_name in trees_cfg.RRT.contacts:
+            geom_id = mujoco.mj_name2id(self.sim.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            self.contacts.append(geom_id)
+
+        self.original_stable_configs_full = []
+        for i in range(self.config_count):
+            self.sim.pushConfig(self.original_stable_configs["qpos"][i], self.original_stable_configs["ctrl"][i])
+            state_vec = self.sim.getStateVector(
+                self.q_mask,
+                self.vel_weight,
+                self.objs,
+                self.contacts,
+                self.dist_weight,
+                self.dist_max
+            )
+            self.original_stable_configs_full.append(state_vec)
         
         if self.guiding == "StaGE":
 
@@ -90,7 +122,7 @@ class StableConfigsEnv(gym.Env):
                 print(f"Starting enviroment with guiding on {len(self.traj_pairs)} trajectories with average length {sum(len(p) for p in self.paths)/len(self.traj_pairs)}.")
 
         elif self.guiding == "SGRL":
-            self.originals_kd_tree = KDTree(self.original_stable_configs["q"] * self.q_mask)
+            self.originals_kd_tree = KDTree(self.original_stable_configs_full)
         
         # Defines observation space
         state = self.sim.getState()
@@ -138,7 +170,7 @@ class StableConfigsEnv(gym.Env):
             prio = qpos[:self.ctrl_dim]
 
             if self.goal_conditioning:
-                prio = np.concatenate((prio, self.target_state))
+                prio = np.concatenate((prio, self.goal_condition))
             
             if not self.camera_filter or self.camera_filter == "none":
                 pass
@@ -160,7 +192,7 @@ class StableConfigsEnv(gym.Env):
                 self.state = np.concatenate((self.state, qvel))
             
             if self.goal_conditioning:
-                self.state = np.concatenate((self.state, self.target_state))
+                self.state = np.concatenate((self.state, self.goal_condition))
 
         self.last_time = time_
         self.last_ctrl = ctrl
@@ -210,22 +242,22 @@ class StableConfigsEnv(gym.Env):
             
             if self.guiding == "SGRL":
                 query = (
-                    self.original_stable_configs["q"][s_cfg_idx] * self.schedule_alpha +
-                    self.original_stable_configs["q"][e_cfg_idx] * (1. - self.schedule_alpha)
+                    self.original_stable_configs_full[s_cfg_idx] * self.schedule_alpha +
+                    self.original_stable_configs_full[e_cfg_idx] * (1. - self.schedule_alpha)
                 )
-                query *= self.q_mask
                 query = query.reshape(1, -1)
                 _, ind = self.originals_kd_tree.query(query, k=1)
                 s_cfg_idx = ind[0][0]
         
-            start_qpos = self.original_stable_configs["q"][s_cfg_idx]
+            start_qpos = self.original_stable_configs["qpos"][s_cfg_idx]
             start_ctrl = self.original_stable_configs["ctrl"][s_cfg_idx]
 
             self.sim.pushConfig(start_qpos, start_ctrl)
             self.max_steps = self.max_steps_default
             
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
-        self.target_state = self.original_stable_configs["q"][e_cfg_idx]
+        self.target_state = self.original_stable_configs_full[e_cfg_idx]
+        self.goal_condition = self.original_stable_configs["qpos"][e_cfg_idx]
         
         self.iter = 0
         
@@ -254,9 +286,16 @@ class StableConfigsEnv(gym.Env):
         self.iter += 1
 
         ### Reward Computation ###
-        eval_state = self.sim_state[1]
+        eval_state = self.sim.getStateVector(
+            self.q_mask,
+            self.vel_weight,
+            self.objs,
+            self.contacts,
+            self.dist_weight,
+            self.dist_max
+        )
         
-        cost = cost_computation(eval_state, self.target_state, self.q_mask, scene_quat_indices=self.model_quats)
+        cost = cost_computation(eval_state, self.target_state, scene_quat_indices=self.model_quats)
         
         if cost < self.min_cost:
             goal_reached_reward = 1.0 
@@ -278,9 +317,12 @@ class StableConfigsEnv(gym.Env):
             "reward": self.reward
         }
 
-        self.schedule_alpha += self.schedule_alpha_step
-        if self.schedule_alpha > 1.0:
-            self.schedule_alpha = 1.0
+        self.schedule_buffer += 1
+        if self.schedule_buffer >= self.schedule_alpha_block:
+            self.schedule_buffer = 0
+            self.schedule_alpha += self.schedule_alpha_step
+            if self.schedule_alpha > 1.0:
+                self.schedule_alpha = 1.0
 
         return self.state, self.reward, terminated, truncated, info
 

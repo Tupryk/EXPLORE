@@ -148,12 +148,25 @@ class MjSim:
                 ctrls.append(np.copy(self.data.ctrl))
         
         return frames, states, ctrls
-        
-    def getState(self, geoms_in_cost: list[int]=None):
+    
+    def getStateVector(self,
+            q_mask: np.ndarray=np.array([]),
+            vel_weight: float=0.0,
+            objs: list[int]=[],
+            contacts: list[int]=[],
+            dist_weight: float=0.0,
+            dist_max: float=0.0,
+            geoms_in_cost: list[int]=[],
+            geoms_in_cost_weights: np.ndarray=np.array([])
+        ) -> np.ndarray:
 
-        q = np.copy(self.data.qpos)
+        # qpos
+        state_vec = np.copy(self.data.qpos) * q_mask
 
-        if geoms_in_cost:
+        # geoms
+        if len(geoms_in_cost):
+            poses = np.array([])
+            
             for geom_id in geoms_in_cost:
                 pos = self.data.geom_xpos[geom_id]
                 mat = self.data.geom_xmat[geom_id]
@@ -161,12 +174,36 @@ class MjSim:
                 quat = np.zeros(4)
                 mujoco.mju_mat2Quat(quat, mat)
                 
-                q = np.concatenate([q, pos])
-                q = np.concatenate([q, quat])
+                poses = np.concatenate([poses, pos])
+                poses = np.concatenate([poses, quat])
+        
+            poses *= geoms_in_cost_weights
+            state_vec = np.concatenate([state_vec, poses])
+
+        # vels
+        qvel = np.copy(self.data.qvel) * vel_weight
+        state_vec = np.concatenate([state_vec, qvel])
+
+        # dists
+        if len(objs):
+            fromto = np.zeros(6)
+            dists = np.zeros(len(objs) * len(contacts))
+            i = 0
+            for oi in objs:
+                for ci in contacts:
+                    dist = mujoco.mj_geomDistance(self.model, self.data, ci, oi, dist_max, fromto)
+                    dists[i] = 1 - np.clip(dist / dist_max, 0., 1.)
+                    i += 1
+            dists *= dist_weight
+            state_vec = np.concatenate([state_vec, dists])
+        
+        return state_vec
+        
+    def getState(self):
 
         state = (
             self.data.time,
-            q,
+            np.copy(self.data.qpos),
             np.copy(self.data.qvel),
             np.copy(self.data.ctrl),
             self.last_ctrl_target,
