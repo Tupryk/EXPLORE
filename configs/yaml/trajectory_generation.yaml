@@ -17,7 +17,7 @@ RRT:
   end_idx: -1
   bidirectional: false
   cost_max_method: false
-  sample_count: 500
+  sample_count: 100
   sampling_strategy: rs
   n_best_actions: 16  # Only for random sampling strategy
   cem_steps: 10  # Only for CEM

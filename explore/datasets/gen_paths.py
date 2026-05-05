@@ -6,6 +6,7 @@ import psutil
 import pickle
 import hnswlib
 import numpy as np
+from tqdm import tqdm
 from tqdm import trange
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig, ListConfig
@@ -513,7 +514,7 @@ class Search:
         for tr_idx in range(self.train_runs):
             datapoints_in_run = 0  # For logging
 
-            for i, start_idx in enumerate(self.start_ids):
+            for i, start_idx in tqdm(enumerate(self.start_ids), total=len(self.start_ids)):
 
                 if self.sample_uniform_prob:
                     max_elems = self.n_best_actions * self.max_nodes_per_tree
@@ -522,7 +523,7 @@ class Search:
                     kNN_tree.add_items(self.configs_full[start_idx], ids=[0])
                     kNN_tree_size = 1
 
-                if self.verbose > 0:
+                if self.verbose > 1:
                     pbar = trange(self.max_nodes_per_tree, desc=f"Tree {i+1}/{len(self.start_ids)}", unit="nodes")
                 else:
                     pbar = range(self.max_nodes_per_tree)
@@ -666,10 +667,10 @@ class Search:
                 if not self.use_flow:
                     self.trees = self.init_trees()
 
-                if self.verbose > 0:
-                    process = psutil.Process(os.getpid())
-                    print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
-                    print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
+            if self.verbose > 0:
+                process = psutil.Process(os.getpid())
+                print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
+                print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
                 
             ### TRAIN SAMPLER ###
             if self.use_flow:
