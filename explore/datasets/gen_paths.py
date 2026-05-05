@@ -193,6 +193,7 @@ class Search:
             self.as_dataset = ActionSamplerDataset(cfg.flow_model.dataset_max_size)
             self.max_training_runs = cfg.flow_model.max_training_runs
             self.current_training_run = 0
+            self.minimum_datapoint_kNN_quality = cfg.flow_model.minimum_datapoint_kNN_quality
 
         assert not (self.sample_uniform_prob and self.self.use_flow)
         assert not (self.sampling_strategy != "rs" and self.use_flow)
@@ -266,19 +267,32 @@ class Search:
 
         learned_perc = self.current_training_run / self.max_training_runs if self.use_flow else 0
 
-        sampled_ctrls = self.gauss_sample_ctrl(parent_node, int(self.sample_count * (1-learned_perc)))
+        gauss_sample_count = int(self.sample_count * (1-learned_perc))
+        if gauss_sample_count == 0:
+            gauss_sample_count = 1
+
+        sampled_ctrls = self.gauss_sample_ctrl(parent_node, gauss_sample_count)
 
         if self.use_flow and learned_perc != 0:
             
+            learned_sample_count = int(self.sample_count * learned_perc)
             learned_sampled_ctrls, _ = sample(
                 self.learned_action_sampler,
                 torch.tensor(parent_node.phi, dtype=torch.float32),
                 torch.tensor(target, dtype=torch.float32),
-                int(self.sample_count * learned_perc),
+                learned_sample_count,
                 self.flow_steps,
                 self.device
             )
-            learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :]
+
+            # Add noise to learned sample to avoid mode collapse
+            std_devs = self.stepsize * 0.2
+            noise = np.random.randn(learned_sample_count * self.horizon * self.ctrl_dim)
+            noise = noise.reshape(learned_sample_count, self.horizon, self.ctrl_dim)
+            noise *= std_devs
+
+            learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :] + noise
+            learned_sampled_ctrls = np.clip(learned_sampled_ctrls, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])
 
             sampled_ctrls = np.vstack([sampled_ctrls, learned_sampled_ctrls])
 
@@ -497,6 +511,7 @@ class Search:
             self.max_nodes_per_tree = self.learn_every
 
         for _ in range(self.train_runs):
+            datapoints_in_run = 0  # For logging
 
             for i, start_idx in enumerate(self.start_ids):
 
@@ -567,8 +582,9 @@ class Search:
                                     self.trees_closest_nodes_costs[start_idx][ci][k] = new_cost
                                     self.trees_closest_nodes_idxs[start_idx][ci][k] = len(self.trees[start_idx]) - 1
 
-                                    if self.use_flow:
-                                        self.as_dataset.add_data(best_phi, self.configs_full[ci], (best_q - node.state[3]).copy().squeeze(0))
+                                    if self.use_flow and k < self.minimum_datapoint_kNN_quality:
+                                        self.as_dataset.add_data(node.phi, self.configs_full[ci], best_q.copy().squeeze(0))
+                                        datapoints_in_run += 1
 
                                     break
                         
@@ -650,13 +666,16 @@ class Search:
                 if not self.use_flow:
                     self.trees = self.init_trees()
 
-                if self.verbose > 6:
+                if self.verbose > 0:
                     process = psutil.Process(os.getpid())
                     print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
                     print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
                 
             ### TRAIN SAMPLER ###
             if self.use_flow:
+                if self.verbose:
+                    print("New datapoints collected in run: ", datapoints_in_run)
+                    datapoints_in_run = 0
                 self.learned_action_sampler = Net(self.flow_input_dim, self.ctrl_dim, self.flow_model_arch)
                 self.learned_action_sampler = train(self.learned_action_sampler, self.as_dataset, self.batch_size, self.nepochs, self.device, self.verbose)
                 self.current_training_run += 1
