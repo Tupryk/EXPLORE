@@ -193,8 +193,8 @@ class Search:
             self.device = cfg.flow_model.device
             self.as_dataset = ActionSamplerDataset(cfg.flow_model.dataset_max_size)
             self.max_training_runs = cfg.flow_model.max_training_runs
-            self.current_training_run = 0
             self.minimum_datapoint_kNN_quality = cfg.flow_model.minimum_datapoint_kNN_quality
+            if self.minimum_datapoint_kNN_quality == -1: self.minimum_datapoint_kNN_quality = self.knnK
 
         assert not (self.sample_uniform_prob and self.self.use_flow)
         assert not (self.sampling_strategy != "rs" and self.use_flow)
@@ -208,9 +208,8 @@ class Search:
         self.trees_closest_nodes_idxs = []
         self.trees_closest_nodes_costs = []
 
-        print("Initializing trees...")
-        
         if self.verbose > 1:
+            print("Initializing trees...")
             pbar = trange(self.config_count, desc="Init trees", unit="tree")
         else:
             pbar = range(self.config_count)
@@ -292,7 +291,8 @@ class Search:
             noise = noise.reshape(learned_sample_count, self.horizon, self.ctrl_dim)
             noise *= std_devs
 
-            learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :] + noise
+            # learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :] + noise
+            learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :]
             learned_sampled_ctrls = np.clip(learned_sampled_ctrls, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])
 
             sampled_ctrls = np.vstack([sampled_ctrls, learned_sampled_ctrls])
@@ -510,6 +510,7 @@ class Search:
         else:
             self.train_runs = self.max_nodes_per_tree // self.learn_every
             self.max_nodes_per_tree = self.learn_every
+            self.current_training_run = 0
 
         for tr_idx in range(self.train_runs):
             datapoints_in_run = 0  # For logging
@@ -674,12 +675,16 @@ class Search:
                 
             ### TRAIN SAMPLER ###
             if self.use_flow:
-                if self.verbose:
-                    print(f"Training run {tr_idx+1}/{self.train_runs}")
-                    print("New datapoints collected in run: ", datapoints_in_run)
-                    datapoints_in_run = 0
-                self.learned_action_sampler = Net(self.flow_input_dim, self.ctrl_dim, self.flow_model_arch)
-                self.learned_action_sampler = train(self.learned_action_sampler, self.as_dataset, self.batch_size, self.nepochs, self.device, self.verbose)
+                if datapoints_in_run:
+                    if self.verbose:
+                        print(f"Training run {tr_idx+1}/{self.train_runs}")
+                        print("New datapoints collected in run: ", datapoints_in_run)
+                        datapoints_in_run = 0
+                    self.learned_action_sampler = Net(self.flow_input_dim, self.ctrl_dim, self.flow_model_arch)
+                    self.learned_action_sampler = train(self.learned_action_sampler, self.as_dataset, self.batch_size, self.nepochs, self.device, self.verbose)
+                else:
+                    print("No new data to train model!")
+                
                 self.current_training_run += 1
         
         if self.use_flow:

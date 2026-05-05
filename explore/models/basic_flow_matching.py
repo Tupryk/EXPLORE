@@ -1,4 +1,3 @@
-# Define net
 import torch
 import numpy as np
 from torch import nn
@@ -8,7 +7,7 @@ from torch.utils.data import DataLoader
 
 
 class Net(nn.Module):
-    def __init__(self, input_dim: int, output_dim: int, arch: int=[256, 256]):
+    def __init__(self, input_dim: int, output_dim: int, arch: list[int]=[256, 256]):
         super().__init__()
 
         self.output_dim = output_dim
@@ -69,12 +68,12 @@ def sample(model: Net, state: torch.Tensor, goal: torch.Tensor, n_samples: int=1
     initial_noise = x_t.clone()
 
     step_size = 1 / n_steps
+    with torch.no_grad():
+        for i in range(n_steps):
 
-    for i in range(n_steps):
-
-        t = torch.full((n_samples, 1), i * step_size, device=device)
-        noise_prediction = model(state, goal, x_t, t)
-        x_t += step_size * noise_prediction
+            t = torch.full((n_samples, 1), i * step_size, device=device)
+            noise_prediction = model(state, goal, x_t, t)
+            x_t += step_size * noise_prediction
 
     return x_t, initial_noise
 

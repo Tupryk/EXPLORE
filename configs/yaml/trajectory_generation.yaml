@@ -1,7 +1,7 @@
 RRT:
   verbose: 1
   max_nodes_per_tree: 2500
-  min_cost: 0.02
+  min_cost: 0.001
   sample_uniform_prob: 0.
   horizon: 1
   max_configs: -1
@@ -48,11 +48,11 @@ RRT:
     learn_every: 100
     device: "cuda"
     nepochs: 100
-    batch_size: 256
-    dataset_max_size: 128000
-    steps: 64
+    batch_size: 512
+    dataset_max_size: 64000
+    steps: 128
     max_training_runs: 25
-    minimum_datapoint_kNN_quality: 6
+    minimum_datapoint_kNN_quality: 16
 
   sim:
     tau_sim: 0.005
