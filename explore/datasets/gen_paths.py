@@ -181,7 +181,8 @@ class Search:
         ### FLOW MODEL ###
         self.use_flow = cfg.use_flow
         if self.use_flow:
-            self.flow_input_dim = 1 + self.ctrl_dim + len(self.configs_full[0]) * 2
+            # self.flow_input_dim = 1 + self.ctrl_dim + len(self.configs_full[0]) * 2
+            self.flow_input_dim = 1 + self.ctrl_dim + len(self.configs_full[0])
             self.flow_model_arch = cfg.flow_model.arch
             
             self.learned_action_sampler = Net(self.flow_input_dim, self.ctrl_dim, self.flow_model_arch)
@@ -191,12 +192,11 @@ class Search:
             self.batch_size = cfg.flow_model.batch_size
             self.nepochs = cfg.flow_model.nepochs
             self.device = cfg.flow_model.device
-            self.as_dataset = ActionSamplerDataset(cfg.flow_model.dataset_max_size)
+            self.as_dataset_max_size = cfg.flow_model.dataset_max_size
+            self.as_dataset = ActionSamplerDataset(self.as_dataset_max_size)
             self.max_training_runs = cfg.flow_model.max_training_runs
-            self.minimum_datapoint_kNN_quality = cfg.flow_model.minimum_datapoint_kNN_quality
-            if self.minimum_datapoint_kNN_quality == -1: self.minimum_datapoint_kNN_quality = self.knnK
 
-        assert not (self.sample_uniform_prob and self.self.use_flow)
+        assert not (self.sample_uniform_prob and self.use_flow)
         assert not (self.sampling_strategy != "rs" and self.use_flow)
 
         if self.verbose:
@@ -263,9 +263,10 @@ class Search:
             self,
             parent_node: MultiSearchNode,
             target: np.ndarray
-        ) -> list[tuple[float, np.ndarray, np.ndarray]]:
+        ) -> tuple[list[tuple[float, np.ndarray, np.ndarray]], tuple]:
 
         learned_perc = self.current_training_run / self.max_training_runs if self.use_flow else 0
+        learned_sample_count = int(self.sample_count * learned_perc)
 
         gauss_sample_count = int(self.sample_count * (1-learned_perc))
         if gauss_sample_count == 0:
@@ -275,42 +276,54 @@ class Search:
 
         if self.use_flow and learned_perc != 0:
             
-            learned_sample_count = int(self.sample_count * learned_perc)
-            learned_sampled_ctrls, _ = sample(
-                self.learned_action_sampler,
-                torch.tensor(parent_node.phi, dtype=torch.float32),
-                torch.tensor(target, dtype=torch.float32),
-                learned_sample_count,
-                self.flow_steps,
-                self.device
-            )
+            # learned_sampled_ctrls, _ = sample(
+            #     self.learned_action_sampler,
+            #     torch.tensor(parent_node.phi, dtype=torch.float32),
+            #     torch.tensor(target, dtype=torch.float32),
+            #     learned_sample_count,
+            #     self.flow_steps,
+            #     self.device
+            # )
 
-            # Add noise to learned sample to avoid mode collapse
-            std_devs = self.stepsize * 0.2
-            noise = np.random.randn(learned_sample_count * self.horizon * self.ctrl_dim)
-            noise = noise.reshape(learned_sample_count, self.horizon, self.ctrl_dim)
-            noise *= std_devs
+            # # Add noise to learned sample to avoid mode collapse
+            # std_devs = self.stepsize * 0.2
+            # noise = np.random.randn(learned_sample_count * self.horizon * self.ctrl_dim)
+            # noise = noise.reshape(learned_sample_count, self.horizon, self.ctrl_dim)
+            # noise *= std_devs
 
-            # learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :] + noise
-            learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :]
-            learned_sampled_ctrls = np.clip(learned_sampled_ctrls, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])
+            # # learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :] + noise
+            # learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :]
+            # learned_sampled_ctrls = np.clip(learned_sampled_ctrls, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])
+
+            learned_sampled_ctrls = self.gauss_sample_ctrl(parent_node, learned_sample_count)
 
             sampled_ctrls = np.vstack([sampled_ctrls, learned_sampled_ctrls])
 
         results = self.eval_multiple_ctrls(sampled_ctrls, parent_node.state, target)
         
-        if self.n_best_actions != -1:
-            best_results = sorted(results, key=lambda x: x[0])[:self.n_best_actions]
-        else:
-            best_results = results
+        indexed_results = [(cost2target, phi, state, ctrl, i) for i, (cost2target, phi, state, ctrl) in enumerate(results)]
 
-        return best_results
+        if self.n_best_actions != -1:
+            best_indexed = sorted(indexed_results, key=lambda x: x[0])[:self.n_best_actions]
+        else:
+            best_indexed = indexed_results
+
+        best_results = [(cost2target, phi, state, ctrl) for cost2target, phi, state, ctrl, _ in best_indexed]
+
+        stats = (self.n_best_actions, self.sample_count, 0, 0)
+        if learned_sample_count > 0:
+            total_best = len(best_indexed)
+            learned_in_best = sum(1 for *_, i in best_indexed if i >= gauss_sample_count)
+            gauss_in_best = total_best - learned_in_best
+            stats = (gauss_in_best, gauss_sample_count, learned_in_best, learned_sample_count)
+
+        return best_results, stats
     
     def cem_sample_ctrls(
             self,
             parent_node: MultiSearchNode,
             target: np.ndarray
-        ) -> list[tuple[float, np.ndarray, np.ndarray]]:
+        ) -> tuple[list[tuple[float, np.ndarray, np.ndarray]], tuple]:
         q_offset = np.tile(parent_node.state[3], self.horizon).reshape(self.horizon, self.ctrl_dim)
         top_results = None
         mean = np.zeros_like(parent_node.delta_q)
@@ -324,7 +337,7 @@ class Search:
             top_results = sorted(results)[:self.n_best_actions]
             mean = np.mean([r[2] for r in top_results], axis=0) - q_offset
 
-        return top_results
+        return top_results, (0, 0, 0, 0)
     
     def eval_multiple_ctrls_seq(self, ctrls: np.ndarray, origin: tuple,
                                 target: np.ndarray, sim_idx: int=0) -> list[tuple[float, np.ndarray, np.ndarray]]:
@@ -461,7 +474,7 @@ class Search:
         below_target = costs < self.target_min_dist
         above_min = costs > self.min_cost
 
-        preferred_mask = below_target # & above_min
+        preferred_mask = below_target & above_min
         preferred_indices = valid_indices[preferred_mask[valid_indices]]
 
         # Print percentages (debug/info)
@@ -512,9 +525,11 @@ class Search:
             self.max_nodes_per_tree = self.learn_every
             self.current_training_run = 0
 
-        for tr_idx in range(self.train_runs):
+        trs = tqdm(range(self.train_runs)) if self.verbose else range(self.train_runs)
+        for tr_idx in trs:
             datapoints_in_run = 0  # For logging
 
+            sampler_stats = [0, 0, 0, 0]
             for i, start_idx in tqdm(enumerate(self.start_ids), total=len(self.start_ids)):
 
                 if self.sample_uniform_prob:
@@ -565,7 +580,11 @@ class Search:
 
                     # Expand node
                     expanded = False
-                    best_expansions = self.action_sampler(node, sim_sample)
+                    best_expansions, stats = self.action_sampler(node, sim_sample)
+                    sampler_stats[0] += stats[0]
+                    sampler_stats[1] += stats[1]
+                    sampler_stats[2] += stats[2]
+                    sampler_stats[3] += stats[3]
                     for best_node_cost, best_phi, best_state, best_q in best_expansions:
                         
                         store_node = False
@@ -584,10 +603,6 @@ class Search:
                                     self.trees_closest_nodes_costs[start_idx][ci][k] = new_cost
                                     self.trees_closest_nodes_idxs[start_idx][ci][k] = len(self.trees[start_idx]) - 1
 
-                                    if self.use_flow and k < self.minimum_datapoint_kNN_quality:
-                                        self.as_dataset.add_data(node.phi, self.configs_full[ci], best_q.copy().squeeze(0))
-                                        datapoints_in_run += 1
-
                                     break
                         
                         if store_node:
@@ -602,6 +617,10 @@ class Search:
                             if self.sample_uniform_prob:
                                 kNN_tree.add_items(best_phi, ids=[kNN_tree_size])
                                 kNN_tree_size += 1
+                            
+                            if self.use_flow:
+                                self.as_dataset.add_data(node.phi, self.configs_full[target_config_idx], best_q.copy().squeeze(0))
+                                datapoints_in_run += 1
 
                     if not expanded:
 
@@ -658,6 +677,7 @@ class Search:
                         else:
                             print()
 
+                
                 # Store information when appropriate
                 if self.verbose > 3:
                     print(f"Storing tree {start_idx}")
@@ -668,6 +688,17 @@ class Search:
                 if not self.use_flow:
                     self.trees = self.init_trees()
 
+            gauss_in_best = sampler_stats[0]
+            gauss_sample_count = sampler_stats[1]
+            learned_in_best = sampler_stats[2]
+            learned_sample_count = sampler_stats[3]
+            if gauss_sample_count > 0:
+                gauss_acc = gauss_in_best   / gauss_sample_count
+                print(f"Gauss accuracy: {gauss_in_best}/{gauss_sample_count} ({gauss_acc:.1%})")
+            if learned_sample_count > 0:
+                learned_acc = learned_in_best / learned_sample_count
+                print(f"Learned accuracy: {learned_in_best}/{learned_sample_count} ({learned_acc:.1%})")
+            
             if self.verbose > 0:
                 process = psutil.Process(os.getpid())
                 print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
@@ -679,6 +710,7 @@ class Search:
                     if self.verbose:
                         print(f"Training run {tr_idx+1}/{self.train_runs}")
                         print("New datapoints collected in run: ", datapoints_in_run)
+                        print(f"Training flow model with {len(self.as_dataset)} samples (max: {self.as_dataset_max_size})")
                         datapoints_in_run = 0
                     self.learned_action_sampler = Net(self.flow_input_dim, self.ctrl_dim, self.flow_model_arch)
                     self.learned_action_sampler = train(self.learned_action_sampler, self.as_dataset, self.batch_size, self.nepochs, self.device, self.verbose)

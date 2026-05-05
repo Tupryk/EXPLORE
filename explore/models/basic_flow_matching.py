@@ -26,7 +26,8 @@ class Net(nn.Module):
             nn.init.kaiming_uniform_(layer.weight)
 
     def forward(self, current_state: torch.Tensor, goal: torch.Tensor, noise: torch.Tensor, t: torch.Tensor):
-        x = torch.concat([current_state, goal, noise, t], axis=-1)
+        # x = torch.concat([current_state, goal, noise, t], axis=-1)
+        x = torch.concat([current_state, noise, t], axis=-1)
         for l in self.linears[:-1]:
             x = nn.ReLU()(l(x))
         return self.linears[-1](x)
@@ -80,8 +81,6 @@ def sample(model: Net, state: torch.Tensor, goal: torch.Tensor, n_samples: int=1
 
 def train(model: Net, dataset: Dataset, batch_size: int=256, nepochs: int=10, device: str="cpu", verbose: int=0) -> Net:
     
-    print(f"Training flow model with {len(dataset)} samples")
-
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
