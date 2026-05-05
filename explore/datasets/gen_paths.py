@@ -510,7 +510,7 @@ class Search:
             self.train_runs = self.max_nodes_per_tree // self.learn_every
             self.max_nodes_per_tree = self.learn_every
 
-        for _ in range(self.train_runs):
+        for tr_idx in range(self.train_runs):
             datapoints_in_run = 0  # For logging
 
             for i, start_idx in enumerate(self.start_ids):
@@ -674,6 +674,7 @@ class Search:
             ### TRAIN SAMPLER ###
             if self.use_flow:
                 if self.verbose:
+                    print(f"Training run {tr_idx}/{self.train_runs}")
                     print("New datapoints collected in run: ", datapoints_in_run)
                     datapoints_in_run = 0
                 self.learned_action_sampler = Net(self.flow_input_dim, self.ctrl_dim, self.flow_model_arch)
