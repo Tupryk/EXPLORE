@@ -674,7 +674,7 @@ class Search:
             ### TRAIN SAMPLER ###
             if self.use_flow:
                 if self.verbose:
-                    print(f"Training run {tr_idx}/{self.train_runs}")
+                    print(f"Training run {tr_idx+1}/{self.train_runs}")
                     print("New datapoints collected in run: ", datapoints_in_run)
                     datapoints_in_run = 0
                 self.learned_action_sampler = Net(self.flow_input_dim, self.ctrl_dim, self.flow_model_arch)
