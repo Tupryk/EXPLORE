@@ -112,6 +112,7 @@ class Search:
         self.disable_node_max_strikes = cfg.disable_node_max_strikes
         self.n_best_actions = cfg.n_best_actions
         self.knnK = cfg.knnK
+        if self.knnK == -1: self.knnK = self.configs.shape[0]
         self.vel_weight = cfg.velocity_weight
 
         self.sim = [

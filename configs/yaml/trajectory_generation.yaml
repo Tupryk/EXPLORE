@@ -16,7 +16,7 @@ RRT:
   n_best_actions: 16  # Only for random sampling strategy
   cem_steps: 10  # Only for CEM
   output_dir: ${hydra:runtime.output_dir}
-  knnK: 16
+  knnK: -1
 
   use_flow: true
   flow_model:
@@ -25,15 +25,15 @@ RRT:
     device: "cuda"
     nepochs: 100
     batch_size: 512
-    dataset_max_size: 128000
+    dataset_max_size: 1280000
     steps: 128
     max_training_runs: 25
 
   # Environment specific
   min_cost: 0.02
   stepsize: 0.1
-  sample_count: 500
-  max_configs: 128
+  sample_count: 100
+  max_configs: -1
   q_mask:
   - 1
   - 1
@@ -41,27 +41,60 @@ RRT:
   - 1
   - 1
   - 1
-  - 2
-  - 2
-  - 2
-  - .25
-  - .25
-  - .25
-  - .25
+  - 0
+  - 0
+  - 0
+  - 0
   geoms_in_cost: []
   geoms_in_cost_weights: []
   objs: []
   contacts: []
   dist_max: 0.2
   dist_weight: 0.1
-  velocity_weight: 0.01
-  
+  velocity_weight: 0.
+
   sim:
     tau_sim: 0.005
-    tau_action: 0.2
+    tau_action: 0.1
     interpolate_actions: true
     joints_are_same_as_ctrl: true
     use_spline_ref: false
-    mujoco_xml: configs/mujoco_/twoFingersCube.xml
+    mujoco_xml: configs/mujoco_/fingerRamp.xml
     camera: fixed_cam
-configs_path: configs/stable/twoFingersCube.h5
+configs_path: configs/stable/fingerRamp_onRamp.h5
+
+#   min_cost: 0.02
+#   stepsize: 0.1
+#   sample_count: 500
+#   max_configs: 128
+#   q_mask:
+#   - 1
+#   - 1
+#   - 1
+#   - 1
+#   - 1
+#   - 1
+#   - 2
+#   - 2
+#   - 2
+#   - .25
+#   - .25
+#   - .25
+#   - .25
+#   geoms_in_cost: []
+#   geoms_in_cost_weights: []
+#   objs: []
+#   contacts: []
+#   dist_max: 0.2
+#   dist_weight: 0.1
+#   velocity_weight: 0.01
+
+#   sim:
+#     tau_sim: 0.005
+#     tau_action: 0.2
+#     interpolate_actions: true
+#     joints_are_same_as_ctrl: true
+#     use_spline_ref: false
+#     mujoco_xml: configs/mujoco_/twoFingersCube.xml
+#     camera: fixed_cam
+# configs_path: configs/stable/twoFingersCube.h5
