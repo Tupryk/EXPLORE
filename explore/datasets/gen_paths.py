@@ -112,7 +112,6 @@ class Search:
         self.disable_node_max_strikes = cfg.disable_node_max_strikes
         self.n_best_actions = cfg.n_best_actions
         self.knnK = cfg.knnK
-        if self.knnK == -1: self.knnK = self.configs.shape[0]
         self.vel_weight = cfg.velocity_weight
 
         self.sim = [
@@ -277,26 +276,24 @@ class Search:
 
         if self.use_flow and learned_perc != 0:
             
-            # learned_sampled_ctrls, _ = sample(
-            #     self.learned_action_sampler,
-            #     torch.tensor(parent_node.phi, dtype=torch.float32),
-            #     torch.tensor(target, dtype=torch.float32),
-            #     learned_sample_count,
-            #     self.flow_steps,
-            #     self.device
-            # )
+            learned_sampled_ctrls, _ = sample(
+                self.learned_action_sampler,
+                torch.tensor(parent_node.phi, dtype=torch.float32),
+                torch.tensor(target, dtype=torch.float32),
+                learned_sample_count,
+                self.flow_steps,
+                self.device
+            )
 
-            # # Add noise to learned sample to avoid mode collapse
-            # std_devs = self.stepsize * 0.2
-            # noise = np.random.randn(learned_sample_count * self.horizon * self.ctrl_dim)
-            # noise = noise.reshape(learned_sample_count, self.horizon, self.ctrl_dim)
-            # noise *= std_devs
+            # Add noise to learned sample to avoid mode collapse
+            std_devs = self.stepsize * 0.2
+            noise = np.random.randn(learned_sample_count * self.horizon * self.ctrl_dim)
+            noise = noise.reshape(learned_sample_count, self.horizon, self.ctrl_dim)
+            noise *= std_devs
 
-            # # learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :] + noise
-            # learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :]
-            # learned_sampled_ctrls = np.clip(learned_sampled_ctrls, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])
-
-            learned_sampled_ctrls = self.gauss_sample_ctrl(parent_node, learned_sample_count)
+            # learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :] + noise
+            learned_sampled_ctrls = learned_sampled_ctrls.detach().cpu().numpy()[:, None, :]
+            learned_sampled_ctrls = np.clip(learned_sampled_ctrls, self.ctrl_ranges[:, 0], self.ctrl_ranges[:, 1])
 
             sampled_ctrls = np.vstack([sampled_ctrls, learned_sampled_ctrls])
 
