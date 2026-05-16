@@ -1,0 +1,39 @@
+min_cost: 0.1
+q_mask: [
+  .2, .2, 2., 1., 1., 1., 1.,
+  1., 1., 1.,  # hip
+  .75, .25, .25,  # knee, ankle, ankle
+  1., 1., 1.,  # hip
+  .5, .25, .25,  # knee, ankle, ankle
+  1.25, 1.25, 1.25,  # waist
+  .75, .75, .75,  # shoulder
+  .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+  .75, .75, .75,  # shoulder
+  .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+  7., 7., 7., .1, .1, .1, .1,
+]
+geoms_in_cost: [
+  # "left_ankle_roll_joint", "right_ankle_roll_joint",
+  # "left_rubber_hand_0", "right_rubber_hand_0",
+  # "box_marker_0", "box_marker_1", "box_marker_2"
+]
+geoms_in_cost_weights: [
+  # 3., 3., 3., .1, .1, .1, .1,
+  # 3., 3., 3., .1, .1, .1, .1,
+  
+  # 2., 2., 2., .0, .0, .0, .0,
+  # 2., 2., 2., .0, .0, .0, .0,
+  
+  # 2., 2., 2., .0, .0, .0, .0,
+  # 2., 2., 2., .0, .0, .0, .0,
+  # 2., 2., 2., .0, .0, .0, .0
+]
+objs: [
+  # obj_col
+]
+contacts: [
+  # "left_rubber_hand_0", "right_rubber_hand_0"
+]
+velocity_weight: 0.1
+dist_weight: 0.1
+dist_max: 0.2
