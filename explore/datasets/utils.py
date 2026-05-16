@@ -601,3 +601,43 @@ def expand_qpos_with_geoms(qpos: np.ndarray, sim: MjSim, geom_ids: list[int]):
         new_qpos.append(q)
 
     return np.array(new_qpos)
+
+
+def find_config_pairs():
+    h5_file = "configs/stable/humanoid_box_grasps.h5"
+    mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
+
+    file = h5py.File(h5_file, 'r')
+    stable_configs = file["qpos"]
+    stable_configs_ctrl = file["ctrl"]
+    
+    sim = MjSim(mujoco_xml, verbose=1, tau_sim=1e-3)
+    scene_quat_indices = get_model_quaternions(sim.model)
+
+    state_vectors = []
+    for i, sc in enumerate(stable_configs):
+        q = stable_configs_ctrl[i].copy()
+        sim.pushConfig(sc, q)
+        sv = sim.getStateVector(
+            cfg.q_mask,
+            cfg.velocity_weight,
+            cfg.objs, cfg.contacts,
+            cfg.dist_weight, cfg.dist_max,
+            cfg.geoms_in_cost, cfg.geoms_in_cost_weights
+        )
+        state_vectors.append(sv)
+    
+    pairs = []
+    for i, sv_a in tqdm(enumerate(state_vectors[:1000]), total=len(state_vectors[:1000])):
+        for j in range(i+1, len(state_vectors)):
+            if i == j: continue
+            sv_b = state_vectors[j]
+            cost = cost_computation(sv_a, sv_b, scene_quat_indices)
+            if cost < cfg.min_cost:
+                pairs.append((i, j))
+                pairs.append((j, i))
+                print(len(pairs))
+    print(pairs)
+    print(f"Total pairs: {len(pairs)} (of {len(state_vectors)**2} possible ({((len(pairs)/len(state_vectors)**2)*100):.2f}))")
+                
+    return pairs

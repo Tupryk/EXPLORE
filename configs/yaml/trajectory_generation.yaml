@@ -22,7 +22,7 @@ RRT:
     arch: [256, 256]
     learn_every: 100
     device: "cuda"
-    nepochs: 100
+    nepochs: 20000
     batch_size: 512
     dataset_max_size: 12800
     steps: 64

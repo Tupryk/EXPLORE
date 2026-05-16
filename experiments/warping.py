@@ -1,15 +1,59 @@
+import math
+import h5py
+import torch
 import mujoco
+import warp as wp
+import numpy as np
+from tqdm import tqdm
 import mujoco_warp as mjw
 
+NWORLD = 256
 
-mj_model = mujoco.MjModel.from_xml_path("configs/mujoco_/unitree_g1/scene.xml")
+new_file_path = "configs/stable/humanoid_box_grasps.h5"
+mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
+
+start_idx = 1
+end_idx = 12217
+ctrl_n = 10
+tau_action = 0.1
+tau_sim = 0.005
+action_steps = math.ceil(tau_action / tau_sim)
+
+mj_model = mujoco.MjModel.from_xml_path(mujoco_xml)
+mj_model.opt.timestep = tau_sim
+mj_model.opt.ccd_iterations = 200
 mj_data = mujoco.MjData(mj_model)
+mujoco.mj_resetData(mj_model, mj_data)
 
 model = mjw.put_model(mj_model)
-data = mjw.put_data(mj_model, mj_data, nworld=4096)
+data = mjw.put_data(mj_model, mj_data, nworld=NWORLD, nconmax=250, njmax=250)
 
-mjw.reset_data(model, data)
-for t in range(10):
-    print(f"Step {t}")
-    mjw.step(model, data)
+ctrl_torch = torch.zeros((NWORLD, mj_model.nu), device="cuda")
+ctrl_wp = wp.from_torch(ctrl_torch)
+
+file = h5py.File(new_file_path, 'r')
+stable_configs = file["qpos"]
+stable_configs_ctrl = file["ctrl"]
+
+data.qpos = wp.array(np.tile(stable_configs[start_idx], (NWORLD, 1)), dtype=wp.float32)
+data.ctrl = wp.array(np.tile(stable_configs_ctrl[start_idx], (NWORLD, 1)), dtype=wp.float32)
+mjw.forward(model, data)
+
+# two different random targets per instance
+ctrl_sequence = [torch.tensor(stable_configs_ctrl[:NWORLD], device="cuda")]
+for _ in range(ctrl_n-1):
+    ctrl_target = torch.rand((NWORLD, mj_model.nu), device="cuda") * 2 - 1
+    ctrl_sequence.append(ctrl_target)
+
+for target_ctrl_idx in tqdm(range(1, len(ctrl_sequence))):
+    
+    for t in range(action_steps):
+
+        alpha = t / (action_steps - 1)
+
+        ctrl_torch[:] = (1 - alpha) * ctrl_sequence[target_ctrl_idx-1] + alpha * ctrl_sequence[target_ctrl_idx]
+
+        data.ctrl.assign(ctrl_wp)
+        mjw.step(model, data)
+
 print(data.qpos.shape)

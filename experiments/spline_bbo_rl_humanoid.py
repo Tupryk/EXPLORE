@@ -9,9 +9,11 @@ from scipy.interpolate import make_interp_spline
 
 
 start_idx = 1
-end_idx = 0
-ctrl_n = 6
+end_idx = 12217
+ctrl_n = 10
 
+new_file_path = "configs/stable/humanoid_box_grasps.h5"
+mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
 
 class BSpline:
     def __init__(self, start_pos: np.ndarray, end_pos: np.ndarray, degree: int=6):
@@ -34,9 +36,6 @@ class BSpline:
         point = np.array([s(t) for s in self.splines])
         return point
 
-
-new_file_path = "configs/stable/new_rnd_twoFingers.h5"
-
 file = h5py.File(new_file_path, 'r')
 stable_configs = file["qpos"]
 stable_configs_ctrl = file["ctrl"]
@@ -45,7 +44,7 @@ start_ctrl = stable_configs_ctrl[start_idx]
 end_ctrl = stable_configs_ctrl[end_idx]
 spline = BSpline(start_ctrl, end_ctrl)
 
-sim = MjSim("configs/mujoco_/twoFingers.xml", view=False, verbose=0)
+sim = MjSim(mujoco_xml, view=False, verbose=0)
 
 def eval_spline(points: np.ndarray, sim: MjSim, vis: bool=False) -> float:
 
@@ -60,8 +59,7 @@ def eval_spline(points: np.ndarray, sim: MjSim, vis: bool=False) -> float:
         sim.step(tau_action, ctrl, view)
     
     final_state = sim.getState()[1]
-    q_mask = np.array([.1, .1, .1, .1, .1, .1, 1., 1., 1., 0., 0., 0., 0.])
-    e = (final_state - stable_configs[end_idx]) * q_mask
+    e = (final_state - stable_configs[end_idx])
     result = e.T @ e
     return result
 
@@ -69,7 +67,7 @@ def eval_splines(candidates: np.ndarray, sim: MjSim) -> list[float]:
 
     results = []
     for c in candidates:
-        v = eval_spline(c.reshape(-1, 6), sim, vis=True)
+        v = eval_spline(c.reshape(-1, start_ctrl.shape[0]), sim, vis=True)
         results.append(v)
     
     return results
@@ -82,8 +80,8 @@ initial_guess += np.random.randn(initial_guess.shape[0]) * .01
 print("Decision variables: ", initial_guess.shape)
 
 es = cma.CMAEvolutionStrategy(initial_guess, 1.5, {
-    "popsize": 512,
-    "maxfevals": 50000,
+    "popsize": 2,
+    "maxfevals": 1,
     "verbose": -1
 })
 
@@ -98,28 +96,16 @@ while not es.stop():
 print(f"Done! with cost {es.result.fbest}")
 
 r = es.result.xbest
-points = np.concatenate((spline.start_pos.reshape(1, -1), r.reshape(-1, 6)))
+points = np.concatenate((spline.start_pos.reshape(1, -1), r.reshape(-1, start_ctrl.shape[0])))
 times = np.linspace(spline.start_time, spline.end_time, points.shape[0])
 
 spline.compute(points)
-ts = np.linspace(spline.start_time, spline.end_time, 100)
-ctrls = np.array([spline.eval(t) for t in ts])
-
-fig, axes = plt.subplots(3, 2, figsize=(16, 14))
-
-for i in range(6):
-    axes[i%3, i//3].set_title(f"Dim {i}")
-    axes[i%3, i//3].plot(ts, ctrls[:, i])
-    axes[i%3, i//3].scatter(times, points[:, i], c="r")
-
-plt.tight_layout()
-plt.show()
 
 del sim
-sim = MjSim("configs/mujoco_/twoFingers.xml", view=True, verbose=0, joints_are_same_as_ctrl=True)
+sim = MjSim(mujoco_xml, view=True, verbose=0, joints_are_same_as_ctrl=True)
 sim.pushConfig(stable_configs[start_idx])
 time.sleep(3)
 sim.pushConfig(stable_configs[end_idx])
 time.sleep(3)
-eval_spline(initial_guess.reshape(-1, 6), sim, vis=True)
+eval_spline(initial_guess.reshape(-1, start_ctrl.shape[0]), sim, vis=True)
 time.sleep(3)
