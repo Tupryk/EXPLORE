@@ -1,15 +1,15 @@
 min_cost: 2.5
 q_mask: [
-  .2, .2, 2., 1., 1., 1., 1.,
-  1., 1., 1.,  # hip
-  .75, .25, .25,  # knee, ankle, ankle
-  1., 1., 1.,  # hip
-  .5, .25, .25,  # knee, ankle, ankle
-  1.25, 1.25, 1.25,  # waist
-  .75, .75, .75,  # shoulder
-  .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
-  .75, .75, .75,  # shoulder
-  .5, .25, .25, .25,  # elbow, wrist, wrist, wrist
+  2., 2., 2., 1., 1., 1., 1.,
+  .1, .1, .1,  # hip
+  .075, .025, .025,  # knee, ankle, ankle
+  .1, .1, .1,  # hip
+  .05, .025, .025,  # knee, ankle, ankle
+  .125, .125, .125,  # waist
+  .075, .075, .075,  # shoulder
+  .05, .025, .025, .025,  # elbow, wrist, wrist, wrist
+  .075, .075, .075,  # shoulder
+  .05, .025, .025, .025,  # elbow, wrist, wrist, wrist
   7., 7., 7., .1, .1, .1, .1,
 ]
 geoms_in_cost: [

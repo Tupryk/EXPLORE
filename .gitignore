@@ -10,3 +10,4 @@ MUJOCO_LOG.TXT
 *.scad
 .vscode
 tensorboard/
+*.mp4
