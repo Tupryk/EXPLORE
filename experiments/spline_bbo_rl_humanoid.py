@@ -8,8 +8,8 @@ from explore.env.mujoco_sim import MjSim
 from scipy.interpolate import make_interp_spline
 
 
-start_idx = 1
-end_idx = 12217
+start_idx = 3014
+end_idx = 304
 ctrl_n = 10
 
 new_file_path = "configs/stable/humanoid_box_grasps.h5"
