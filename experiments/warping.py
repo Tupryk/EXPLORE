@@ -12,29 +12,29 @@ wp.init()
 device = "cuda" # Ensure running on GPU
 
 ### SETUP ###
-NWORLD = 1024
-new_file_path = "configs/stable/humanoid_box_grasps.h5"
-mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
+NWORLD = 512
+new_file_path = "configs/stable/gobox.h5"
+mujoco_xml = "configs/mujoco_/unitree_go2/box_scene.xml"
 start_idx = 1
-end_idx = 12217
+end_idx = 2
 ctrl_n = 4
 tau_action = 0.25
-tau_sim = 0.005
+tau_sim = 0.01
 action_steps = math.ceil(tau_action / tau_sim)
 num_generations = 10
-noise_std = .1
+noise_std = 10.
 lam = 1.  # MPPI temperature
 
 geoms_in_cost_names = [
-    "left_ankle_roll_joint", "right_ankle_roll_joint",
-    "left_rubber_hand_0", "right_rubber_hand_0",
+    "FL", "FR",
+    "RL", "RR",
     "box_marker_0", "box_marker_1", "box_marker_2"
 ]
 
 geom_weights = wp.array([
     1., 1.,     # Feet
-    2., 2.,     # Hands
-    4., 4., 4.  # Box
+    1., 1.,     # Hands
+    10., 10., 10.  # Box
 ], dtype=wp.float32, device=device)
 
 mj_model = mujoco.MjModel.from_xml_path(mujoco_xml)
@@ -72,9 +72,6 @@ ctrl_low = wp.array(mj_model.actuator_ctrlrange[:, 0], dtype=wp.float32, device=
 ctrl_high = wp.array(mj_model.actuator_ctrlrange[:, 1], dtype=wp.float32, device=device)
 
 ### WARP KERNELS ###
-
-### WARP KERNELS ###
-
 @wp.kernel
 def interpolate_ctrl_kernel(
     U: wp.array(dtype=wp.float32, ndim=2),          # Explicitly 2D (ctrl_n, nu)
@@ -99,9 +96,21 @@ def interpolate_ctrl_kernel(
     out_ctrl[world, nu] = (1.0 - alpha) * ctrl_a + alpha * ctrl_b
 
 @wp.kernel
+def running_cost_kernel(
+    qvel: wp.array(dtype=wp.float32, ndim=2),
+    out_cost: wp.array(dtype=wp.float32, ndim=1)
+):
+    world = wp.tid()
+    cost = float(0.0)
+    for i in range(qvel.shape[1]):
+        v = qvel[world, i]
+        cost += v * v
+    out_cost[world] = cost * 0.001
+
+@wp.kernel
 def compute_cost_kernel(
-    geom_xpos: wp.array(dtype=wp.vec3, ndim=2),        # FIXED: 2D array of vec3
-    target_geom_xpos: wp.array(dtype=wp.vec3, ndim=1), # FIXED: 1D array of vec3
+    geom_xpos: wp.array(dtype=wp.vec3, ndim=2),
+    target_geom_xpos: wp.array(dtype=wp.vec3, ndim=1),
     geom_weights: wp.array(dtype=wp.float32, ndim=1),
     geom_indices: wp.array(dtype=wp.int32, ndim=1),
     out_cost: wp.array(dtype=wp.float32, ndim=1)
@@ -152,7 +161,7 @@ def update_u_kernel(
         new_val = low
     elif new_val > high:
         new_val = high
-        
+    
     U[t_idx, nu_idx] = new_val
 
 
@@ -162,11 +171,15 @@ best_U = wp.array(U_np, dtype=wp.float32, device=device)
 
 qpos_init = wp.array(np.tile(stable_configs[start_idx], (NWORLD, 1)), dtype=wp.float32, device=device)
 ctrl_init = wp.array(np.tile(stable_configs_ctrl[start_idx], (NWORLD, 1)), dtype=wp.float32, device=device)
+terminal_cost = wp.zeros(shape=(NWORLD,), dtype=wp.float32, device=device)
+running_cost = wp.zeros(shape=(NWORLD,), dtype=wp.float32, device=device)
 cost = wp.zeros(shape=(NWORLD,), dtype=wp.float32, device=device)
+qvel_dim = data.qvel.shape[-1]
 
 ### MPPI LOOP ###
 for i in tqdm(range(num_generations), total=num_generations):
     # Reset all parallel worlds to starting config
+    cost *= 0.
     wp.copy(data.qpos, qpos_init)
     wp.copy(data.ctrl, ctrl_init)
     mjw.forward(model, data)
@@ -188,13 +201,22 @@ for i in tqdm(range(num_generations), total=num_generations):
             )
             mjw.step(model, data)
 
+        wp.launch(
+            kernel=running_cost_kernel,
+            dim=(NWORLD, qvel_dim),
+            inputs=[data.qvel, running_cost],
+            device=device
+        )
+        cost += running_cost
+
     # Execute GPU cost updates
     wp.launch(
         kernel=compute_cost_kernel,
         dim=(NWORLD,),
-        inputs=[data.geom_xpos, target_geom_xpos, geom_weights, geom_indices, cost],
+        inputs=[data.geom_xpos, target_geom_xpos, geom_weights, geom_indices, terminal_cost],
         device=device
     )
+    cost += terminal_cost
     
     # Pull lightweight cost scalar properties back to Host for quick evaluation
     cost_np = cost.numpy()
@@ -218,6 +240,8 @@ for i in tqdm(range(num_generations), total=num_generations):
     if min_cost < best_cost:
         best_cost = min_cost
         wp.copy(best_U, U)
+    else:
+        wp.copy(U, best_U)
 
     print(f"Cost in generation {i+1}/{num_generations}: {min_cost:.4f} (best: {best_cost:.4f})")
 

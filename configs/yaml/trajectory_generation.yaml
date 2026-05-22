@@ -1,50 +1,49 @@
 RRT:
-  verbose: 1
-  max_nodes_per_tree: 2500
+  verbose: 3
+  max_nodes_per_tree: 10000
   sample_uniform_prob: 0.
   horizon: 1
-  target_min_dist: 10.
+  target_min_dist: 1000000.
   target_prob: .2
-  disable_node_max_strikes: 1
   sample_uniform: false
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: -1
+  start_idx: 0
   end_idx: -1
   sampling_strategy: rs
-  n_best_actions: -1
   cem_steps: 10  # Only for CEM
   output_dir: ${hydra:runtime.output_dir}
+  
+  # The Big Three
   knnK: 16
+  n_best_actions: 16
+  disable_node_max_strikes: 1
 
   use_flow: true
   flow_model:
     arch: [256, 256]
-    learn_every: 100
+    learn_every: 500
     device: "cuda"
     nepochs: 20000
     batch_size: 512
     dataset_max_size: 12800
     steps: 64
-    max_training_runs: 25
+    max_training_runs: 10
 
   # Environment specific
   path_diff_thresh: 0.05
-  min_cost: 0.02
-  stepsize: 0.1
-  sample_count: 100
+  min_cost: 0.1
+  stepsize: .25
+  sample_count: 500
   max_configs: -1
-  q_mask:
-  - 1
-  - 1
-  - 1
-  - 1
-  - 1
-  - 1
-  - 0
-  - 0
-  - 0
-  - 0
+  q_mask: [
+    1., 1., 1., .1, .1, .1, .1,  # Free body
+    .05, .05, .05,  # FL
+    .05, .05, .05,  # FR
+    .05, .05, .05,  # RL
+    .05, .05, .05,  # RR
+    4., 4., 4., .1, .1, .1, .1,  # Free body
+  ]
   geoms_in_cost: []
   geoms_in_cost_weights: []
   objs: []
@@ -57,11 +56,11 @@ RRT:
     tau_sim: 0.005
     tau_action: 0.1
     interpolate_actions: true
-    joints_are_same_as_ctrl: true
+    joints_are_same_as_ctrl: false
     use_spline_ref: false
-    mujoco_xml: configs/mujoco_/fingerRamp.xml
+    mujoco_xml: configs/mujoco_/unitree_go2/box_scene.xml
     camera: fixed_cam
-configs_path: configs/stable/fingerRamp_onRamp.h5
+configs_path: configs/stable/gobox.h5
 
 #   min_cost: 0.02
 #   stepsize: 0.1

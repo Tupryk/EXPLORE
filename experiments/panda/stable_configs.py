@@ -6,8 +6,11 @@ import matplotlib.pyplot as plt
 from explore.env.mujoco_sim import MjSim
 
 
-h5_file = "configs/stable/humanoid_box_grasps.h5"
-mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
+h5_file = "configs/stable/gobox.h5"
+mujoco_xml = "configs/mujoco_/unitree_go2/box_scene.xml"
+
+# h5_file = "configs/stable/humanoid_box_grasps.h5"
+# mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
 
 # h5_file = "configs/stable/pandasTableConfigs.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
@@ -66,6 +69,6 @@ for i, sc in enumerate(stable_configs):
     # print(sc)
     sim.pushConfig(sc, q)
     # input()
-    # time.sleep(10.)
-    sim.step(.1, view=1.)
+    time.sleep(1.)
+    sim.step(1., view=1.)
     print("sum: ", sum([float(i) for i in sim.getContacts()]))
