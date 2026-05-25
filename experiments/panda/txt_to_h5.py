@@ -14,8 +14,10 @@ from explore.utils.vis import AdjMap
 # h5_file = "configs/stable/pandaHook.h5"
 # txt_file = "data/fixed_humanoid_box_grasps.txt"
 # h5_file = "configs/stable/humanoid_box_grasps.h5"
-txt_file = "data/fixed_gobox.txt"
-h5_file = "configs/stable/gobox.h5"
+# txt_file = "data/fixed_gobox.txt"
+# h5_file = "configs/stable/gobox.h5"
+txt_file = "data/fixed_gobox_table.txt"
+h5_file = "configs/stable/gobox_table.h5"
 
 # SAME_THRESH = 0.07
 SAME_THRESH = 0.0

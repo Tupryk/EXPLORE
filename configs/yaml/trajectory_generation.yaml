@@ -8,7 +8,7 @@ RRT:
   sample_uniform: false
   warm_start: false
   threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: -1
+  start_idx: 0
   end_idx: -1
   sampling_strategy: rs
   cem_steps: 10  # Only for CEM
@@ -58,9 +58,9 @@ RRT:
     interpolate_actions: true
     joints_are_same_as_ctrl: false
     use_spline_ref: false
-    mujoco_xml: configs/mujoco_/unitree_go2/box_scene.xml
+    mujoco_xml: configs/mujoco_/unitree_go2/table_box_scene.xml
     camera: fixed_cam
-configs_path: configs/stable/gobox.h5
+configs_path: configs/stable/gobox_table.h5
 
 #   min_cost: 0.02
 #   stepsize: 0.1

@@ -6,8 +6,11 @@ import matplotlib.pyplot as plt
 from explore.env.mujoco_sim import MjSim
 
 
-h5_file = "configs/stable/gobox.h5"
-mujoco_xml = "configs/mujoco_/unitree_go2/box_scene.xml"
+h5_file = "configs/stable/gobox_table.h5"
+mujoco_xml = "configs/mujoco_/unitree_go2/table_box_scene.xml"
+
+# h5_file = "configs/stable/gobox.h5"
+# mujoco_xml = "configs/mujoco_/unitree_go2/box_scene.xml"
 
 # h5_file = "configs/stable/humanoid_box_grasps.h5"
 # mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
@@ -58,7 +61,7 @@ print(stable_configs.shape)
 # for i, sc in enumerate(sampled_configs):
 for i, sc in enumerate(stable_configs):
     print(i)
-    # if i != 8:
+    # if i < 2:
     #     continue
     # sim.pushConfig(sc)
     # print(sc)

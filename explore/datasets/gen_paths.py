@@ -594,6 +594,7 @@ class Search:
                                     expanded = True
                                     store_node = True
                                     
+                                    # TODO: add kNN lookup here so that n_best_actions can always be -1
                                     # Shift values
                                     self.trees_closest_nodes_costs[start_idx][ci, k+1:] = self.trees_closest_nodes_costs[start_idx][ci, k:-1]
                                     self.trees_closest_nodes_idxs[start_idx][ci, k+1:] = self.trees_closest_nodes_idxs[start_idx][ci, k:-1]
