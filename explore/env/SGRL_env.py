@@ -29,7 +29,7 @@ class StableConfigsEnv(gym.Env):
         self.use_csrl = cfg.use_csrl
         self.schedule_alpha_step = 1. / (cfg.schedule_alpha_end_step / cfg.schedule_alpha_block)
         self.schedule_alpha_block = cfg.schedule_alpha_block
-        self.schedule_alpha = 0.
+        self.schedule_alpha = self.schedule_alpha_step
         self.schedule_buffer = 0
         
         self.original_stable_configs = h5py.File(cfg.stable_configs_path, 'r')
@@ -68,7 +68,7 @@ class StableConfigsEnv(gym.Env):
         state = np.concatenate((state, self.goal_condition))
         return state
 
-    def reset(self, *, seed: int=None, options: dict={}):
+    def reset(self, *, seed: int=None, options: dict={}) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
         np.random.seed(seed)
 
@@ -97,7 +97,7 @@ class StableConfigsEnv(gym.Env):
         start_ctrl = self.original_stable_configs["ctrl"][s_cfg_idx]
 
         self.sim.pushConfig(start_qpos, start_ctrl)
-        self.max_steps = self.max_steps_default
+        self.max_steps = np.clip(self.schedule_alpha, 0.1, 1.0) * self.max_steps_default
             
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
         self.target_state = self.original_stable_configs_full[e_cfg_idx]
@@ -127,7 +127,8 @@ class StableConfigsEnv(gym.Env):
         ### Reward Computation ###
         eval_state = self.sim.getCustomStateScaled()
         
-        cost = eval_state.T @ self.target_state
+        e = eval_state - self.target_state
+        cost = e.T @ e
         if cost < self.min_cost:
             goal_reached_reward = 1.0
             terminated = True

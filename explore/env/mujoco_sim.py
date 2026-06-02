@@ -48,7 +48,7 @@ class MjSim:
         self.geoms_in_cost = []
         geoms_in_cost_names = cfg.get("geoms_in_cost", [])
         self.geoms_in_cost_weights = np.array(cfg.get("geoms_in_cost_weights", []))
-        self.vels_geoms_in_cost = cfg.get("vels_geoms_in_cost", False)
+        self.vels_geoms_in_cost_weights = np.array(cfg.get("vels_geoms_in_cost_weights", []))
         for geom_name in geoms_in_cost_names:
             geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
             self.geoms_in_cost.append(geom_id)
@@ -73,7 +73,7 @@ class MjSim:
             self.custom_state_sequence.append(geoms_state)
             self.custom_state_sequence_scaled.append(lambda: geoms_state() * self.geoms_in_cost_weights)
         
-        if self.vels_geoms_in_cost:
+        if len(self.vels_geoms_in_cost_weights):
             def geoms_vels_state() -> np.ndarray:
                 vels = np.empty((len(self.geoms_in_cost), 3))
 
@@ -93,7 +93,7 @@ class MjSim:
                 return vels
 
             self.custom_state_sequence.append(geoms_vels_state)
-            self.custom_state_sequence_scaled.append(lambda: geoms_vels_state() * self.geoms_in_cost_weights)
+            self.custom_state_sequence_scaled.append(lambda: geoms_vels_state() * self.vels_geoms_in_cost_weights)
 
         if self.objs:
             def dists_state() -> np.ndarray:

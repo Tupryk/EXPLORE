@@ -1,68 +1,22 @@
 rl_method: "TD7"
 verbose: 1
-total_timesteps: 2e6
+total_timesteps: 3e5
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 net_arch: [256, 256]
-save_freq: 25e4
+save_freq: 5e4
 batch_size: 2048
-TD7:
-  tag: nil
-  use_checkpoints: false
-  timesteps_before_training: 25_000
-  eval_freq: 1000
-  eval_eps: 10
-  max_timesteps: 2_000_000
-  file_name: td7
-  
-  # Generic
-  training_steps: 1
-  learning_rate: 1e-3 #3e-4
-  batch_size: 10000 #256
-  buffer_size: 1e6
-  discount: 0.95
-  target_update_rate: 250
-  exploration_noise: 0.05 # 0.025
-  
-  # TD3
-  target_policy_noise: 0.05 # 0.025
-  noise_clip: 0.1 # 0.05
-  policy_freq: 2
-  
-  # LAP
-  alpha: 0.4
-  min_priority: 1
-  
-  # TD3+BC
-  lmbda: 0.1
-  
-  # Checkpointing
-  max_eps_when_checkpointing: 20
-  steps_before_checkpointing: 75e4 
-  reset_weight: 0.9
-  
-  # Encoder Model
-  zs_dim: 512
-  enc_hdim: 512
-  enc_activ: Callable = F.elu
-  
-  # Critic Model
-  critic_hdim: 256
-  critic_activ: Callable = F.elu
-  
-  # Actor Model
-  actor_hdim: 256
-  actor_activ: Callable = F.relu
+
 env:
   min_cost: 0.01
-  max_steps: 100
+  max_steps: 64
   use_schedule: true
-  schedule_alpha_end_step: 1000000
-  schedule_alpha_block: 100000
+  schedule_alpha_end_step: 100000
+  schedule_alpha_block: 5000
   use_csrl: true
   verbose: 1
 
-  tau_action: 0.1
+  tau_action: 0.2
   stepsize: 0.1
 
   sim_interface:
@@ -70,13 +24,16 @@ env:
     tau_sim: 0.005
     verbose: 1
     geoms_in_cost: [
-        "l_fing", "obj"
+      "l_fing", "obj"
     ]
     geoms_in_cost_weights: [
-        1., 1., 1.,
-        2., 2., 2.
+      1., 1., 1.,
+      2., 2., 2.
     ]
-    vels_geoms_in_cost: True
+    vels_geoms_in_cost_weights: [
+      0., 0., 0.,
+      0., 0., 0.
+    ]
     camera: fixed_cam
     render_w: 640
     render_h: 480
