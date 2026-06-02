@@ -4,6 +4,7 @@ from typing import Callable
 
 import torch
 import torch.nn as nn
+from pathlib import Path
 import torch.nn.functional as F
 
 from .buffer import *
@@ -198,6 +199,9 @@ class TD7_Agent(object):
         self.min_target = 0
 
     def save(self, filename):
+        path = Path("data/tmp")
+        if not path.exists():
+            path.mkdir(parents=True)
         torch.save(
             {
                 "actor": self.actor.state_dict(),

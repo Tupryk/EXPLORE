@@ -33,12 +33,11 @@ class RL_Trainer:
 
         # Model
         self.rl_method = cfg.rl_method
-        policy = "MultiInputPolicy" if cfg.env.use_vision else "MlpPolicy"
 
         if self.rl_method == "PPO":
             policy_kwargs = dict(net_arch=cfg.net_arch)
             self.model = PPO(
-                policy,
+                "MlpPolicy",
                 self.env,
                 policy_kwargs=policy_kwargs,
                 verbose=cfg.verbose,
@@ -53,7 +52,7 @@ class RL_Trainer:
                 )
             )
             self.model = SAC(
-                policy,
+                "MlpPolicy",
                 self.env,
                 policy_kwargs=policy_kwargs,
                 verbose=cfg.verbose,
@@ -69,7 +68,7 @@ class RL_Trainer:
                 )
             )
             self.model = TD3(
-                policy,
+                "MlpPolicy",
                 self.env,
                 policy_kwargs=policy_kwargs,
                 verbose=cfg.verbose,

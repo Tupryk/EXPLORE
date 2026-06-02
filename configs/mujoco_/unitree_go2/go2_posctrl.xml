@@ -224,8 +224,4 @@
     <position class="go2" name="RR_calf_joint" joint="RR_calf_joint"/>
   </actuator>
 
-  <keyframe>
-    <key name="home" qpos="0 0 0.27 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"
-      ctrl="0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"/>
-  </keyframe>
 </mujoco>

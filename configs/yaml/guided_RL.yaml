@@ -54,34 +54,34 @@ TD7:
   actor_hdim: 256
   actor_activ: Callable = F.relu
 env:
-  time_scaling: 1.0
+  min_cost: 0.1
   max_steps: 50
   use_schedule: true
   schedule_alpha_end_step: 1000000
   schedule_alpha_block: 100000
-  actions_noise_sigma: 0.0
-  use_vel: true
-  guiding: "SGRL"
-  start_config_idx: -1
-  target_config_idx: -1
-  goal_conditioning: true
-  use_vision: false
-  render_w: 640
-  render_h: 480
-  camera_filter: "balls_mask"
+  use_csrl: true
   verbose: 1
 
-  stepsize: 0.05
-  sim:
+  tau_action: 0.1
+  stepsize: 0.25
+
+  sim_interface:
+    "xml_path": "configs/mujoco_/unitree_go2/table_box_scene.xml"
     tau_sim: 0.005
-    tau_action: 0.1
-    interpolate_actions: true
-    joints_are_same_as_ctrl: true
-    use_spline_ref: false
-    mujoco_xml: configs/mujoco_/fingerRamp.xml
+    "verbose": 1
+    "geoms_in_cost": [
+        "FL", "FR", "RL", "RR",
+        "box_marker0", "box_marker1", "box_marker2"
+    ]
+    "geoms_in_cost_weights": [
+        1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
+        4., 4., 4., 4., 4., 4., 4., 4., 4.
+    ]
+    "vels_geoms_in_cost": True
     camera: fixed_cam
-  trajectory_data_path: "data/finger_ramp_new_cost"  # TODO: either make this optional or remove stable_configs_path and mujoco_xml or idk.
-  stable_configs_path: configs/stable/fingerRamp_onRamp.h5
+    render_w: 640
+    render_h: 480
+  stable_configs_path: configs/stable/gobox_table.h5
 
   # stepsize: 0.05
   # sim:
