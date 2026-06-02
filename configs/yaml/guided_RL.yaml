@@ -55,7 +55,7 @@ TD7:
   actor_activ: Callable = F.relu
 env:
   min_cost: 0.1
-  max_steps: 50
+  max_steps: 100
   use_schedule: true
   schedule_alpha_end_step: 1000000
   schedule_alpha_block: 100000

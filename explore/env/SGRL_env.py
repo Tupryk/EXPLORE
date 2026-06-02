@@ -128,14 +128,19 @@ class StableConfigsEnv(gym.Env):
         eval_state = self.sim.getCustomStateScaled()
         
         cost = eval_state.T @ self.target_state
-        goal_reached_reward = 1.0 if cost < self.min_cost else 0.0
+        if cost < self.min_cost:
+            goal_reached_reward = 1.0
+            terminated = True
+        else:
+            goal_reached_reward = 0.0
+            terminated = False
 
         self.reward = goal_reached_reward
 
         ### Logging ###
         truncated = self.iter >= self.max_steps
         
-        terminated = truncated
+        terminated = truncated or terminated
         info = {
             "frames": frames,
             "states": ss,
