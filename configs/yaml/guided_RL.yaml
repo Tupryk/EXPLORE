@@ -54,7 +54,7 @@ TD7:
   actor_hdim: 256
   actor_activ: Callable = F.relu
 env:
-  min_cost: 0.1
+  min_cost: 0.01
   max_steps: 100
   use_schedule: true
   schedule_alpha_end_step: 1000000
@@ -63,25 +63,24 @@ env:
   verbose: 1
 
   tau_action: 0.1
-  stepsize: 0.25
+  stepsize: 0.1
 
   sim_interface:
-    xml_path: "configs/mujoco_/unitree_go2/table_box_scene.xml"
+    xml_path: "configs/mujoco_/fingerRamp.xml"
     tau_sim: 0.005
     verbose: 1
     geoms_in_cost: [
-        "FL", "FR", "RL", "RR",
-        "box_marker0", "box_marker1", "box_marker2"
+        "l_fing", "obj"
     ]
     geoms_in_cost_weights: [
-        1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
-        4., 4., 4., 4., 4., 4., 4., 4., 4.
+        1., 1., 1.,
+        2., 2., 2.
     ]
     vels_geoms_in_cost: True
     camera: fixed_cam
     render_w: 640
     render_h: 480
-  stable_configs_path: configs/stable/gobox_table.h5
+  stable_configs_path: configs/stable/finger_ramp_big.h5
 
   # stepsize: 0.05
   # sim:

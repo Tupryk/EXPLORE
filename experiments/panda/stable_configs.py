@@ -1,13 +1,17 @@
 import time
 import h5py
 import numpy as np
+from omegaconf import OmegaConf
 import matplotlib.pyplot as plt
 
 from explore.env.mujoco_sim import MjSim
 
 
-h5_file = "configs/stable/gobox_table.h5"
-mujoco_xml = "configs/mujoco_/unitree_go2/table_box_scene.xml"
+h5_file = "configs/stable/finger_ramp_big.h5"
+mujoco_xml = "configs/mujoco_/fingerRamp.xml"
+
+# h5_file = "configs/stable/gobox_table.h5"
+# mujoco_xml = "configs/mujoco_/unitree_go2/table_box_scene.xml"
 
 # h5_file = "configs/stable/gobox.h5"
 # mujoco_xml = "configs/mujoco_/unitree_go2/box_scene.xml"
@@ -52,11 +56,15 @@ stable_configs_ctrl = file["ctrl"]
 # plt.axis("equal")
 # plt.show()
 
-sim = MjSim(mujoco_xml, view=True, verbose=1, tau_sim=1e-3)
+cfg = OmegaConf.create({
+    "xml_path": mujoco_xml,
+    "verbose": 1,
+})
+sim = MjSim(cfg, view=True)
 
-sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
 print("Total configs: ", stable_configs)
 print(stable_configs.shape)
+sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
 
 # for i, sc in enumerate(sampled_configs):
 for i, sc in enumerate(stable_configs):

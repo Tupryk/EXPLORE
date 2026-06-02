@@ -16,8 +16,10 @@ from explore.utils.vis import AdjMap
 # h5_file = "configs/stable/humanoid_box_grasps.h5"
 # txt_file = "data/fixed_gobox.txt"
 # h5_file = "configs/stable/gobox.h5"
-txt_file = "data/fixed_gobox_table.txt"
-h5_file = "configs/stable/gobox_table.h5"
+# txt_file = "data/fixed_gobox_table.txt"
+# h5_file = "configs/stable/gobox_table.h5"
+txt_file = "data/finger_ramp.txt"
+h5_file = "configs/stable/finger_ramp_big.h5"
 
 # SAME_THRESH = 0.07
 SAME_THRESH = 0.0
@@ -55,6 +57,11 @@ new_data_pos = []
 new_data_ctrl = []
 for i, vec in tqdm(enumerate(data)):
     if i >= MAX_CONFIGS: break
+    ### FINGER RAMP ###
+    state_vec = vec
+    state_vec[2] += 0.4
+    ctrl_vec = state_vec[:3]
+
     # ### FRANKA HOOK ###
     # state_vec = np.zeros(23)
     
@@ -201,48 +208,48 @@ for i, vec in tqdm(enumerate(data)):
     # # state_vec[42] = 0
 
     ### UNITREE GO2 ###
-    joint_limits_min = np.array([
-        -1.0472, -1.5708, -2.7227,  # FL
-        -1.0472, -1.5708, -2.7227,  # FR
-        -1.0472, -0.5236, -2.7227,  # RL
-        -1.0472, -0.5236, -2.7227,  # RR
-    ])
-    joint_limits_max = np.array([
-        1.0472,  3.4907, -0.83776,  # FL
-        1.0472,  3.4907, -0.83776,  # FR
-        1.0472,  4.5379, -0.83776,  # RL
-        1.0472,  4.5379, -0.83776,  # RR
-    ])
-    ctrl_limits_min = np.array([
-        -23.7, -23.7, -45.43,       # FL
-        -23.7, -23.7, -45.43,       # FR
-        -23.7, -23.7, -45.43,       # RL
-        -23.7, -23.7, -45.43,       # RR
-    ])
-    ctrl_limits_max = np.array([
-        23.7, 23.7, 45.43,          # FL
-        23.7, 23.7, 45.43,          # FR
-        23.7, 23.7, 45.43,          # RL
-        23.7, 23.7, 45.43,          # RR
-    ])
+    # joint_limits_min = np.array([
+    #     -1.0472, -1.5708, -2.7227,  # FL
+    #     -1.0472, -1.5708, -2.7227,  # FR
+    #     -1.0472, -0.5236, -2.7227,  # RL
+    #     -1.0472, -0.5236, -2.7227,  # RR
+    # ])
+    # joint_limits_max = np.array([
+    #     1.0472,  3.4907, -0.83776,  # FL
+    #     1.0472,  3.4907, -0.83776,  # FR
+    #     1.0472,  4.5379, -0.83776,  # RL
+    #     1.0472,  4.5379, -0.83776,  # RR
+    # ])
+    # ctrl_limits_min = np.array([
+    #     -23.7, -23.7, -45.43,       # FL
+    #     -23.7, -23.7, -45.43,       # FR
+    #     -23.7, -23.7, -45.43,       # RL
+    #     -23.7, -23.7, -45.43,       # RR
+    # ])
+    # ctrl_limits_max = np.array([
+    #     23.7, 23.7, 45.43,          # FL
+    #     23.7, 23.7, 45.43,          # FR
+    #     23.7, 23.7, 45.43,          # RL
+    #     23.7, 23.7, 45.43,          # RR
+    # ])
 
-    state_vec = vec.copy()
-    state_vec[2] += -0.1 - 0.025
+    # state_vec = vec.copy()
+    # state_vec[2] += -0.1 - 0.025
 
-    # ctrl_vec = (vec[7:-7] - joint_limits_min) / (joint_limits_max - joint_limits_min) * (ctrl_limits_max - ctrl_limits_min) + ctrl_limits_min
-    ctrl_vec = vec.copy()[7:-7]
+    # # ctrl_vec = (vec[7:-7] - joint_limits_min) / (joint_limits_max - joint_limits_min) * (ctrl_limits_max - ctrl_limits_min) + ctrl_limits_min
+    # ctrl_vec = vec.copy()[7:-7]
 
-    print(state_vec[7:-7])
+    # print(state_vec[7:-7])
 
-    ## + Box ##
-    state_vec[21] += - 0.1 - 0.025
-    # state_vec[19] = 1
-    # state_vec[20] = 0
-    # state_vec[21] = 0.3
-    # state_vec[22] = 1
-    # state_vec[23] = 0
-    # state_vec[24] = 0
-    # state_vec[25] = 0
+    # ## + Box ##
+    # state_vec[21] += - 0.1 - 0.025
+    # # state_vec[19] = 1
+    # # state_vec[20] = 0
+    # # state_vec[21] = 0.3
+    # # state_vec[22] = 1
+    # # state_vec[23] = 0
+    # # state_vec[24] = 0
+    # # state_vec[25] = 0
     
     new_data_pos.append(state_vec)
     new_data_ctrl.append(ctrl_vec)
