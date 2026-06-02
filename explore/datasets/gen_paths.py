@@ -1,7 +1,6 @@
 import os
 import time
 import torch
-import mujoco
 import psutil
 import pickle
 import hnswlib
@@ -13,8 +12,6 @@ from omegaconf import DictConfig, ListConfig
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from explore.env.mujoco_sim import MjSim
-from explore.utils.mj import get_model_quaternions
-from explore.datasets.utils import cost_computation
 from explore.models.basic_flow_matching import Net, ActionSamplerDataset, sample, train
 
 
@@ -43,60 +40,70 @@ class Search:
     def __init__(self, configs: np.ndarray, configs_ctrl: np.ndarray, cfg: DictConfig):
         
         assert len(configs) == len(configs_ctrl)
-        self.max_configs = cfg.max_configs
-
+        self.output_dir = cfg.output_dir
+        
+        # Slice config arrays if too long
+        self.max_configs = cfg.get("max_configs", -1)
         if self.max_configs != -1 and len(configs) > self.max_configs:
             self.configs = configs[:self.max_configs]
             self.configs_ctrl = configs_ctrl[:self.max_configs]
         else:
             self.configs = configs
             self.configs_ctrl = configs_ctrl
-
+        
         self.config_count = self.configs.shape[0]
 
-        self.max_nodes_per_tree = int(cfg.max_nodes_per_tree)
-
+        # Environment specific variables
+        self.min_cost = cfg.min_cost
+        self.sample_count = cfg.sample_count
+        self.tau_action = cfg.tau_action
         self.stepsize = cfg.stepsize
+        
         if isinstance(self.stepsize, ListConfig):
             self.stepsize = np.array(self.stepsize)
-        self.target_prob = cfg.target_prob
-        self.target_min_dist = cfg.target_min_dist
-        
-        self.min_cost = cfg.min_cost
-        self.output_dir = cfg.output_dir
-        
-        self.tau_sim = cfg.sim.tau_sim
-        self.tau_action = cfg.sim.tau_action
-        self.interpolate_actions = cfg.sim.interpolate_actions
-        self.joints_are_same_as_ctrl = cfg.sim.joints_are_same_as_ctrl
-        self.mujoco_xml = cfg.sim.mujoco_xml
-        
-        self.horizon = cfg.horizon
-        self.sample_count = cfg.sample_count
-        self.warm_start = cfg.warm_start
-        self.sampling_strategy = cfg.sampling_strategy
-        self.q_mask = np.array(cfg.q_mask)
-        if not self.q_mask.shape[0]:
-            self.q_mask = np.ones_like(self.configs[0])
             
+        self.target_prob = cfg.get("target_prob", 0.0)
+        self.target_min_dist = cfg.get("target_min_dist", 1000.0)
+        self.max_nodes_per_tree = int(cfg.get("max_nodes_per_tree", 2500))
+        self.warm_start = cfg.get("warm_start", False)
+        self.horizon = cfg.get("horizon", 1)
+        self.verbose = cfg.get("verbose", 0)
         assert (self.warm_start and self.horizon == 1) or not self.warm_start
         
-        self.sample_uniform_prob = cfg.sample_uniform_prob
+        # MPC
+        self.sampling_strategy = cfg.get("sampling_strategy", "rs")
+        if self.sampling_strategy == "rs":
+            self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
+        elif self.sampling_strategy == "cem":
+            self.cem_steps = cfg.cem_steps
+            self.action_sampler = lambda o, t: self.cem_sample_ctrls(o, t)
+        else:
+            raise Exception(f"Sampling strategy '{self.sampling_strategy}' not implemented yet!")
+        
+        # The big three
+        self.disable_node_max_strikes = cfg.get("disable_node_max_strikes", 1)
+        self.n_best_actions = cfg.get("n_best_actions", 16)
+        self.knnK = cfg.get("knnK", 16)
+        
+        
+        self.sample_uniform_prob = cfg.get("sample_uniform_prob", 0.)
         if self.sample_uniform_prob:
             self.mins_uniform_sample = np.array(cfg.mins_uniform_sample)
             self.maxs_uniform_sample = np.array(cfg.maxs_uniform_sample)
 
         # Does not always provide faster execution! Depends on weird factors like tau_sim
-        self.threading = cfg.threading
+        self.threading = cfg.get("threading", False)
         # Five Workers and ten simulators seem to be optimal
         self.max_workers = 5
         self.sim_count = 10 if self.threading else 1
-        self.verbose = cfg.verbose
+        
+        assert (not self.threading) or (self.sample_count % self.sim_count == 0)
         if self.threading:
             self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
         
-        self.start_ids = cfg.start_idx
-        self.end_ids = cfg.end_idx
+        # Start states and targets
+        self.start_ids = cfg.get("start_idx", -1)
+        self.end_ids = cfg.get("end_idx", -1)
         if not isinstance(self.start_ids, ListConfig):
             if self.start_ids == -1:
                 self.start_ids = list(range(self.config_count))
@@ -108,80 +115,23 @@ class Search:
             else:
                 self.end_ids = [self.end_ids]
         self.end_ids = np.array(self.end_ids)
-        
-        self.disable_node_max_strikes = cfg.disable_node_max_strikes
-        self.n_best_actions = cfg.n_best_actions
-        self.knnK = cfg.knnK
-        self.vel_weight = cfg.velocity_weight
 
         self.sim = [
-            MjSim(
-                self.mujoco_xml, self.tau_sim, view=False, verbose=0,
-                interpolate=self.interpolate_actions,
-                joints_are_same_as_ctrl=self.joints_are_same_as_ctrl,
-                use_spline_ref=cfg.sim.use_spline_ref) for _ in range(self.sim_count)
+            MjSim(cfg.sim_interface) for _ in range(self.sim_count)
         ]
-        assert (not self.threading) or (self.sample_count % len(self.sim) == 0)
+        self.configs_full = []
+        for i in range(self.config_count):
+            self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
+            state_vec = self.sim[0].getCustomStateScaled()
+            self.configs_full.append(state_vec)
 
         self.ctrl_dim = self.sim[0].data.ctrl.shape[0]
         self.ctrl_ranges = self.sim[0].model.actuator_ctrlrange
         self.state_dim = self.sim[0].data.qpos.shape[0]
-        
-        self.geoms_in_cost = []
-        self.geoms_in_cost_weights = np.array(cfg.geoms_in_cost_weights)
-        for geom_name in cfg.geoms_in_cost:
-            geom_id = mujoco.mj_name2id(self.sim[0].model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-            self.geoms_in_cost.append(geom_id)
 
-        self.scene_quat_indices = get_model_quaternions(self.sim[0].model)
-        
-        if len(self.geoms_in_cost):
-            for i in range(len(self.geoms_in_cost)):
-                self.scene_quat_indices.append(i * 7 + 3 + self.state_dim)
-
-        self.dist_weight = cfg.dist_weight
-        self.dist_max = cfg.dist_max
-        
-        self.objs = []
-        for geom_name in cfg.objs:
-            geom_id = mujoco.mj_name2id(self.sim[0].model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-            self.objs.append(geom_id)
-
-        self.contacts = []
-        for geom_name in cfg.contacts:
-            geom_id = mujoco.mj_name2id(self.sim[0].model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-            self.contacts.append(geom_id)
-
-        self.configs_full = []
-        for i in range(self.config_count):
-            self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
-            state_vec = self.sim[0].getStateVector(
-                self.q_mask,
-                self.vel_weight,
-                self.objs,
-                self.contacts,
-                self.dist_weight,
-                self.dist_max,
-                self.geoms_in_cost,
-                self.geoms_in_cost_weights
-            )
-            self.configs_full.append(state_vec)
-
-        if self.verbose > 2:
-            print("Quaternions in scene: ", self.scene_quat_indices)
-        
-        if self.sampling_strategy == "rs":
-            self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
-        elif self.sampling_strategy == "cem":
-            self.cem_steps = cfg.cem_steps
-            self.action_sampler = lambda o, t: self.cem_sample_ctrls(o, t)
-        else:
-            raise Exception(f"Sampling strategy '{self.sampling_strategy}' not implemented yet!")
-        
-        ### FLOW MODEL ###
-        self.use_flow = cfg.use_flow
+        # Learning best actions
+        self.use_flow = cfg.get("use_flow", False)
         if self.use_flow:
-            # self.flow_input_dim = 1 + self.ctrl_dim + len(self.configs_full[0]) * 2
             self.flow_input_dim = 1 + self.ctrl_dim + len(self.configs_full[0])
             self.flow_model_arch = cfg.flow_model.arch
             
@@ -218,16 +168,7 @@ class Search:
             
             self.sim[0].pushConfig(self.configs[i], self.configs_ctrl[i])
             state = self.sim[0].getState()
-            phi = self.sim[0].getStateVector(
-                self.q_mask,
-                self.vel_weight,
-                self.objs,
-                self.contacts,
-                self.dist_weight,
-                self.dist_max,
-                self.geoms_in_cost,
-                self.geoms_in_cost_weights
-            )
+            phi = self.sim[0].getCustomStateScaled()
         
             root = MultiSearchNode(phi, -1, np.zeros_like(self.configs_ctrl[0]), state, 0.)
             trees.append([root])
@@ -236,7 +177,8 @@ class Search:
             self.trees_closest_nodes_costs.append(np.full((self.config_count, self.knnK), np.nan))
             
             for ci in range(self.config_count):
-                cost = cost_computation(self.configs_full[i], self.configs_full[ci], self.scene_quat_indices)
+                e = self.configs_full[i] - self.configs_full[ci]
+                cost = e.T @ e
                 self.trees_closest_nodes_costs[i][ci, 0] = cost
                 self.trees_closest_nodes_idxs[i][ci, 0] = 0
 
@@ -399,18 +341,10 @@ class Search:
             self.sim[sim_idx].step(self.tau_action, c)
         
         state = self.sim[sim_idx].getState()
-        phi = self.sim[sim_idx].getStateVector(
-            self.q_mask,
-            self.vel_weight,
-            self.objs,
-            self.contacts,
-            self.dist_weight,
-            self.dist_max,
-            self.geoms_in_cost,
-            self.geoms_in_cost_weights
-        )
+        phi = self.sim[sim_idx].getCustomStateScaled()
 
-        cost2target = cost_computation(target, phi, self.scene_quat_indices)
+        e = target - phi
+        cost2target = e.T @ e
         
         return cost2target, phi, state, ctrl
     
@@ -587,7 +521,8 @@ class Search:
                         
                         store_node = False
                         for ci in range(self.config_count):
-                            new_cost = cost_computation(best_phi, self.configs_full[ci], self.scene_quat_indices)
+                            e = best_phi - self.configs_full[ci]
+                            new_cost = e.T @ e
                             for k in range(self.knnK):
                                 stored_cost = self.trees_closest_nodes_costs[start_idx][ci][k]
                                 if new_cost < self.target_min_dist and stored_cost >= new_cost:
@@ -650,12 +585,8 @@ class Search:
                                         break
                                 
                                 if np.isnan(self.trees_closest_nodes_costs[start_idx][ci, 0]):
-
-                                    self.trees_closest_nodes_costs[start_idx][ci, 0] = cost_computation(
-                                        self.trees[start_idx][0].phi,
-                                        self.configs_full[ci],
-                                        self.scene_quat_indices
-                                    )
+                                    e = self.trees[start_idx][0].phi - self.configs_full[ci]
+                                    self.trees_closest_nodes_costs[start_idx][ci, 0] = e.T @ e
                                     self.trees_closest_nodes_idxs[start_idx][ci, 0] = 0
 
                         elif self.verbose > 2:

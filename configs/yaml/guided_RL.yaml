@@ -66,18 +66,18 @@ env:
   stepsize: 0.25
 
   sim_interface:
-    "xml_path": "configs/mujoco_/unitree_go2/table_box_scene.xml"
+    xml_path: "configs/mujoco_/unitree_go2/table_box_scene.xml"
     tau_sim: 0.005
-    "verbose": 1
-    "geoms_in_cost": [
+    verbose: 1
+    geoms_in_cost: [
         "FL", "FR", "RL", "RR",
         "box_marker0", "box_marker1", "box_marker2"
     ]
-    "geoms_in_cost_weights": [
+    geoms_in_cost_weights: [
         1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
         4., 4., 4., 4., 4., 4., 4., 4., 4.
     ]
-    "vels_geoms_in_cost": True
+    vels_geoms_in_cost: True
     camera: fixed_cam
     render_w: 640
     render_h: 480

@@ -31,69 +31,30 @@ RRT:
     max_training_runs: 10
 
   # Environment specific
-  path_diff_thresh: 0.05
   min_cost: 0.1
-  stepsize: .25
+  path_diff_thresh: 0.05
+
+  stepsize: 0.25
+  tau_action: 0.1
+  
   sample_count: 500
   max_configs: -1
-  q_mask: [
-    1., 1., 1., .1, .1, .1, .1,  # Free body
-    .05, .05, .05,  # FL
-    .05, .05, .05,  # FR
-    .05, .05, .05,  # RL
-    .05, .05, .05,  # RR
-    4., 4., 4., .1, .1, .1, .1,  # Free body
-  ]
-  geoms_in_cost: []
-  geoms_in_cost_weights: []
-  objs: []
-  contacts: []
-  dist_max: 0.2
-  dist_weight: 0.1
-  velocity_weight: 0.
 
-  sim:
+  sim_interface:
+    xml_path: "configs/mujoco_/unitree_go2/table_box_scene.xml"
     tau_sim: 0.005
-    tau_action: 0.1
-    interpolate_actions: true
-    joints_are_same_as_ctrl: false
-    use_spline_ref: false
-    mujoco_xml: configs/mujoco_/unitree_go2/table_box_scene.xml
+    verbose: 1
+    geoms_in_cost: [
+        "FL", "FR", "RL", "RR",
+        "box_marker0", "box_marker1", "box_marker2"
+    ]
+    geoms_in_cost_weights: [
+        1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
+        4., 4., 4., 4., 4., 4., 4., 4., 4.
+    ]
+    vels_geoms_in_cost: True
     camera: fixed_cam
+    render_w: 640
+    render_h: 480
+
 configs_path: configs/stable/gobox_table.h5
-
-#   min_cost: 0.02
-#   stepsize: 0.1
-#   sample_count: 500
-#   max_configs: 128
-#   q_mask:
-#   - 1
-#   - 1
-#   - 1
-#   - 1
-#   - 1
-#   - 1
-#   - 2
-#   - 2
-#   - 2
-#   - .25
-#   - .25
-#   - .25
-#   - .25
-#   geoms_in_cost: []
-#   geoms_in_cost_weights: []
-#   objs: []
-#   contacts: []
-#   dist_max: 0.2
-#   dist_weight: 0.1
-#   velocity_weight: 0.01
-
-#   sim:
-#     tau_sim: 0.005
-#     tau_action: 0.2
-#     interpolate_actions: true
-#     joints_are_same_as_ctrl: true
-#     use_spline_ref: false
-#     mujoco_xml: configs/mujoco_/twoFingersCube.xml
-#     camera: fixed_cam
-# configs_path: configs/stable/twoFingersCube.h5
