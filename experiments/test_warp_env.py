@@ -1,9 +1,9 @@
-import time
 from omegaconf import OmegaConf
-from explore.env.mujoco_sim import MjSim
+from explore.env.mujoco_warp_sim import MjSim
 
 cfg = OmegaConf.create({
-    "xml_path": "configs/mujoco_/unitree_go2/table_box_scene.xml",
+    "parallel_sims": 10,
+    "xml_path": "configs/mujoco_/fingerRamp.xml",
     "verbose": 1,
     "geoms_in_cost": [
         "FL", "FR", "RL", "RR",
@@ -15,10 +15,11 @@ cfg = OmegaConf.create({
     ],
 })
 
-sim = MjSim(cfg, view=True)
+sim = MjSim(cfg)
 print(sim.getCustomState())
 print(sim.getCustomStateScaled())
 
-sim.step(10, view=1.)
+sim.step(10, sim.data.ctrl.numpy().copy())
 print(sim.getCustomState())
 print(sim.getCustomStateScaled())
+

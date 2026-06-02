@@ -56,7 +56,6 @@ initial_ctrl_np = np.array(stable_configs_ctrl[start_idx], dtype=np.float32)
 initial_ctrl = wp.array(initial_ctrl_np, dtype=wp.float32, device=device)
 
 # Get target xpos
-# Get target xpos
 mj_data.qpos[:] = stable_configs[end_idx]
 mujoco.mj_forward(mj_model, mj_data)
 target_geom_xpos_np = np.array([mj_data.geom_xpos[idx] for idx in geom_indices_np], dtype=np.float32)
@@ -139,8 +138,8 @@ def compute_cost_kernel(
 
 @wp.kernel
 def update_u_kernel(
-    U: wp.array(dtype=wp.float32, ndim=2),          # Explicitly 2D
-    noise: wp.array(dtype=wp.float32, ndim=3),      # Explicitly 3D
+    U: wp.array(dtype=wp.float32, ndim=2),
+    noise: wp.array(dtype=wp.float32, ndim=3),
     weights: wp.array(dtype=wp.float32, ndim=1),
     ctrl_low: wp.array(dtype=wp.float32, ndim=1),
     ctrl_high: wp.array(dtype=wp.float32, ndim=1)

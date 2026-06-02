@@ -6,7 +6,7 @@ import numpy as np
 import mujoco.viewer
 from omegaconf import DictConfig
 
-from explore.utils.mj import explain_qpos, get_model_quaternions
+from explore.utils.mj import explain_qpos
 
 
 class MjSim:
@@ -113,19 +113,6 @@ class MjSim:
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
         else:
             self.viewer = None
-            
-        frames = []
-        for geom_id in range(self.model.ngeom):
-            body_id = self.model.geom_bodyid[geom_id]
-            frames.append(body_id)
-
-        self.possible_contacts = []
-        while len(frames):
-            for i in range(1, len(frames)):
-                self.possible_contacts.append((frames[0], frames[i]))
-            del frames[0]
-        
-        self.model_quats = get_model_quaternions(self.model) if len(self.q_mask) else []
         
         self.frame_dt = 1.0 / 24.0
         self.next_frame_time = 0.0
@@ -201,7 +188,6 @@ class MjSim:
         return frames, states, ctrls
         
     def getState(self):
-
         state = (
             self.data.time,
             np.copy(self.data.qpos),
@@ -221,31 +207,9 @@ class MjSim:
         self.data.qpos[:] = qpos
         self.data.qvel[:] = qvel
         self.data.ctrl[:] = ctrl
-        mujoco.mj_forward(self.model, self.data)  # Investigate!!
+        mujoco.mj_forward(self.model, self.data)
         if self.viewer is not None:
             self.viewer.sync()
-        
-    def getContacts(self) -> np.ndarray:
-        contacts = []
-        for i in range(self.data.ncon):
-            contact = self.data.contact[i]
-
-            geom1 = contact.geom1
-            geom2 = contact.geom2
-
-            body1 = self.model.geom_bodyid[geom1]
-            body2 = self.model.geom_bodyid[geom2]
-
-            contacts.append((body1, body2))
-        
-        contacts_vec = np.zeros(len(self.possible_contacts))
-        for c in contacts:
-            if c in self.possible_contacts:
-                contacts_vec[self.possible_contacts.index(c)] = 1
-            else:
-                contacts_vec[self.possible_contacts.index((c[1], c[0]))] = 1
-        
-        return contacts_vec
     
     def setupRenderer(self, w: int=640, h: int=480, camera: str=""):
         self.renderer = mujoco.Renderer(self.model, h, w)
