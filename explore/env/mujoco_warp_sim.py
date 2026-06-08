@@ -146,18 +146,35 @@ class MjSim:
     def getCustomStateScaled(self) -> np.ndarray:
         return np.concatenate([cs() for cs in self.custom_state_sequence_scaled], axis=-1)
 
-    def pushConfig(self, joint_state: np.ndarray, ctrl_state: np.ndarray):
+    def pushConfig(self, joint_state: np.ndarray, ctrl_state: np.ndarray, indices: np.ndarray = None):
         """
-        Reset all worlds to the given state and run a forward pass.
-
+        Reset worlds to the given state and run a forward pass.
         Args:
-            joint_state: [nworld, nq]
-            ctrl_state:  [nworld, nu]
+            joint_state: [n, nq] where n == nworld if indices is None, else n == len(indices)
+            ctrl_state:  [n, nu]
+            indices:     optional 1-D array of world indices to reset; if None, resets all
         """
-        self.data.time.assign(wp.zeros(self.nworld, dtype=wp.float32))
-        self.data.qpos.assign(wp.array(joint_state, dtype=wp.float32))
-        self.data.qvel.assign(wp.zeros_like(self.data.qvel))
-        self.data.ctrl.assign(wp.array(ctrl_state, dtype=wp.float32))
+        if indices is None:
+            self.data.time.assign(wp.zeros(self.nworld, dtype=wp.float32))
+            self.data.qpos.assign(wp.array(joint_state, dtype=wp.float32))
+            self.data.qvel.assign(wp.zeros_like(self.data.qvel))
+            self.data.ctrl.assign(wp.array(ctrl_state, dtype=wp.float32))
+        else:
+            time_np = self.data.time.numpy()
+            qpos_np = self.data.qpos.numpy()
+            qvel_np = self.data.qvel.numpy()
+            ctrl_np = self.data.ctrl.numpy()
+
+            time_np[indices] = 0.0
+            qpos_np[indices] = joint_state
+            qvel_np[indices] = 0.0
+            ctrl_np[indices] = ctrl_state
+
+            self.data.time.assign(wp.array(time_np, dtype=wp.float32))
+            self.data.qpos.assign(wp.array(qpos_np, dtype=wp.float32))
+            self.data.qvel.assign(wp.array(qvel_np, dtype=wp.float32))
+            self.data.ctrl.assign(wp.array(ctrl_np, dtype=wp.float32))
+
         mjw.forward(self.model, self.data)
 
     def setState(

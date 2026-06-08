@@ -6,7 +6,7 @@ from gymnasium import spaces
 from sklearn.neighbors import KDTree
 from omegaconf import DictConfig, ListConfig
 
-from explore.env.mujoco_sim import MjSim
+from explore.env.mujoco_warp_sim import MjSim
 
 
 class StableConfigsEnv(gym.Env):
@@ -19,6 +19,7 @@ class StableConfigsEnv(gym.Env):
         
         # Sim interface
         self.sim = MjSim(cfg.sim_interface)
+        self.sim_count = cfg.sim_interface.parallel_sims
         self.min_cost = cfg.min_cost
         self.stepsize = cfg.stepsize
         self.tau_action = cfg.tau_action
@@ -36,19 +37,29 @@ class StableConfigsEnv(gym.Env):
         self.config_count = self.original_stable_configs["qpos"].shape[0]
         if self.verbose:
             print("Total configs in h5: ", self.config_count)
+        
+        self.stable_qpos = self.original_stable_configs["qpos"][:]
+        self.stable_ctrl = self.original_stable_configs["ctrl"][:]
             
         self.original_stable_configs_full = []
         for i in tqdm(range(self.config_count), total=self.config_count):
-            self.sim.pushConfig(self.original_stable_configs["qpos"][i], self.original_stable_configs["ctrl"][i])
-            state_vec = self.sim.getCustomStateScaled()
+            self.sim.pushConfig(
+                self.original_stable_configs["qpos"][i],
+                self.original_stable_configs["ctrl"][i]
+            )
+            state_vec = self.sim.getCustomStateScaled()[0]
             self.original_stable_configs_full.append(state_vec)
+        self.original_stable_configs_full = np.array(self.original_stable_configs_full)
+        
+        self.iter = np.zeros((self.sim_count,))
+        self.target_state = np.zeros((self.sim_count, self.original_stable_configs_full.shape[1]))
 
         if self.use_csrl:
             self.originals_kd_tree = KDTree(self.original_stable_configs_full)
         
         # Define observation space
         state = self.sim.getCustomState()
-        state_n = state.shape[0] * 2
+        state_n = state.shape[1] * 2
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_n,), dtype=np.float32)
         
         # Define action space
@@ -60,51 +71,56 @@ class StableConfigsEnv(gym.Env):
             min_ctrl = ctrl_ranges[:, 0].astype(np.float32)
             max_ctrl = ctrl_ranges[:, 1].astype(np.float32)
         
-        ctrl_dim = self.sim.data.ctrl.shape[0]
+        ctrl_dim = self.sim.data.ctrl.shape[1]
         self.action_space = spaces.Box(low=min_ctrl, high=max_ctrl, shape=(ctrl_dim,), dtype=np.float32)
         
     def getState(self) -> np.ndarray:
         state = self.sim.getCustomState()
-        state = np.concatenate((state, self.goal_condition))
+        state = np.concatenate((state, self.target_state), axis=1)
         return state
 
-    def reset(self, *, seed: int=None, options: dict={}) -> tuple[np.ndarray, dict]:
+    def reset(self, done=None, *, seed: int=None, options: dict={}) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
         np.random.seed(seed)
 
-        self.eval_view = "" if not "eval_view" in options else options["eval_view"]
-
         if "alpha" in options:
             self.schedule_alpha = options["alpha"]
+            if self.verbose > 1:
+                print("Current alpha: ", self.schedule_alpha)
 
-        if self.verbose > 1:
-            print("Current alpha: ", self.schedule_alpha)
+        if done is None:
+            done = np.ones(self.sim_count, dtype=bool)
+        reset_idx = np.where(done)[0]
+        n_reset = len(reset_idx)
+
+        if n_reset == 0:
+            return self.getState(), {}
 
         # Choose start and end configurations
-        s_cfg_idx = np.random.randint(0, self.config_count)
-        e_cfg_idx = np.random.randint(0, self.config_count)
-        
-        if self.use_csrl:
-            query = (
-                self.original_stable_configs_full[s_cfg_idx] * self.schedule_alpha +
-                self.original_stable_configs_full[e_cfg_idx] * (1. - self.schedule_alpha)
-            )
-            query = query.reshape(1, -1)
-            _, ind = self.originals_kd_tree.query(query, k=1)
-            s_cfg_idx = ind[0][0]
-    
-        start_qpos = self.original_stable_configs["qpos"][s_cfg_idx]
-        start_ctrl = self.original_stable_configs["ctrl"][s_cfg_idx]
+        s_cfg_idx = np.random.randint(0, self.config_count, (n_reset,))
+        e_cfg_idx = np.random.randint(0, self.config_count, (n_reset,))
 
-        self.sim.pushConfig(start_qpos, start_ctrl)
+        if self.use_csrl:
+            new_s_cfg_idx = []
+            for i in range(n_reset):
+                query = (
+                    self.original_stable_configs_full[s_cfg_idx[i]] * self.schedule_alpha +
+                    self.original_stable_configs_full[e_cfg_idx[i]] * (1. - self.schedule_alpha)
+                )
+                query = query.reshape(1, -1)
+                _, ind = self.originals_kd_tree.query(query, k=1)
+                new_s_cfg_idx.append(ind[0][0])
+            s_cfg_idx = new_s_cfg_idx
+
+        start_qpos = self.stable_qpos[s_cfg_idx]
+        start_ctrl = self.stable_ctrl[s_cfg_idx]
+        self.sim.pushConfig(start_qpos, start_ctrl, reset_idx)
+
         self.max_steps = np.clip(self.schedule_alpha, 0.1, 1.0) * self.max_steps_default
-            
-        info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx}
-        self.target_state = self.original_stable_configs_full[e_cfg_idx]
-        self.goal_condition = self.original_stable_configs_full[e_cfg_idx]
-        
-        self.iter = 0
-        
+        info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx, "reset_idx": reset_idx}
+        self.target_state[reset_idx] = self.original_stable_configs_full[e_cfg_idx]
+        self.iter[reset_idx] = 0
+
         if self.verbose > 1:
             print(f"Reseting enviroment with start config {s_cfg_idx} and end config {e_cfg_idx}.")
 
@@ -116,11 +132,9 @@ class StableConfigsEnv(gym.Env):
         if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
             action += np.copy(self.sim.data.ctrl)
         
-        frames, ss, cs = self.sim.step(
+        self.sim.step(
             self.tau_action,
-            action,
-            view=self.eval_view,
-            log_all=bool(self.eval_view)
+            action
         )
         self.iter += 1
 
@@ -128,25 +142,20 @@ class StableConfigsEnv(gym.Env):
         eval_state = self.sim.getCustomStateScaled()
         
         e = eval_state - self.target_state
-        cost = e.T @ e
-        if cost < self.min_cost:
-            goal_reached_reward = 1.0
-            terminated = True
-        else:
-            goal_reached_reward = 0.0
-            terminated = False
+        cost = np.sum(e**2, axis=1)
 
-        self.reward = goal_reached_reward
+        goal_reached = cost < self.min_cost
+        goal_reached_reward = goal_reached.astype(np.float32)
 
-        ### Logging ###
-        truncated = self.iter >= self.max_steps
-        
-        terminated = truncated or terminated
+        truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
+        terminated = np.logical_or(goal_reached, truncated)
+        rewards = goal_reached_reward
+
         info = {
-            "frames": frames,
-            "states": ss,
-            "ctrls": cs,
-            "reward": self.reward
+            "frames": [],
+            "states": [],
+            "ctrls": [],
+            "reward": rewards
         }
 
         ### CSRL step ###
@@ -157,8 +166,8 @@ class StableConfigsEnv(gym.Env):
                 self.schedule_alpha += self.schedule_alpha_step
                 if self.schedule_alpha > 1.0:
                     self.schedule_alpha = 1.0
-
-        return self.getState(), self.reward, terminated, truncated, info
+    
+        return self.getState(), rewards, terminated, truncated, info
 
     def render(self, mode: str="", config_idx: int=-1) -> np.ndarray:
         if config_idx != -1:

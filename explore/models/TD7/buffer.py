@@ -39,7 +39,7 @@ class LAP(object):
 	
 	def add(self, state, action, next_state, reward, done):
 		self.state[self.ptr] = state
-		self.action[self.ptr] = action/self.normalize_actions
+		self.action[self.ptr] = action / self.normalize_actions
 		self.next_state[self.ptr] = next_state
 		self.reward[self.ptr] = reward
 		self.not_done[self.ptr] = 1. - done
@@ -49,6 +49,23 @@ class LAP(object):
 
 		self.ptr = (self.ptr + 1) % self.max_size
 		self.size = min(self.size + 1, self.max_size)
+  
+  
+	def add_multiple(self, states, actions, next_states, rewards, dones):
+		n = states.shape[0]
+		indices = (self.ptr + np.arange(n)) % self.max_size
+
+		self.state[indices] = states
+		self.action[indices] = actions / self.normalize_actions
+		self.next_state[indices] = next_states
+		self.reward[indices] = rewards
+		self.not_done[indices] = 1. - dones
+
+		if self.prioritized:
+			self.priority[indices] = self.max_priority
+
+		self.ptr = (self.ptr + n) % self.max_size
+		self.size = min(self.size + n, self.max_size)
 
 
 	def sample(self):

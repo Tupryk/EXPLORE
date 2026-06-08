@@ -80,7 +80,8 @@ class RL_Trainer:
             )
 
         elif self.rl_method == "TD7":
-            self.eval_env = StableConfigsEnv(cfg.env)
+            # self.eval_env = StableConfigsEnv(cfg.env)
+            self.eval_env = None
             state_dim = self.env.observation_space.shape[0]
             action_dim = self.env.action_space.shape[0] 
             max_action = float(self.env.action_space.high[0])
@@ -120,44 +121,43 @@ def train_online(RL_agent, env, eval_env, max_timesteps=300000, use_checkpoints=
     evals = []
     start_time = time.time()
     allow_train = False
-
-    state, _ = env.reset()
-    ep_finished = False
-    ep_total_reward, ep_timesteps, ep_num = 0, 0, 1
+    states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
+    ep_total_reward = np.zeros(env.sim_count)
+    ep_timesteps = np.zeros(env.sim_count, dtype=int)
+    ep_num = 1
 
     for t in range(int(max_timesteps+1)):
-        maybe_evaluate_and_print(RL_agent, eval_env, evals, t, start_time)
-        
+        # maybe_evaluate_and_print(RL_agent, eval_env, evals, t, start_time)
         if allow_train:
-            action = RL_agent.select_action(np.array(state))
+            actions = RL_agent.select_action(np.array(states))
         else:
-            action = env.action_space.sample()
+            actions = np.array([
+                env.action_space.sample()
+                for _ in range(env.sim_count)
+            ])
 
-        next_state, reward, ep_finished, _, _ = env.step(action)
-        
-        ep_total_reward += reward
+        next_states, rewards, dones, _, _ = env.step(actions)
+        ep_total_reward += rewards
         ep_timesteps += 1
 
-        done = 1. if ep_finished else 0.
-        RL_agent.replay_buffer.add(state, action, next_state, reward, done)
-
-        state = next_state
+        RL_agent.replay_buffer.add_multiple(states, actions, next_states, rewards.reshape(-1, 1), dones.astype(float).reshape(-1, 1))
+        states, _ = env.reset(done=dones)
+        states[~dones] = next_states[~dones]
 
         if allow_train and not use_checkpoints:
             RL_agent.train()
 
-        if ep_finished:
-            print(f"Total T: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps} Reward: {ep_total_reward:.3f} Alpha: {env.schedule_alpha}")
+        if dones.any():
+            for i in np.where(dones)[0]:
+                print(f"Total T: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}")
+                if allow_train and use_checkpoints:
+                    RL_agent.maybe_train_and_checkpoint(ep_timesteps[i], ep_total_reward[i])
+                ep_num += 1
+            ep_total_reward[dones] = 0
+            ep_timesteps[dones] = 0
 
-            if allow_train and use_checkpoints:
-                RL_agent.maybe_train_and_checkpoint(ep_timesteps, ep_total_reward)
-
-            if t >= timesteps_before_training:
-                allow_train = True
-
-            state, _ = env.reset()
-            ep_total_reward, ep_timesteps = 0, 0
-            ep_num += 1
+        if t >= timesteps_before_training:
+            allow_train = True
                   
 
 def maybe_evaluate_and_print(RL_agent, eval_env, evals, t, start_time, file_name="model", eval_freq=50000, eval_eps=20, use_checkpoints=False):
