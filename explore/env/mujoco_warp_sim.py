@@ -16,9 +16,6 @@ class MjSim:
         self.tau_sim = cfg.get("tau_sim", 1e-3)
 
         ### MJ MODEL AND DATA ###
-        # mj_model / mj_data are kept only for CPU-only MuJoCo calls
-        # (mj_name2id, mj_geomDistance, mj_objectVelocity).
-        # All simulation state lives in self.model / self.data (warp).
         self.mj_model = mujoco.MjModel.from_xml_path(cfg.xml_path)
         self.mj_model.opt.timestep = self.tau_sim
         self.mj_data = mujoco.MjData(self.mj_model)
@@ -45,14 +42,14 @@ class MjSim:
         if len(self.q_mask):
             def q_state() -> np.ndarray:
                 # [nworld, nq]
-                return self.data.qpos.numpy().copy()
+                return self._cache["qpos"]
             self.custom_state_sequence.append(q_state)
             self.custom_state_sequence_scaled.append(lambda: q_state() * self.q_mask)
 
         if self.vel_weight:
             def qvel_state() -> np.ndarray:
                 # [nworld, nv]
-                return self.data.qvel.numpy().copy()
+                return self._cache["qvel"]
             self.custom_state_sequence.append(qvel_state)
             self.custom_state_sequence_scaled.append(lambda: qvel_state() * self.vel_weight)
 
@@ -71,27 +68,14 @@ class MjSim:
 
         if self.objs:
             def dists_state() -> np.ndarray:
-                # mj_geomDistance is CPU-only; loop over worlds by copying each row
-                # into mj_data, running a forward kinematics update, then querying.
-                # Returns [nworld, n_objs * n_contacts].
-                n_pairs = len(self.objs) * len(self.contacts)
-                all_dists = np.zeros((self.nworld, n_pairs))
-                qpos_all = self.data.qpos.numpy()   # [nworld, nq]
-                qvel_all = self.data.qvel.numpy()   # [nworld, nv]
-                fromto = np.zeros(6)
-                for w in range(self.nworld):
-                    self.mj_data.qpos[:] = qpos_all[w]
-                    self.mj_data.qvel[:] = qvel_all[w]
-                    mujoco.mj_forward(self.mj_model, self.mj_data)
-                    i = 0
-                    for oi in self.objs:
-                        for ci in self.contacts:
-                            dist = mujoco.mj_geomDistance(
-                                self.mj_model, self.mj_data, ci, oi, self.dist_max, fromto
-                            )
-                            all_dists[w, i] = 1 - np.clip(dist / self.dist_max, 0.0, 1.0)
-                            i += 1
-                return all_dists
+                geom_xpos = self._cache["geom_xpos"]  # [nworld, ngeom, 3]
+                obj_pos = geom_xpos[:, self.objs, :]      # [nworld, n_objs, 3]
+                con_pos = geom_xpos[:, self.contacts, :]  # [nworld, n_contacts, 3]
+                # Broadcast: [nworld, n_objs, n_contacts]
+                diff = obj_pos[:, :, None, :] - con_pos[:, None, :, :]
+                dist = np.linalg.norm(diff, axis=-1)
+                proximity = 1 - np.clip(dist / self.dist_max, 0.0, 1.0)
+                return proximity.reshape(self.nworld, -1)
             self.custom_state_sequence.append(dists_state)
             self.custom_state_sequence_scaled.append(lambda: dists_state() * self.dist_weight)
 
@@ -107,7 +91,7 @@ class MjSim:
         if self.geoms_in_cost:
             def geoms_state() -> np.ndarray:
                 # geom_xpos is [nworld, ngeom, 3]; select desired geoms → [nworld, n_geoms, 3]
-                return self.data.geom_xpos.numpy()[:, self.geoms_in_cost, :].reshape(self.nworld, -1)
+                return self._cache["geom_xpos"][:, self.geoms_in_cost, :].reshape(self.nworld, -1)
             self.custom_state_sequence.append(geoms_state)
             self.custom_state_sequence_scaled.append(lambda: geoms_state() * self.geoms_in_cost_weights)
 
@@ -117,8 +101,8 @@ class MjSim:
                 # Returns [nworld, n_geoms * 3].
                 n_geoms = len(self.geoms_in_cost)
                 all_vels = np.empty((self.nworld, n_geoms * 3))
-                qpos_all = self.data.qpos.numpy()
-                qvel_all = self.data.qvel.numpy()
+                qpos_all = self._cache["qpos"]
+                qvel_all = self._cache["qvel"]
                 for w in range(self.nworld):
                     self.mj_data.qpos[:] = qpos_all[w]
                     self.mj_data.qvel[:] = qvel_all[w]
@@ -140,10 +124,20 @@ class MjSim:
                 lambda: geoms_vels_state() * self.vels_geoms_in_cost_weights
             )
 
+    def _sync_gpu_state(self):
+        """Single GPU→CPU transfer per step."""
+        self._cache = {
+            "qpos": self.data.qpos.numpy().copy(),
+            "qvel": self.data.qvel.numpy().copy(),
+            "geom_xpos": self.data.geom_xpos.numpy().copy(),
+        }
+
     def getCustomState(self) -> np.ndarray:
+        self._sync_gpu_state()
         return np.concatenate([cs() for cs in self.custom_state_sequence], axis=-1)
 
     def getCustomStateScaled(self) -> np.ndarray:
+        self._sync_gpu_state()
         return np.concatenate([cs() for cs in self.custom_state_sequence_scaled], axis=-1)
 
     def pushConfig(self, joint_state: np.ndarray, ctrl_state: np.ndarray, indices: np.ndarray = None):

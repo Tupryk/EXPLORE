@@ -4,6 +4,9 @@ from omegaconf import DictConfig
 from explore.utils.logger import get_logger
 from explore.train.rl_trainer import RL_Trainer
 
+# import warp as wp
+# wp.init()
+# wp.set_device("cpu") 
 
 @hydra.main(version_base="1.3", config_path="../configs/yaml", config_name="guided_RL")
 def main(cfg: DictConfig):

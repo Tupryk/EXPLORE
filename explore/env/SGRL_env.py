@@ -40,7 +40,7 @@ class StableConfigsEnv(gym.Env):
         
         self.stable_qpos = self.original_stable_configs["qpos"][:]
         self.stable_ctrl = self.original_stable_configs["ctrl"][:]
-            
+        
         self.original_stable_configs_full = []
         for i in tqdm(range(self.config_count), total=self.config_count):
             self.sim.pushConfig(
@@ -59,8 +59,8 @@ class StableConfigsEnv(gym.Env):
         
         # Define observation space
         state = self.sim.getCustomState()
-        state_n = state.shape[1] * 2
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_n,), dtype=np.float32)
+        state_dim = state.shape[1] * 2
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_dim,), dtype=np.float32)
         
         # Define action space
         if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
@@ -73,6 +73,9 @@ class StableConfigsEnv(gym.Env):
         
         ctrl_dim = self.sim.data.ctrl.shape[1]
         self.action_space = spaces.Box(low=min_ctrl, high=max_ctrl, shape=(ctrl_dim,), dtype=np.float32)
+
+        self._cost_buf = np.empty(self.sim_count, dtype=np.float32)
+        self._e_buf    = np.empty((self.sim_count, self.original_stable_configs_full.shape[1]), dtype=np.float32)
         
     def getState(self) -> np.ndarray:
         state = self.sim.getCustomState()
@@ -130,7 +133,8 @@ class StableConfigsEnv(gym.Env):
         
         ### Simulation Step ###
         if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
-            action += np.copy(self.sim.data.ctrl)
+            ctrl_np = self.sim.data.ctrl.numpy()
+            np.add(action, ctrl_np, out=action)
         
         self.sim.step(
             self.tau_action,
@@ -141,10 +145,10 @@ class StableConfigsEnv(gym.Env):
         ### Reward Computation ###
         eval_state = self.sim.getCustomStateScaled()
         
-        e = eval_state - self.target_state
-        cost = np.sum(e**2, axis=1)
+        np.subtract(eval_state, self.target_state, out=self._e_buf)
+        np.sum(self._e_buf**2, axis=1, out=self._cost_buf)
 
-        goal_reached = cost < self.min_cost
+        goal_reached = self._cost_buf < self.min_cost
         goal_reached_reward = goal_reached.astype(np.float32)
 
         truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)

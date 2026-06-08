@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import numpy as np
+from tqdm import tqdm
 from omegaconf import DictConfig
 from stable_baselines3 import PPO, SAC, TD3
 from stable_baselines3.common.logger import configure
@@ -117,7 +118,7 @@ class RL_Trainer:
         self.logger.info(f"Model saved as {self.save_as}")
 
 
-def train_online(RL_agent, env, eval_env, max_timesteps=300000, use_checkpoints=False, timesteps_before_training=5000):
+def train_online(RL_agent, env, eval_env, max_training_steps=300000, use_checkpoints=True, timesteps_before_training=5000):
     evals = []
     start_time = time.time()
     allow_train = False
@@ -126,7 +127,11 @@ def train_online(RL_agent, env, eval_env, max_timesteps=300000, use_checkpoints=
     ep_timesteps = np.zeros(env.sim_count, dtype=int)
     ep_num = 1
 
-    for t in range(int(max_timesteps+1)):
+    mean_reward_every = 150
+    rewards_count = 0
+    reward_sum = 0.
+
+    for t in tqdm(range(max_training_steps), total=max_training_steps):
         # maybe_evaluate_and_print(RL_agent, eval_env, evals, t, start_time)
         if allow_train:
             actions = RL_agent.select_action(np.array(states))
@@ -149,16 +154,27 @@ def train_online(RL_agent, env, eval_env, max_timesteps=300000, use_checkpoints=
 
         if dones.any():
             for i in np.where(dones)[0]:
-                print(f"Total T: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}")
+                # print(f"Total max_training_steps: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}")
+                reward_sum += ep_total_reward[i]
+                rewards_count += 1
+        
+                if (rewards_count+1) % mean_reward_every == 0:
+                    print(f"Avg. reward: {(reward_sum / mean_reward_every):.3f}; Episodes: {rewards_count}; Alpha: {env.schedule_alpha}")
+                    reward_sum = 0
+                
                 if allow_train and use_checkpoints:
                     RL_agent.maybe_train_and_checkpoint(ep_timesteps[i], ep_total_reward[i])
                 ep_num += 1
+        
             ep_total_reward[dones] = 0
             ep_timesteps[dones] = 0
+        
+        if (t+1) % 100_000 == 0:
+            RL_agent.save_checkpoint(path="checkpoints")
 
         if t >= timesteps_before_training:
             allow_train = True
-                  
+        
 
 def maybe_evaluate_and_print(RL_agent, eval_env, evals, t, start_time, file_name="model", eval_freq=50000, eval_eps=20, use_checkpoints=False):
     if t % eval_freq == 0:

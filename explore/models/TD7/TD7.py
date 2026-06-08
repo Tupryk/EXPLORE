@@ -2,7 +2,6 @@ import copy
 from dataclasses import dataclass
 from typing import Callable
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -194,7 +193,7 @@ class Agent(object):
 
 	def select_action(self, state, use_checkpoint=False, use_exploration=True):
 		with torch.no_grad():
-			state = torch.tensor(state.reshape(1,-1), dtype=torch.float, device=self.device)
+			state = torch.tensor(state, dtype=torch.float, device=self.device)
 
 			if use_checkpoint: 
 				zs = self.checkpoint_encoder.zs(state)
@@ -206,7 +205,7 @@ class Agent(object):
 			if use_exploration: 
 				action = action + torch.randn_like(action) * self.hp.exploration_noise
 
-			return action.clamp(-1,1).cpu().data.numpy().flatten() * self.max_action
+			return action.clamp(-1,1).cpu().data.numpy() * self.max_action
 
 
 	def train(self):
@@ -325,4 +324,54 @@ class Agent(object):
 		self.eps_since_update = 0
 		self.timesteps_since_update = 0
 		self.min_return = 1e8
+	
+	def save_checkpoint(self, path: str = "checkpoints", tag: str = ""):
+		import os
+		os.makedirs(path, exist_ok=True)
+		
+		tag = f"_{tag}" if tag else f"_step{self.training_steps}"
+		
+		torch.save({
+			"training_steps": self.training_steps,
+			"best_min_return": self.best_min_return,
+			
+			"actor": self.actor.state_dict(),
+			"actor_target": self.actor_target.state_dict(),
+			"actor_optimizer": self.actor_optimizer.state_dict(),
+			
+			"critic": self.critic.state_dict(),
+			"critic_target": self.critic_target.state_dict(),
+			"critic_optimizer": self.critic_optimizer.state_dict(),
+
+			"encoder": self.encoder.state_dict(),
+			"fixed_encoder": self.fixed_encoder.state_dict(),
+			"fixed_encoder_target": self.fixed_encoder_target.state_dict(),
+			"encoder_optimizer": self.encoder_optimizer.state_dict(),
+
+			"checkpoint_actor": self.checkpoint_actor.state_dict(),
+			"checkpoint_encoder": self.checkpoint_encoder.state_dict(),
+		}, f"{path}/agent{tag}.pt")
+
+
+	def load_checkpoint(self, path: str):
+		data = torch.load(path, map_location=self.device)
+
+		self.training_steps = data["training_steps"]
+		self.best_min_return = data["best_min_return"]
+
+		self.actor.load_state_dict(data["actor"])
+		self.actor_target.load_state_dict(data["actor_target"])
+		self.actor_optimizer.load_state_dict(data["actor_optimizer"])
+
+		self.critic.load_state_dict(data["critic"])
+		self.critic_target.load_state_dict(data["critic_target"])
+		self.critic_optimizer.load_state_dict(data["critic_optimizer"])
+
+		self.encoder.load_state_dict(data["encoder"])
+		self.fixed_encoder.load_state_dict(data["fixed_encoder"])
+		self.fixed_encoder_target.load_state_dict(data["fixed_encoder_target"])
+		self.encoder_optimizer.load_state_dict(data["encoder_optimizer"])
+
+		self.checkpoint_actor.load_state_dict(data["checkpoint_actor"])
+		self.checkpoint_encoder.load_state_dict(data["checkpoint_encoder"])
 		
