@@ -127,7 +127,7 @@ def train_online(RL_agent, env, eval_env, max_training_steps=300000, use_checkpo
     ep_timesteps = np.zeros(env.sim_count, dtype=int)
     ep_num = 1
 
-    mean_reward_every = 150
+    mean_reward_every = 1000
     rewards_count = 0
     reward_sum = 0.
 
@@ -158,8 +158,8 @@ def train_online(RL_agent, env, eval_env, max_training_steps=300000, use_checkpo
                 reward_sum += ep_total_reward[i]
                 rewards_count += 1
         
-                if (rewards_count+1) % mean_reward_every == 0:
-                    print(f"Avg. reward: {(reward_sum / mean_reward_every):.3f}; Episodes: {rewards_count}; Alpha: {env.schedule_alpha}")
+                if rewards_count % mean_reward_every == 0:
+                    print(f"Avg. reward: {(reward_sum / mean_reward_every):.3f}; Episodes: {rewards_count}; Alpha: {env.schedule_alpha:.3f}")
                     reward_sum = 0
                 
                 if allow_train and use_checkpoints:
