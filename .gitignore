@@ -11,3 +11,5 @@ MUJOCO_LOG.TXT
 .vscode
 tensorboard/
 *.mp4
+uv.lock
+.venv/
