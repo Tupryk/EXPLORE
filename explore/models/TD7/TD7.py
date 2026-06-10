@@ -14,14 +14,14 @@ class Hyperparameters:
 	# Generic
 	batch_size: int = 10000
 	buffer_size: int = 2e6
-	discount: float = 0.99
+	discount: float = 0.95
 	target_update_rate: int = 250
-	exploration_noise: float = 0.1
-	value_clip = [0., 1.]
+	exploration_noise: float = 0.05
+	value_clip = [0., 2.]
 	
 	# TD3
-	target_policy_noise: float = 0.2
-	noise_clip: float = 0.5
+	target_policy_noise: float = 0.05
+	noise_clip: float = 0.1
 	policy_freq: int = 2
 	
 	# LAP
@@ -40,15 +40,15 @@ class Hyperparameters:
 	zs_dim: int = 512
 	enc_hdim: int = 512
 	enc_activ: Callable = F.elu
-	encoder_lr: float = 3e-4
+	encoder_lr: float = 1e-3
 	
 	# Critic Model
-	critic_hdim: int = 512
+	critic_hdim: int = 256
 	critic_activ: Callable = F.elu
 	critic_lr: float = 1e-3
 	
 	# Actor Model
-	actor_hdim: int = 512
+	actor_hdim: int = 256
 	actor_activ: Callable = F.relu
 	actor_lr: float = 1e-3
 
@@ -152,6 +152,7 @@ class Agent(object):
 		# Changing hyperparameters example: hp=Hyperparameters(batch_size=128)
 		
 		self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+		print("TD7 is using: ", self.device)
 		self.hp = hp
 
 		self.actor = Actor(state_dim, action_dim, hp.zs_dim, hp.actor_hdim, hp.actor_activ).to(self.device)
