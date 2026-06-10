@@ -142,20 +142,19 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
                 for _ in range(env.sim_count)
             ])
 
-        next_states, rewards, dones, _, info = env.step(actions)
-        ep_total_success += info["goal_reached"]
-        ep_total_reward += rewards
-        ep_timesteps += 1
+        next_states, rewards, terminated, truncated, info = env.step(actions)
+        dones_for_buffer = terminated
+        dones_for_reset = np.logical_or(terminated, truncated)
 
-        RL_agent.replay_buffer.add_multiple(states, actions, next_states, rewards.reshape(-1, 1), dones.astype(float).reshape(-1, 1))
-        states, _ = env.reset(done=dones)
-        states[~dones] = next_states[~dones]
+        RL_agent.replay_buffer.add_multiple(states, actions, next_states, rewards.reshape(-1, 1), dones_for_buffer.astype(float).reshape(-1, 1))
+        states, _ = env.reset(done=dones_for_reset)
+        states[~dones_for_reset] = next_states[~dones_for_reset]
 
         if allow_train:
             RL_agent.train()
 
-        if dones.any():
-            for i in np.where(dones)[0]:
+        if dones_for_reset.any():
+            for i in np.where(dones_for_reset)[0]:
                 # print(f"Total max_training_steps: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}; Success: {ep_total_success[i]}")
                 reward_sum += ep_total_success[i]
                 rewards_count += 1
@@ -166,9 +165,9 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
                 
                 ep_num += 1
         
-            ep_total_success[dones] = 0
-            ep_total_reward[dones] = 0
-            ep_timesteps[dones] = 0
+            ep_total_success[dones_for_reset] = 0
+            ep_total_reward[dones_for_reset] = 0
+            ep_timesteps[dones_for_reset] = 0
         
         if (t+1) % 100_000 == 0:
             RL_agent.save_checkpoint(path="checkpoints")
