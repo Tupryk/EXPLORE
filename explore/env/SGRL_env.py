@@ -93,7 +93,13 @@ class StableConfigsEnv(gym.Env):
         n_reset = len(reset_idx)
 
         if n_reset == 0:
-            return self.getState(), {}
+            eval_state = self.sim.getCustomStateScaled()
+        
+            state = self.sim.getCustomState()
+            np.subtract(eval_state, self.target_state, out=self._e_buf)
+            state = np.concatenate((state, self._e_buf), axis=1)
+        
+            return state, {}
 
         # Choose start and end configurations
         s_cfg_idx = np.random.randint(0, self.config_count, (n_reset,))
