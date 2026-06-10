@@ -156,8 +156,8 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
 
         if dones.any():
             for i in np.where(dones)[0]:
-                print(f"Total max_training_steps: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}; Success: {ep_total_success[i]}")
-                reward_sum += ep_total_reward[i]
+                # print(f"Total max_training_steps: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}; Success: {ep_total_success[i]}")
+                reward_sum += ep_total_success[i]
                 rewards_count += 1
         
                 if rewards_count % mean_reward_every == 0:
