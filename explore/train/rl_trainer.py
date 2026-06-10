@@ -143,6 +143,11 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
             ])
 
         next_states, rewards, terminated, truncated, info = env.step(actions)
+
+        ep_total_success += info["goal_reached"]
+        ep_total_reward += rewards
+        ep_timesteps += 1
+
         dones_for_buffer = terminated
         dones_for_reset = np.logical_or(terminated, truncated)
 
