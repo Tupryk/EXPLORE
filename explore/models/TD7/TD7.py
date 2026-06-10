@@ -12,11 +12,12 @@ from explore.models.TD7 import buffer
 @dataclass
 class Hyperparameters:
 	# Generic
-	batch_size: int = 256
+	batch_size: int = 10000
 	buffer_size: int = 2e6
 	discount: float = 0.99
 	target_update_rate: int = 250
 	exploration_noise: float = 0.1
+	value_clip = [0., 1.]
 	
 	# TD3
 	target_policy_noise: float = 0.2
@@ -44,12 +45,12 @@ class Hyperparameters:
 	# Critic Model
 	critic_hdim: int = 512
 	critic_activ: Callable = F.elu
-	critic_lr: float = 3e-4
+	critic_lr: float = 1e-3
 	
 	# Actor Model
 	actor_hdim: int = 512
 	actor_activ: Callable = F.relu
-	actor_lr: float = 3e-4
+	actor_lr: float = 1e-3
 
 
 def AvgL1Norm(x, eps=1e-8):
@@ -246,6 +247,8 @@ class Agent(object):
 
 			fixed_zs = self.fixed_encoder.zs(state)
 			fixed_zsa = self.fixed_encoder.zsa(fixed_zs, action)
+
+			Q_target = Q_target.clip(*self.hp.value_clip)
 
 		Q = self.critic(state, action, fixed_zsa, fixed_zs)
 		td_loss = (Q - Q_target).abs()
