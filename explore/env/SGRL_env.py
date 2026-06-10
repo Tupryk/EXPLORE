@@ -169,7 +169,7 @@ class StableConfigsEnv(gym.Env):
         # rewards = goal_reached.astype(np.float32)
 
         truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
-        terminated = np.logical_or(goal_reached, truncated)
+        terminated = goal_reached
 
         info = {
             "frames": [],
