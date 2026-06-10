@@ -19,8 +19,8 @@ env:
   tau_action: 0.05
   stepsize: 0.05
   
-  # stable_configs_path: configs/stable/finger_ramp_big.h5
-  stable_configs_path: configs/stable/fingerRamp_onRamp.h5
+  stable_configs_path: configs/stable/finger_ramp_big.h5
+  # stable_configs_path: configs/stable/fingerRamp_onRamp.h5
 
   sim_interface:
     parallel_sims: 80
