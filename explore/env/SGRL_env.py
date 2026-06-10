@@ -76,11 +76,7 @@ class StableConfigsEnv(gym.Env):
 
         self._cost_buf = np.empty(self.sim_count, dtype=np.float32)
         self._e_buf    = np.empty((self.sim_count, self.original_stable_configs_full.shape[1]), dtype=np.float32)
-        
-    def getState(self) -> np.ndarray:
-        state = self.sim.getCustomState()
-        state = np.concatenate((state, self.target_state), axis=1)
-        return state
+        self.d_t = np.zeros((self.sim_count,), dtype=np.float32)
 
     def reset(self, done=None, *, seed: int=None, options: dict={}) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
@@ -127,7 +123,15 @@ class StableConfigsEnv(gym.Env):
         if self.verbose > 1:
             print(f"Reseting enviroment with start config {s_cfg_idx} and end config {e_cfg_idx}.")
 
-        return self.getState(), info
+        eval_state = self.sim.getCustomStateScaled()
+        
+        state = self.sim.getCustomState()
+        np.subtract(eval_state, self.target_state, out=self._e_buf)
+        state = np.concatenate((state, self._e_buf), axis=1)
+        
+        self.d_t[reset_idx] = 0
+        
+        return state, info
 
     def step(self, action: np.ndarray):
         
@@ -147,18 +151,25 @@ class StableConfigsEnv(gym.Env):
         
         np.subtract(eval_state, self.target_state, out=self._e_buf)
         np.sum(self._e_buf**2, axis=1, out=self._cost_buf)
+        np.sqrt(self._cost_buf, out=self._cost_buf)
 
         goal_reached = self._cost_buf < self.min_cost
-        goal_reached_reward = goal_reached.astype(np.float32)
+        
+        d_t1 = np.clip(1.0 - self._cost_buf / (self.min_cost * 10.0), 0.0, 1.0)
+        rewards = d_t1 - self.d_t + goal_reached.astype(np.float32)
+        self.d_t = d_t1
+        
+        # Sparse
+        # rewards = goal_reached.astype(np.float32)
 
         truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
         terminated = np.logical_or(goal_reached, truncated)
-        rewards = goal_reached_reward
 
         info = {
             "frames": [],
             "states": [],
             "ctrls": [],
+            "goal_reached": goal_reached.astype(np.float32),
             "reward": rewards
         }
 
@@ -171,7 +182,9 @@ class StableConfigsEnv(gym.Env):
                 if self.schedule_alpha > 1.0:
                     self.schedule_alpha = 1.0
     
-        return self.getState(), rewards, terminated, truncated, info
+        state = self.sim.getCustomState()
+        state = np.concatenate((state, self._e_buf), axis=1)
+        return state, rewards, terminated, truncated, info
 
     def render(self, mode: str="", config_idx: int=-1) -> np.ndarray:
         if config_idx != -1:

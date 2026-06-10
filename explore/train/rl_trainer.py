@@ -118,11 +118,12 @@ class RL_Trainer:
         self.logger.info(f"Model saved as {self.save_as}")
 
 
-def train_online(RL_agent, env, eval_env, max_training_steps=300000, use_checkpoints=True, timesteps_before_training=5000):
+def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, use_checkpoints=True, timesteps_before_training=5000):
     evals = []
     start_time = time.time()
     allow_train = False
     states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
+    ep_total_success = np.zeros(env.sim_count)
     ep_total_reward = np.zeros(env.sim_count)
     ep_timesteps = np.zeros(env.sim_count, dtype=int)
     ep_num = 1
@@ -141,7 +142,8 @@ def train_online(RL_agent, env, eval_env, max_training_steps=300000, use_checkpo
                 for _ in range(env.sim_count)
             ])
 
-        next_states, rewards, dones, _, _ = env.step(actions)
+        next_states, rewards, dones, _, info = env.step(actions)
+        ep_total_success += info["goal_reached"]
         ep_total_reward += rewards
         ep_timesteps += 1
 
@@ -154,18 +156,19 @@ def train_online(RL_agent, env, eval_env, max_training_steps=300000, use_checkpo
 
         if dones.any():
             for i in np.where(dones)[0]:
-                # print(f"Total max_training_steps: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}")
+                print(f"Total max_training_steps: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}; Success: {ep_total_success[i]}")
                 reward_sum += ep_total_reward[i]
                 rewards_count += 1
         
                 if rewards_count % mean_reward_every == 0:
-                    print(f"Avg. reward: {(reward_sum / mean_reward_every):.3f}; Episodes: {rewards_count}; Alpha: {env.schedule_alpha:.3f}")
+                    print(f"Avg. success rate: {(reward_sum / mean_reward_every):.3f}; Episodes: {rewards_count}; Alpha: {env.schedule_alpha:.3f}")
                     reward_sum = 0
                 
                 if allow_train and use_checkpoints:
                     RL_agent.maybe_train_and_checkpoint(ep_timesteps[i], ep_total_reward[i])
                 ep_num += 1
         
+            ep_total_success[dones] = 0
             ep_total_reward[dones] = 0
             ep_timesteps[dones] = 0
         
