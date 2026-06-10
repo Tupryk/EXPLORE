@@ -118,7 +118,7 @@ class RL_Trainer:
         self.logger.info(f"Model saved as {self.save_as}")
 
 
-def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, use_checkpoints=True, timesteps_before_training=5000):
+def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, timesteps_before_training=5000):
     evals = []
     start_time = time.time()
     allow_train = False
@@ -151,7 +151,7 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
         states, _ = env.reset(done=dones)
         states[~dones] = next_states[~dones]
 
-        if allow_train and not use_checkpoints:
+        if allow_train:
             RL_agent.train()
 
         if dones.any():
@@ -164,8 +164,6 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
                     print(f"Avg. success rate: {(reward_sum / mean_reward_every):.3f}; Episodes: {rewards_count}; Alpha: {env.schedule_alpha:.3f}")
                     reward_sum = 0
                 
-                if allow_train and use_checkpoints:
-                    RL_agent.maybe_train_and_checkpoint(ep_timesteps[i], ep_total_reward[i])
                 ep_num += 1
         
             ep_total_success[dones] = 0
