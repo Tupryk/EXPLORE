@@ -108,9 +108,10 @@ class StableConfigsEnv(gym.Env):
         if self.use_csrl:
             new_s_cfg_idx = []
             for i in range(n_reset):
+                t = self.schedule_alpha * (1. - np.random.uniform(0, 1))
                 query = (
-                    self.original_stable_configs_full[s_cfg_idx[i]] * self.schedule_alpha +
-                    self.original_stable_configs_full[e_cfg_idx[i]] * (1. - self.schedule_alpha)
+                    self.original_stable_configs_full[s_cfg_idx[i]] * t +
+                    self.original_stable_configs_full[e_cfg_idx[i]] * (1. - t)
                 )
                 query = query.reshape(1, -1)
                 _, ind = self.originals_kd_tree.query(query, k=1)

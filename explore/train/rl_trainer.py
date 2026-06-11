@@ -118,7 +118,7 @@ class RL_Trainer:
         self.logger.info(f"Model saved as {self.save_as}")
 
 
-def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, timesteps_before_training=5000):
+def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, timesteps_before_training=25000):
     evals = []
     start_time = time.time()
     allow_train = False

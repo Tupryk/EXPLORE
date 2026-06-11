@@ -9,7 +9,7 @@ batch_size: 2048
 
 env:
   min_cost: 0.05
-  max_steps: 128
+  max_steps: 64
   use_schedule: true
   schedule_alpha_end_step: 100000
   schedule_alpha_block: 5000
