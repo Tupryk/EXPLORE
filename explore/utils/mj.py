@@ -64,3 +64,12 @@ def getContacts(data, model, possible_contacts) -> np.ndarray:
             contacts_vec[possible_contacts.index((c[1], c[0]))] = 1
     
     return contacts_vec
+
+def geom_names2ids(geom_names: list[str], mj_model) -> list[int]:
+    geom_ids = []
+    
+    for geom_name in geom_names:
+        geom_id = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+        geom_ids.append(geom_id)
+    
+    return geom_ids

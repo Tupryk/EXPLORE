@@ -39,23 +39,37 @@ cfg = OmegaConf.create({
     
     "stable_configs_path": "configs/stable/fingerRamp_onRamp.h5",
     
+    "q": [0,3],
+    "q_dot": [0,3],
+    "q_obj_dot": 3,
+    "P": ["obj"],
+    "G": ["obj"],
+
+    "q_weight": 0.2,
+
     "sim_interface": {    
         "parallel_sims": 10,
         "xml_path": "configs/mujoco_/fingerRamp.xml",
-        "verbose": 1,
-        "geoms_in_cost": [
-            "l_fing", "obj"
-        ],
-        "geoms_in_cost_weights": [
-            1., 1., 1.,
-            4., 4., 4.
-        ]
+        "verbose": 1
     }
 })
 
 env = StableConfigsEnv(cfg)
-env.reset()
+states, _ = env.reset(options={"alpha": 1.0})
+print("After Reset:")
+print("q: ", states[0, :3])
+print("q_dot: ", states[0, 3:6])
+print("q_obj_dot: ", states[0, 6:12])
+print("r_q: ", states[0, 12:15])
+print("P: ", states[0, 15:18])
+print("G* - G: ", states[0, 18:21])
 
-actions = np.random.random((10, 3))
-env.step(actions)
-print(env.getState())
+actions = np.random.uniform(-env.stepsize, env.stepsize, (10, 3))
+next_states, rewards, terminated, truncated, info = env.step(actions)
+print("After First Action:")
+print("q: ", next_states[0, :3])
+print("q_dot: ", next_states[0, 3:6])
+print("q_obj_dot: ", next_states[0, 6:12])
+print("r_q: ", next_states[0, 12:15])
+print("P: ", next_states[0, 15:18])
+print("G* - G: ", next_states[0, 18:21])

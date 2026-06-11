@@ -36,109 +36,14 @@ class MjSim:
         self.dist_max = cfg.get("dist_max", 0.2)
         self.vel_weight = cfg.get("velocity_weight", 0.0)
 
-        # Basic
-        self.custom_state_sequence = []
-        self.custom_state_sequence_scaled = []
-        if len(self.q_mask):
-            def q_state() -> np.ndarray:
-                # [nworld, nq]
-                return self._cache["qpos"]
-            self.custom_state_sequence.append(q_state)
-            self.custom_state_sequence_scaled.append(lambda: q_state() * self.q_mask)
-
-        if self.vel_weight:
-            def qvel_state() -> np.ndarray:
-                # [nworld, nv]
-                return self._cache["qvel"]
-            self.custom_state_sequence.append(qvel_state)
-            self.custom_state_sequence_scaled.append(lambda: qvel_state() * self.vel_weight)
-
-        # Contacts — geom IDs resolved on mj_model (indices identical in warp)
-        obj_names = cfg.get("objs", [])
-        self.objs = []
-        for geom_name in obj_names:
-            geom_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-            self.objs.append(geom_id)
-
-        contact_names = cfg.get("contacts", [])
-        self.contacts = []
-        for geom_name in contact_names:
-            geom_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-            self.contacts.append(geom_id)
-
-        if self.objs:
-            def dists_state() -> np.ndarray:
-                geom_xpos = self._cache["geom_xpos"]  # [nworld, ngeom, 3]
-                obj_pos = geom_xpos[:, self.objs, :]      # [nworld, n_objs, 3]
-                con_pos = geom_xpos[:, self.contacts, :]  # [nworld, n_contacts, 3]
-                # Broadcast: [nworld, n_objs, n_contacts]
-                diff = obj_pos[:, :, None, :] - con_pos[:, None, :, :]
-                dist = np.linalg.norm(diff, axis=-1)
-                proximity = 1 - np.clip(dist / self.dist_max, 0.0, 1.0)
-                return proximity.reshape(self.nworld, -1)
-            self.custom_state_sequence.append(dists_state)
-            self.custom_state_sequence_scaled.append(lambda: dists_state() * self.dist_weight)
-
-        # Geometries
-        self.geoms_in_cost = []
-        geoms_in_cost_names = cfg.get("geoms_in_cost", [])
-        self.geoms_in_cost_weights = np.array(cfg.get("geoms_in_cost_weights", []))
-        self.vels_geoms_in_cost_weights = np.array(cfg.get("vels_geoms_in_cost_weights", []))
-        for geom_name in geoms_in_cost_names:
-            geom_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-            self.geoms_in_cost.append(geom_id)
-
-        if self.geoms_in_cost:
-            def geoms_state() -> np.ndarray:
-                # geom_xpos is [nworld, ngeom, 3]; select desired geoms → [nworld, n_geoms, 3]
-                return self._cache["geom_xpos"][:, self.geoms_in_cost, :].reshape(self.nworld, -1)
-            self.custom_state_sequence.append(geoms_state)
-            self.custom_state_sequence_scaled.append(lambda: geoms_state() * self.geoms_in_cost_weights)
-
-        if len(self.vels_geoms_in_cost_weights):
-            def geoms_vels_state() -> np.ndarray:
-                # mj_objectVelocity is CPU-only; loop over worlds as above.
-                # Returns [nworld, n_geoms * 3].
-                n_geoms = len(self.geoms_in_cost)
-                all_vels = np.empty((self.nworld, n_geoms * 3))
-                qpos_all = self._cache["qpos"]
-                qvel_all = self._cache["qvel"]
-                for w in range(self.nworld):
-                    self.mj_data.qpos[:] = qpos_all[w]
-                    self.mj_data.qvel[:] = qvel_all[w]
-                    mujoco.mj_forward(self.mj_model, self.mj_data)
-                    for i, geom_id in enumerate(self.geoms_in_cost):
-                        vel6 = np.zeros(6)
-                        mujoco.mj_objectVelocity(
-                            self.mj_model,
-                            self.mj_data,
-                            mujoco.mjtObj.mjOBJ_GEOM,
-                            geom_id,
-                            vel6,
-                            0,  # world frame
-                        )
-                        all_vels[w, i * 3:(i + 1) * 3] = vel6[3:]
-                return all_vels
-            self.custom_state_sequence.append(geoms_vels_state)
-            self.custom_state_sequence_scaled.append(
-                lambda: geoms_vels_state() * self.vels_geoms_in_cost_weights
-            )
-
-    def _sync_gpu_state(self):
-        """Single GPU→CPU transfer per step."""
-        self._cache = {
+    def gen_numpy_dict(self):
+        """GPU to CPU"""
+        self.numpy_dict = {
             "qpos": self.data.qpos.numpy().copy(),
             "qvel": self.data.qvel.numpy().copy(),
+            "ctrl": self.data.ctrl.numpy().copy(),
             "geom_xpos": self.data.geom_xpos.numpy().copy(),
         }
-
-    def getCustomState(self) -> np.ndarray:
-        self._sync_gpu_state()
-        return np.concatenate([cs() for cs in self.custom_state_sequence], axis=-1)
-
-    def getCustomStateScaled(self) -> np.ndarray:
-        self._sync_gpu_state()
-        return np.concatenate([cs() for cs in self.custom_state_sequence_scaled], axis=-1)
 
     def pushConfig(self, joint_state: np.ndarray, ctrl_state: np.ndarray, indices: np.ndarray = None):
         """

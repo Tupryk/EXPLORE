@@ -6,6 +6,7 @@ from gymnasium import spaces
 from sklearn.neighbors import KDTree
 from omegaconf import DictConfig, ListConfig
 
+from explore.utils.mj import geom_names2ids
 from explore.env.mujoco_warp_sim import MjSim
 
 
@@ -26,6 +27,15 @@ class StableConfigsEnv(gym.Env):
         if isinstance(self.stepsize, ListConfig):
             self.stepsize = np.array(self.stepsize, dtype=np.float32)
         
+        # State info
+        self.q = cfg.q
+        self.q_dot = cfg.q_dot
+        self.q_obj_dot = cfg.q_obj_dot
+        self.P = geom_names2ids(cfg.P, self.sim.mj_model)
+        self.G = geom_names2ids(cfg.G, self.sim.mj_model)
+
+        self.q_weight = cfg.q_weight
+
         # SGRL
         self.use_csrl = cfg.use_csrl
         self.schedule_alpha_step = 1. / (cfg.schedule_alpha_end_step / cfg.schedule_alpha_block)
@@ -33,33 +43,44 @@ class StableConfigsEnv(gym.Env):
         self.schedule_alpha = self.schedule_alpha_step
         self.schedule_buffer = 0
         
-        self.original_stable_configs = h5py.File(cfg.stable_configs_path, 'r')
-        self.config_count = self.original_stable_configs["qpos"].shape[0]
+        self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
+        self.config_count = self.stable_configs["qpos"].shape[0]
         if self.verbose:
             print("Total configs in h5: ", self.config_count)
         
-        self.stable_qpos = self.original_stable_configs["qpos"][:]
-        self.stable_ctrl = self.original_stable_configs["ctrl"][:]
+        self.stable_qpos = self.stable_configs["qpos"][:]
+        self.stable_ctrl = self.stable_configs["ctrl"][:]
         
-        self.original_stable_configs_full = []
+        self.all_G_star = []
+        self.phi_stable_configs = []
         for i in tqdm(range(self.config_count), total=self.config_count):
             self.sim.pushConfig(
-                self.original_stable_configs["qpos"][i],
-                self.original_stable_configs["ctrl"][i]
+                self.stable_configs["qpos"][i],
+                self.stable_configs["ctrl"][i]
             )
-            state_vec = self.sim.getCustomStateScaled()[0]
-            self.original_stable_configs_full.append(state_vec)
-        self.original_stable_configs_full = np.array(self.original_stable_configs_full)
+            
+            self.sim.gen_numpy_dict()
+            self.sim.numpy_dict
+
+            q = self.sim.numpy_dict["qpos"][0, self.q[0]:self.q[1]]
+            G = self.sim.numpy_dict["geom_xpos"][0, self.G, :].reshape(-1)
+            phi = np.concatenate([q * self.q_weight, G])
+            
+            self.all_G_star.append(G)
+            self.phi_stable_configs.append(phi)
+
+        self.all_G_star = np.array(self.all_G_star)
+        self.phi_stable_configs = np.array(self.phi_stable_configs)
         
         self.iter = np.zeros((self.sim_count,))
-        self.target_state = np.zeros((self.sim_count, self.original_stable_configs_full.shape[1]))
+        self.G_star = np.zeros((self.sim_count, self.all_G_star.shape[1]))
 
         if self.use_csrl:
-            self.originals_kd_tree = KDTree(self.original_stable_configs_full)
+            self.originals_kd_tree = KDTree(self.phi_stable_configs)
         
         # Define observation space
-        state = self.sim.getCustomState()
-        state_dim = state.shape[1] * 2
+        state = self.get_state()
+        state_dim = state.shape[1]
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_dim,), dtype=np.float32)
         
         # Define action space
@@ -75,8 +96,24 @@ class StableConfigsEnv(gym.Env):
         self.action_space = spaces.Box(low=min_ctrl, high=max_ctrl, shape=(ctrl_dim,), dtype=np.float32)
 
         self._cost_buf = np.empty(self.sim_count, dtype=np.float32)
-        self._e_buf    = np.empty((self.sim_count, self.original_stable_configs_full.shape[1]), dtype=np.float32)
         self.d_t = np.zeros((self.sim_count,), dtype=np.float32)
+    
+    def get_state(self) -> np.ndarray:
+        self.sim.gen_numpy_dict()
+        self.sim.numpy_dict
+
+        q = self.sim.numpy_dict["qpos"][:, self.q[0]:self.q[1]]
+        q_dot = self.sim.numpy_dict["qvel"][:, self.q_dot[0]:self.q_dot[1]]
+        q_obj_dot = self.sim.numpy_dict["qvel"][:, self.q_obj_dot:self.q_obj_dot+6]
+        r = self.sim.numpy_dict["ctrl"]
+        P = self.sim.numpy_dict["geom_xpos"][:, self.P, :].reshape(self.sim.nworld, -1)
+        G = self.sim.numpy_dict["geom_xpos"][:, self.G, :].reshape(self.sim.nworld, -1)
+        
+        state = np.concatenate([
+            q, q_dot, q_obj_dot, r - q, P, self.G_star - G
+        ], axis=1)
+        
+        return state
 
     def reset(self, done=None, *, seed: int=None, options: dict={}) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
@@ -84,7 +121,7 @@ class StableConfigsEnv(gym.Env):
 
         if "alpha" in options:
             self.schedule_alpha = options["alpha"]
-            if self.verbose > 1:
+            if self.verbose > 0:
                 print("Current alpha: ", self.schedule_alpha)
 
         if done is None:
@@ -93,12 +130,8 @@ class StableConfigsEnv(gym.Env):
         n_reset = len(reset_idx)
 
         if n_reset == 0:
-            eval_state = self.sim.getCustomStateScaled()
-        
-            state = self.sim.getCustomState()
-            np.subtract(eval_state, self.target_state, out=self._e_buf)
-            state = np.concatenate((state, self._e_buf), axis=1)
-        
+            # TODO: Maybe avoid re-computing the state for sims that have not been reset.
+            state = self.get_state()
             return state, {}
 
         # Choose start and end configurations
@@ -110,8 +143,8 @@ class StableConfigsEnv(gym.Env):
             for i in range(n_reset):
                 t = self.schedule_alpha * (1. - np.random.uniform(0, 1))
                 query = (
-                    self.original_stable_configs_full[s_cfg_idx[i]] * t +
-                    self.original_stable_configs_full[e_cfg_idx[i]] * (1. - t)
+                    self.phi_stable_configs[s_cfg_idx[i]] * t +
+                    self.phi_stable_configs[e_cfg_idx[i]] * (1. - t)
                 )
                 query = query.reshape(1, -1)
                 _, ind = self.originals_kd_tree.query(query, k=1)
@@ -124,17 +157,13 @@ class StableConfigsEnv(gym.Env):
 
         self.max_steps = np.clip(self.schedule_alpha, 0.1, 1.0) * self.max_steps_default
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx, "reset_idx": reset_idx}
-        self.target_state[reset_idx] = self.original_stable_configs_full[e_cfg_idx]
+        self.G_star[reset_idx] = self.all_G_star[e_cfg_idx]
         self.iter[reset_idx] = 0
 
         if self.verbose > 1:
             print(f"Reseting enviroment with start config {s_cfg_idx} and end config {e_cfg_idx}.")
 
-        eval_state = self.sim.getCustomStateScaled()
-        
-        state = self.sim.getCustomState()
-        np.subtract(eval_state, self.target_state, out=self._e_buf)
-        state = np.concatenate((state, self._e_buf), axis=1)
+        state = self.get_state()
         
         self.d_t[reset_idx] = 0
         
@@ -151,13 +180,11 @@ class StableConfigsEnv(gym.Env):
             self.tau_action,
             action
         )
+        state = self.get_state()
         self.iter += 1
 
         ### Reward Computation ###
-        eval_state = self.sim.getCustomStateScaled()
-        
-        np.subtract(eval_state, self.target_state, out=self._e_buf)
-        np.sum(self._e_buf**2, axis=1, out=self._cost_buf)
+        np.sum(state[:, -self.all_G_star.shape[1]:]**2, axis=1, out=self._cost_buf)
         np.sqrt(self._cost_buf, out=self._cost_buf)
 
         goal_reached = self._cost_buf < self.min_cost
@@ -189,8 +216,6 @@ class StableConfigsEnv(gym.Env):
                 if self.schedule_alpha > 1.0:
                     self.schedule_alpha = 1.0
     
-        state = self.sim.getCustomState()
-        state = np.concatenate((state, self._e_buf), axis=1)
         return state, rewards, terminated, truncated, info
 
     def render(self, mode: str="", config_idx: int=-1) -> np.ndarray:
