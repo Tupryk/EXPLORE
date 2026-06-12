@@ -143,6 +143,10 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_tra
     rewards_count = 0
     success_sum = 0.
     reward_sum = 0.
+    success_timesteps_sum = 0
+    success_timesteps_count = 0
+    fail_timesteps_sum = 0
+    fail_timesteps_count = 0
 
     for t in tqdm(range(max_training_steps), total=max_training_steps):
         
@@ -175,18 +179,39 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_tra
 
         if dones_for_reset.any():
             for i in np.where(dones_for_reset)[0]:
-                # print(f"Total max_training_steps: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}; Success: {ep_total_success[i]}")
                 success_sum += ep_total_success[i]
                 reward_sum += ep_total_reward[i]
                 rewards_count += 1
-        
+                
+                if ep_total_success[i]:
+                    success_timesteps_sum += ep_timesteps[i]
+                    success_timesteps_count += 1
+                else:
+                    fail_timesteps_sum += ep_timesteps[i]
+                    fail_timesteps_count += 1
+                
                 if rewards_count % mean_reward_every == 0:
-                    print(f"Avg. success rate: {(success_sum / mean_reward_every):.3f}; Avg. reward: {(reward_sum / mean_reward_every):.3f}; Episodes: {rewards_count}; Alpha: {env.schedule_alpha:.3f}")
+                    avg_success_t = (success_timesteps_sum / success_timesteps_count) if success_timesteps_count > 0 else float('nan')
+                    avg_fail_t = (fail_timesteps_sum / fail_timesteps_count) if fail_timesteps_count > 0 else float('nan')
+                    
+                    print(f"Avg. success rate: {(success_sum / mean_reward_every):.3f}")
+                    print(f"Avg. reward: {(reward_sum / mean_reward_every):.3f}")
+                    print(f"Avg. success T: {avg_success_t:.1f}")
+                    print(f"Avg. fail T: {avg_fail_t:.1f}")
+                    print(f"Episodes: {rewards_count}")
+                    print(f"Alpha: {env.schedule_alpha:.3f}")
+                    
                     success_sum = 0
                     reward_sum = 0
-                
+
+                    success_timesteps_sum = 0
+                    success_timesteps_count = 0
+                    
+                    fail_timesteps_sum = 0
+                    fail_timesteps_count = 0
+
                 ep_num += 1
-        
+                
             ep_total_success[dones_for_reset] = 0
             ep_total_reward[dones_for_reset] = 0
             ep_timesteps[dones_for_reset] = 0
