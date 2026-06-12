@@ -35,6 +35,10 @@ class StableConfigsEnv(gym.Env):
         self.P = geom_names2ids(cfg.P, self.sim.mj_model)
         self.G = geom_names2ids(cfg.G, self.sim.mj_model)
 
+        self.obs_pos_scale = cfg.get("obs_pos_scale", 1.0)
+        self.obs_vel_scale = cfg.get("obs_vel_scale", 0.1)
+        self.obs_ref_err_scale = cfg.get("obs_ref_err_scale", 10.0)
+
         self.q_weight = cfg.q_weight
 
         # SGRL
@@ -113,7 +117,12 @@ class StableConfigsEnv(gym.Env):
         G = self.sim.numpy_dict["geom_xpos"][:, self.G, :].reshape(self.sim.nworld, -1)
         
         state = np.concatenate([
-            q, q_dot, q_obj_dot, r - q, P, self.G_star - G
+            q * self.obs_pos_scale,
+            q_dot * self.obs_vel_scale,
+            q_obj_dot * self.obs_vel_scale,
+            (r - q) * self.obs_ref_err_scale,
+            P * self.obs_pos_scale,
+            (self.G_star - G) * self.obs_pos_scale
         ], axis=1)
         
         return state
