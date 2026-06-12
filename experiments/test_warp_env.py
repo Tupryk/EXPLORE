@@ -44,6 +44,10 @@ cfg = OmegaConf.create({
     "q_obj_dot": 3,
     "P": ["obj"],
     "G": ["obj"],
+    
+    "obs_pos_scale": 1.0,
+    "obs_vel_scale": 0.05,
+    "obs_ref_err_scale": 20.0,
 
     "q_weight": 0.2,
 

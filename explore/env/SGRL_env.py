@@ -129,7 +129,6 @@ class StableConfigsEnv(gym.Env):
 
     def reset(self, done=None, *, seed: int=None, options: dict={}) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
-        np.random.seed(seed)
 
         if "alpha" in options:
             self.schedule_alpha = options["alpha"]
@@ -194,11 +193,11 @@ class StableConfigsEnv(gym.Env):
         ### Simulation Step ###
         if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
             ctrl_np = self.sim.data.ctrl.numpy()
-            np.add(action, ctrl_np, out=action)
+            ctrl_target = action + ctrl_np
         
         frames = self.sim.step(
             self.tau_action,
-            action,
+            ctrl_target,
             render=self.render
         )
         state = self.get_state()

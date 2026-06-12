@@ -1,3 +1,4 @@
+import os
 import copy
 from dataclasses import dataclass
 from typing import Callable
@@ -346,7 +347,6 @@ class Agent(object):
         self.min_return = 1e8
     
     def save_checkpoint(self, path: str = "checkpoints", tag: str = ""):
-        import os
         os.makedirs(path, exist_ok=True)
         
         tag = f"_{tag}" if tag else f"_step{self.training_steps}"
