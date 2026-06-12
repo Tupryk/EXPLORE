@@ -44,12 +44,12 @@ class StableConfigsEnv(gym.Env):
         self.schedule_buffer = 0
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
-        self.config_count = self.stable_configs["qpos"][:10].shape[0]
+        self.config_count = self.stable_configs["qpos"].shape[0]
         if self.verbose:
             print("Total configs in h5: ", self.config_count)
         
-        self.stable_qpos = self.stable_configs["qpos"][:10]
-        self.stable_ctrl = self.stable_configs["ctrl"][:10]
+        self.stable_qpos = self.stable_configs["qpos"][:]
+        self.stable_ctrl = self.stable_configs["ctrl"][:]
         
         self.all_G_star = []
         self.phi_stable_configs = []
