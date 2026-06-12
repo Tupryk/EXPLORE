@@ -1,5 +1,6 @@
 import os
 import time
+import copy
 import logging
 import numpy as np
 from tqdm import tqdm
@@ -81,11 +82,16 @@ class RL_Trainer:
             )
 
         elif self.rl_method == "TD7":
-            # self.eval_env = StableConfigsEnv(cfg.env)
-            self.eval_env = None
+            
+            eval_cfg = copy.deepcopy(cfg.env)
+            eval_cfg.verbose = 0
+            eval_cfg.sim_interface.parallel_sims = 1
+            self.eval_env = StableConfigsEnv(eval_cfg)
+            
             state_dim = self.env.observation_space.shape[0]
             action_dim = self.env.action_space.shape[0] 
             max_action = float(self.env.action_space.high[0])
+            
             self.model = TD7.Agent(state_dim, action_dim, max_action)
 
         else:
@@ -118,8 +124,7 @@ class RL_Trainer:
         self.logger.info(f"Model saved as {self.save_as}")
 
 
-def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, timesteps_before_training=25000):
-    evals = []
+def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, timesteps_before_training=5000):
     start_time = time.time()
     allow_train = False
     states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
@@ -130,10 +135,13 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
 
     mean_reward_every = 1000
     rewards_count = 0
+    success_sum = 0.
     reward_sum = 0.
 
     for t in tqdm(range(max_training_steps), total=max_training_steps):
-        # maybe_evaluate_and_print(RL_agent, eval_env, evals, t, start_time)
+        
+        maybe_evaluate_and_print(RL_agent, eval_env, t, start_time)
+        
         if allow_train:
             actions = RL_agent.select_action(np.array(states))
         else:
@@ -161,11 +169,13 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
         if dones_for_reset.any():
             for i in np.where(dones_for_reset)[0]:
                 # print(f"Total max_training_steps: {t+1} Episode Num: {ep_num} Episode T: {ep_timesteps[i]} Reward: {ep_total_reward[i]:.3f} Alpha: {env.schedule_alpha}; Success: {ep_total_success[i]}")
-                reward_sum += ep_total_success[i]
+                success_sum += ep_total_success[i]
+                reward_sum += ep_total_reward[i]
                 rewards_count += 1
         
                 if rewards_count % mean_reward_every == 0:
-                    print(f"Avg. success rate: {(reward_sum / mean_reward_every):.3f}; Episodes: {rewards_count}; Alpha: {env.schedule_alpha:.3f}")
+                    print(f"Avg. success rate: {(success_sum / mean_reward_every):.3f}; Avg. reward: {(reward_sum / mean_reward_every):.3f}; Episodes: {rewards_count}; Alpha: {env.schedule_alpha:.3f}")
+                    success_sum = 0
                     reward_sum = 0
                 
                 ep_num += 1
@@ -181,23 +191,24 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
             allow_train = True
         
 
-def maybe_evaluate_and_print(RL_agent, eval_env, evals, t, start_time, file_name="model", eval_freq=50000, eval_eps=20, use_checkpoints=False):
+def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, eval_freq=25000, eval_eps=20):
     if t % eval_freq == 0:
         print("---------------------------------------")
         print(f"Evaluation at {t} time steps")
         print(f"Total time passed: {round((time.time()-start_time)/60.,2)} min(s)")
 
+        total_success = np.zeros(eval_eps)
         total_reward = np.zeros(eval_eps)
         for ep in range(eval_eps):
             state, _ = eval_env.reset(options={"alpha": 1.0})
             done = False
             while not done:
-                action = RL_agent.select_action(np.array(state), use_checkpoints, use_exploration=False)
-                state, reward, done, _, _ = eval_env.step(action)
-                total_reward[ep] += reward
+                action = RL_agent.select_action(np.array(state), use_exploration=False)
+                state, rewards, terminated, truncated, info = eval_env.step(action.reshape(1, -1))
+                
+                total_success[ep] += info["goal_reached"][0]
+                total_reward[ep] += rewards[0]
+                done = np.logical_or(terminated[0], truncated[0])
 
-        print(f"Average total reward over {eval_eps} episodes: {total_reward.mean():.3f}")
+        print(f"Average total reward over {eval_eps} episodes: {total_reward.mean():.3f} (success rate: {total_success.mean():.3f})")
         print("---------------------------------------")
-
-        evals.append(total_reward)
-        np.save(f"./data/{file_name}", evals)

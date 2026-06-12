@@ -196,8 +196,8 @@ class StableConfigsEnv(gym.Env):
         # Sparse
         # rewards = goal_reached.astype(np.float32)
 
-        truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
         terminated = goal_reached
+        truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
 
         info = {
             "frames": [],
