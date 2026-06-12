@@ -12,6 +12,7 @@ env:
   min_cost: 0.01
   max_steps: 64
   use_schedule: true
+  sparse_reward: true
   schedule_alpha_end_step: 50000
   schedule_alpha_block: 5000
   use_csrl: true

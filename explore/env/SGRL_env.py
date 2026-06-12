@@ -17,6 +17,7 @@ class StableConfigsEnv(gym.Env):
         super().__init__()
         self.verbose = cfg.get("verbose", 0)
         self.max_steps_default = cfg.max_steps
+        self.sparse_reward = cfg.get("sparse_reward", True)
         
         # Sim interface
         self.sim = MjSim(cfg.sim_interface)
@@ -200,12 +201,13 @@ class StableConfigsEnv(gym.Env):
 
         goal_reached = self._cost_buf < self.min_cost
         
-        d_t1 = np.clip(1.0 - self._cost_buf / (self.min_cost * 10.0), 0.0, 1.0)
-        rewards = d_t1 - self.d_t + goal_reached.astype(np.float32)
-        self.d_t = d_t1
+        if self.sparse_reward:
+            rewards = goal_reached.astype(np.float32)
         
-        # Sparse
-        # rewards = goal_reached.astype(np.float32)
+        else:
+            d_t1 = np.clip(1.0 - self._cost_buf / (self.min_cost * 10.0), 0.0, 1.0)
+            rewards = d_t1 - self.d_t + goal_reached.astype(np.float32)
+            self.d_t = d_t1
 
         terminated = goal_reached
         truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
