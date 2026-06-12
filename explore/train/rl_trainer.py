@@ -19,6 +19,7 @@ class RL_Trainer:
         self.cfg = cfg
         self.logger = logger
         
+        self.output_dir = cfg.output_dir
         self.total_timesteps = cfg.total_timesteps
         self.save_as = os.path.join(cfg.output_dir, "final_rl_policy") if cfg.output_dir else "final_rl_policy"
         self.save_freq = cfg.save_freq
@@ -116,7 +117,7 @@ class RL_Trainer:
                 callback=checkpoint_callback
             )
         else:
-            train_online(self.model, self.env, self.eval_env)
+            train_online(self.model, self.env, self.eval_env, output_dir=self.output_dir)
 
         if self.rl_method != "TD7":
             self.model.save(self.save_as)
@@ -125,7 +126,7 @@ class RL_Trainer:
         self.logger.info(f"Model saved as {self.save_as}")
 
 
-def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, timesteps_before_training=5000):
+def train_online(RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_training_steps=300000, timesteps_before_training=5000):
     start_time = time.time()
     allow_train = False
     states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
@@ -141,7 +142,8 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
 
     for t in tqdm(range(max_training_steps), total=max_training_steps):
         
-        maybe_evaluate_and_print(RL_agent, eval_env, t, start_time)
+        if output_dir:
+            maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, output_dir=output_dir)
         
         if allow_train:
             actions = RL_agent.select_action(np.array(states))
@@ -191,7 +193,7 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
         if t >= timesteps_before_training:
             allow_train = True
 
-def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, eval_freq=25000, eval_eps=20):
+def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, output_dir, eval_freq=25000, eval_eps=20):
     if t % eval_freq == 0:
         print("---------------------------------------")
         print(f"Evaluation at {t} time steps")
@@ -199,10 +201,8 @@ def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, eval_freq=25000,
         total_success = np.zeros(eval_eps)
         total_reward = np.zeros(eval_eps)
 
-        os.makedirs("data", exist_ok=True)
-
         for ep in range(eval_eps):
-            state, _ = eval_env.reset(options={"alpha": 1.0, "render": True})
+            state, _ = eval_env.reset(options={"alpha": 1.0, "sample_uniform": False, "render": True})
             done = False
             frames = []
             while not done:
@@ -216,7 +216,7 @@ def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, eval_freq=25000,
                 done = np.logical_or(terminated[0], truncated[0])
 
             if frames:
-                imageio.mimsave(os.path.join("evals", f"eval_t{t}_ep{ep}.gif"), frames, fps=24, loop=0)
+                imageio.mimsave(os.path.join(output_dir, f"eval_t{t}_ep{ep}.gif"), frames, fps=24, loop=0)
 
         print(f"Average total reward over {eval_eps} episodes: {total_reward.mean():.3f} (success rate: {total_success.mean():.3f})")
         print("---------------------------------------")

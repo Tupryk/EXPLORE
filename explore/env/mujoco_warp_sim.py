@@ -139,7 +139,7 @@ class MjSim:
             self.data.ctrl.assign(wp.array(interpolated_ctrl, dtype=wp.float32))
             mjw.step(self.model, self.data)
             
-            if render and self.data.time[0] >= self.next_frame_time:
+            if render and self.data.time.numpy()[0] >= self.next_frame_time:
                 
                 mjw.get_data_into(self.mj_data, self.mj_model, self.data)
                 self.renderer.update_scene(self.mj_data, self.camera)

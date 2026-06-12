@@ -44,12 +44,12 @@ class StableConfigsEnv(gym.Env):
         self.schedule_buffer = 0
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
-        self.config_count = self.stable_configs["qpos"].shape[0]
+        self.config_count = self.stable_configs["qpos"][:10].shape[0]
         if self.verbose:
             print("Total configs in h5: ", self.config_count)
         
-        self.stable_qpos = self.stable_configs["qpos"][:]
-        self.stable_ctrl = self.stable_configs["ctrl"][:]
+        self.stable_qpos = self.stable_configs["qpos"][:10]
+        self.stable_ctrl = self.stable_configs["ctrl"][:10]
         
         self.all_G_star = []
         self.phi_stable_configs = []
@@ -145,7 +145,10 @@ class StableConfigsEnv(gym.Env):
         if self.use_csrl:
             new_s_cfg_idx = []
             for i in range(n_reset):
-                t = self.schedule_alpha * (1. - np.random.uniform(0, 1))
+                if "sample_uniform" in options and not options["sample_uniform"]:
+                    t = self.schedule_alpha
+                else:
+                    t = self.schedule_alpha * (1. - np.random.uniform(0, 1))
                 query = (
                     self.phi_stable_configs[s_cfg_idx[i]] * t +
                     self.phi_stable_configs[e_cfg_idx[i]] * (1. - t)
