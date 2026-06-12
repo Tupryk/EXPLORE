@@ -13,7 +13,7 @@ from explore.models.TD7 import buffer
 class Hyperparameters:
 	# Generic
 	batch_size: int = 10000
-	buffer_size: int = 4e6
+	buffer_size: int = 1e6
 	discount: float = 0.95
 	target_update_rate: int = 250
 	exploration_noise: float = 0.05
@@ -37,8 +37,8 @@ class Hyperparameters:
 	reset_weight: float = 0.9
 	
 	# Encoder Model
-	zs_dim: int = 512
-	enc_hdim: int = 512
+	zs_dim: int = 256
+	enc_hdim: int = 256
 	enc_activ: Callable = F.elu
 	encoder_lr: float = 1e-3
 	

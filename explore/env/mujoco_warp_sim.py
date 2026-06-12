@@ -122,8 +122,14 @@ class MjSim:
             self.data.qvel.numpy().copy(),
             self.data.ctrl.numpy().copy(),
         )
+    
+    def render_state(self, qpos: np.ndarray) -> np.ndarray:
+        self.mj_data.qpos[:] = qpos
+        mujoco.mj_forward(self.mj_model, self.mj_data)
+        self.renderer.update_scene(self.mj_data, self.camera)
+        return self.renderer.render()
 
-    def step(self, tau_action: float, ctrl_target: np.ndarray, render: bool=False) -> list:
+    def step(self, tau_action: float, ctrl_target: np.ndarray, render: bool=False) -> list[np.ndarray]:
         """
         Args:
             tau_action:   duration to simulate

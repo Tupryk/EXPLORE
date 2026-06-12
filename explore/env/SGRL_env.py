@@ -44,7 +44,7 @@ class StableConfigsEnv(gym.Env):
         self.schedule_buffer = 0
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
-        self.config_count = self.stable_configs["qpos"].shape[0]
+        self.config_count = self.stable_configs["qpos"][:].shape[0]
         if self.verbose:
             print("Total configs in h5: ", self.config_count)
         
@@ -160,10 +160,13 @@ class StableConfigsEnv(gym.Env):
 
         start_qpos = self.stable_qpos[s_cfg_idx]
         start_ctrl = self.stable_ctrl[s_cfg_idx]
+
+        info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx, "reset_idx": reset_idx}
+        if self.render:
+            info["goal_frame"] = self.sim.render_state(self.stable_qpos[e_cfg_idx[0]])
         self.sim.pushConfig(start_qpos, start_ctrl, reset_idx)
 
         self.max_steps = np.clip(self.schedule_alpha, 0.1, 1.0) * self.max_steps_default
-        info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx, "reset_idx": reset_idx}
         self.G_star[reset_idx] = self.all_G_star[e_cfg_idx]
         self.iter[reset_idx] = 0
 

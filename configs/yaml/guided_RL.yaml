@@ -1,6 +1,7 @@
 rl_method: "TD7"
 verbose: 1
-total_timesteps: 3e5
+total_timesteps: 75000
+timesteps_before_training: 5000
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 net_arch: [256, 256]
@@ -11,7 +12,7 @@ env:
   min_cost: 0.01
   max_steps: 64
   use_schedule: true
-  schedule_alpha_end_step: 100000
+  schedule_alpha_end_step: 50000
   schedule_alpha_block: 5000
   use_csrl: true
   verbose: 1

@@ -21,6 +21,7 @@ class RL_Trainer:
         
         self.output_dir = cfg.output_dir
         self.total_timesteps = cfg.total_timesteps
+        self.timesteps_before_training = cfg.timesteps_before_training
         self.save_as = os.path.join(cfg.output_dir, "final_rl_policy") if cfg.output_dir else "final_rl_policy"
         self.save_freq = cfg.save_freq
 
@@ -117,7 +118,10 @@ class RL_Trainer:
                 callback=checkpoint_callback
             )
         else:
-            train_online(self.model, self.env, self.eval_env, output_dir=self.output_dir)
+            train_online(self.model, self.env, self.eval_env,
+                         max_training_steps=self.total_timesteps,
+                         timesteps_before_training=self.timesteps_before_training,
+                         output_dir=self.output_dir)
 
         if self.rl_method != "TD7":
             self.model.save(self.save_as)
@@ -194,7 +198,7 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_tra
             allow_train = True
 
 def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, output_dir, eval_freq=25000, eval_eps=20):
-    if t % eval_freq == 0:
+    if (t+1) % eval_freq == 0:
         print("---------------------------------------")
         print(f"Evaluation at {t} time steps")
         print(f"Total time passed: {round((time.time()-start_time)/60.,2)} min(s)")
@@ -202,8 +206,9 @@ def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, output_dir, eval
         total_reward = np.zeros(eval_eps)
 
         for ep in range(eval_eps):
-            state, _ = eval_env.reset(options={"alpha": 1.0, "sample_uniform": False, "render": True})
+            state, info = eval_env.reset(options={"alpha": 1.0, "sample_uniform": False, "render": True})
             done = False
+            goal_frame = info["goal_frame"]
             frames = []
             while not done:
                 action = RL_agent.select_action(np.array(state), use_exploration=False)
@@ -216,6 +221,7 @@ def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, output_dir, eval
                 done = np.logical_or(terminated[0], truncated[0])
 
             if frames:
+                frames = [(frame.astype(float)*0.8 + goal_frame.astype(float)*0.2).astype(frame.dtype) for frame in frames]
                 imageio.mimsave(os.path.join(output_dir, f"eval_t{t}_ep{ep}.gif"), frames, fps=24, loop=0)
 
         print(f"Average total reward over {eval_eps} episodes: {total_reward.mean():.3f} (success rate: {total_success.mean():.3f})")
