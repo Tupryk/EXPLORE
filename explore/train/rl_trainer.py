@@ -2,6 +2,7 @@ import os
 import time
 import copy
 import logging
+import imageio
 import numpy as np
 from tqdm import tqdm
 from omegaconf import DictConfig
@@ -189,26 +190,33 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
 
         if t >= timesteps_before_training:
             allow_train = True
-        
 
 def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, eval_freq=25000, eval_eps=20):
     if t % eval_freq == 0:
         print("---------------------------------------")
         print(f"Evaluation at {t} time steps")
         print(f"Total time passed: {round((time.time()-start_time)/60.,2)} min(s)")
-
         total_success = np.zeros(eval_eps)
         total_reward = np.zeros(eval_eps)
+
+        os.makedirs("data", exist_ok=True)
+
         for ep in range(eval_eps):
-            state, _ = eval_env.reset(options={"alpha": 1.0})
+            state, _ = eval_env.reset(options={"alpha": 1.0, "render": True})
             done = False
+            frames = []
             while not done:
                 action = RL_agent.select_action(np.array(state), use_exploration=False)
                 state, rewards, terminated, truncated, info = eval_env.step(action.reshape(1, -1))
                 
+                frames.extend(info["frames"])
                 total_success[ep] += info["goal_reached"][0]
                 total_reward[ep] += rewards[0]
+                
                 done = np.logical_or(terminated[0], truncated[0])
+
+            if frames:
+                imageio.mimsave(os.path.join("evals", f"eval_t{t}_ep{ep}.gif"), frames, fps=24, loop=0)
 
         print(f"Average total reward over {eval_eps} episodes: {total_reward.mean():.3f} (success rate: {total_success.mean():.3f})")
         print("---------------------------------------")

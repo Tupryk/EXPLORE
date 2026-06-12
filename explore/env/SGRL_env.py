@@ -97,6 +97,8 @@ class StableConfigsEnv(gym.Env):
 
         self._cost_buf = np.empty(self.sim_count, dtype=np.float32)
         self.d_t = np.zeros((self.sim_count,), dtype=np.float32)
+        
+        self.render = False
     
     def get_state(self) -> np.ndarray:
         self.sim.gen_numpy_dict()
@@ -123,6 +125,8 @@ class StableConfigsEnv(gym.Env):
             self.schedule_alpha = options["alpha"]
             if self.verbose > 0:
                 print("Current alpha: ", self.schedule_alpha)
+        
+        self.render = "render" in options and options["render"]
 
         if done is None:
             done = np.ones(self.sim_count, dtype=bool)
@@ -176,9 +180,10 @@ class StableConfigsEnv(gym.Env):
             ctrl_np = self.sim.data.ctrl.numpy()
             np.add(action, ctrl_np, out=action)
         
-        self.sim.step(
+        frames = self.sim.step(
             self.tau_action,
-            action
+            action,
+            render=self.render
         )
         state = self.get_state()
         self.iter += 1
@@ -200,7 +205,7 @@ class StableConfigsEnv(gym.Env):
         truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
 
         info = {
-            "frames": [],
+            "frames": frames,
             "states": [],
             "ctrls": [],
             "goal_reached": goal_reached.astype(np.float32),
@@ -217,18 +222,3 @@ class StableConfigsEnv(gym.Env):
                     self.schedule_alpha = 1.0
     
         return state, rewards, terminated, truncated, info
-
-    def render(self, mode: str="", config_idx: int=-1) -> np.ndarray:
-        if config_idx != -1:
-            current_state = self.sim.getState()
-            self.sim.setState(*self.trees[config_idx][0]["state"])
-
-        if mode:
-            img = self.sim.renderImg(mode)
-        else:
-            img = self.sim.renderImg()
-
-        if config_idx != -1:
-            self.sim.setState(*current_state)
-
-        return img

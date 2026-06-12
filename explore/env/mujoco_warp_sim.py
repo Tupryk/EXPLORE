@@ -35,6 +35,16 @@ class MjSim:
         self.dist_weight = cfg.get("dist_weight", 0.1)
         self.dist_max = cfg.get("dist_max", 0.2)
         self.vel_weight = cfg.get("velocity_weight", 0.0)
+        
+        ### RENDERING ###
+        self.frame_dt = 1.0 / cfg.get("fps", 24.0)
+        self.next_frame_time = 0.0
+        
+        render_w = cfg.get("render_w", 640)
+        render_h = cfg.get("render_h", 480)
+        self.camera = cfg.get("camera", "fixed_cam")
+        
+        self.renderer = mujoco.Renderer(self.mj_model, render_h, render_w)
 
     def gen_numpy_dict(self):
         """GPU to CPU"""
@@ -54,11 +64,13 @@ class MjSim:
             indices:     optional 1-D array of world indices to reset; if None, resets all
         """
         if indices is None:
+            self.next_frame_time = 0.0
             self.data.time.assign(wp.zeros(self.nworld, dtype=wp.float32))
             self.data.qpos.assign(wp.array(joint_state, dtype=wp.float32))
             self.data.qvel.assign(wp.zeros_like(self.data.qvel))
             self.data.ctrl.assign(wp.array(ctrl_state, dtype=wp.float32))
         else:
+            if 0 in indices: self.next_frame_time = 0.0
             time_np = self.data.time.numpy()
             qpos_np = self.data.qpos.numpy()
             qvel_np = self.data.qvel.numpy()
@@ -111,7 +123,7 @@ class MjSim:
             self.data.ctrl.numpy().copy(),
         )
 
-    def step(self, tau_action: float, ctrl_target: np.ndarray):
+    def step(self, tau_action: float, ctrl_target: np.ndarray, render: bool=False) -> list:
         """
         Args:
             tau_action:   duration to simulate
@@ -119,10 +131,21 @@ class MjSim:
         """
         steps = math.ceil(tau_action / self.tau_sim)
         prev_ctrl = self.data.ctrl.numpy().copy()   # [nworld, nu]
+        frames = []
 
         for k in range(steps):
             perc = (k + 1) / steps
             interpolated_ctrl = prev_ctrl * (1 - perc) + ctrl_target * perc
             self.data.ctrl.assign(wp.array(interpolated_ctrl, dtype=wp.float32))
             mjw.step(self.model, self.data)
+            
+            if render and self.data.time[0] >= self.next_frame_time:
+                
+                mjw.get_data_into(self.mj_data, self.mj_model, self.data)
+                self.renderer.update_scene(self.mj_data, self.camera)
+                frames.append(self.renderer.render())
+                
+                self.next_frame_time += self.frame_dt
+            
+        return frames
             
