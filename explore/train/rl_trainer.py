@@ -7,6 +7,7 @@ import numpy as np
 from tqdm import tqdm
 from omegaconf import DictConfig
 from stable_baselines3 import PPO, SAC, TD3
+from torch.utils.tensorboard import SummaryWriter
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import CheckpointCallback
 
@@ -27,7 +28,6 @@ class RL_Trainer:
 
         # Set up SB3 logger
         log_dir = os.path.join(cfg.output_dir, "training_logs")
-        log_dir = "data/tmp"
         sb3_logger = configure(log_dir, ["stdout", "csv", "tensorboard"])
         self.chekpoint_dir = os.path.join(cfg.output_dir, "checkpoints")
         os.makedirs(self.chekpoint_dir)
@@ -133,6 +133,7 @@ class RL_Trainer:
 def train_online(RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_training_steps=300000, timesteps_before_training=5000):
     start_time = time.time()
     allow_train = False
+    writer = SummaryWriter(log_dir=os.path.join(output_dir, "tb")) if output_dir else SummaryWriter()
     states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
     ep_total_success = np.zeros(env.sim_count)
     ep_total_reward = np.zeros(env.sim_count)
@@ -175,7 +176,7 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_tra
         states[~dones_for_reset] = next_states[~dones_for_reset]
 
         if allow_train:
-            RL_agent.train()
+                RL_agent.train()
 
         if dones_for_reset.any():
             for i in np.where(dones_for_reset)[0]:
@@ -194,12 +195,21 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_tra
                     avg_success_t = (success_timesteps_sum / success_timesteps_count) if success_timesteps_count > 0 else float('nan')
                     avg_fail_t = (fail_timesteps_sum / fail_timesteps_count) if fail_timesteps_count > 0 else float('nan')
                     
-                    print(f"Avg. success rate: {(success_sum / mean_reward_every):.3f}")
+                    avg_success_rate = success_sum / mean_reward_every
+                    avg_reward = reward_sum / mean_reward_every
+
+                    print(f"Avg. success rate: {avg_success_rate:.3f}")
                     print(f"Avg. reward: {(reward_sum / mean_reward_every):.3f}")
                     print(f"Avg. success T: {avg_success_t:.1f}")
                     print(f"Avg. fail T: {avg_fail_t:.1f}")
                     print(f"Episodes: {rewards_count}")
                     print(f"Alpha: {env.schedule_alpha:.3f}")
+
+                    writer.add_scalar("rollout/avg_success_rate", avg_success_rate, t)
+                    writer.add_scalar("rollout/avg_reward", avg_reward, t)
+                    writer.add_scalar("rollout/avg_success_T", avg_success_t, t)
+                    writer.add_scalar("rollout/avg_fail_T", avg_fail_t, t)
+                    writer.add_scalar("rollout/alpha", env.schedule_alpha, t)
                     
                     success_sum = 0
                     reward_sum = 0
@@ -221,6 +231,9 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_tra
 
         if t >= timesteps_before_training:
             allow_train = True
+
+    writer.close()
+
 
 def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, output_dir, eval_freq=25000, eval_eps=20):
     if (t+1) % eval_freq == 0:

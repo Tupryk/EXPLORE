@@ -210,7 +210,7 @@ class Agent(object):
             return action.clamp(-1,1).cpu().data.numpy() * self.max_action
 
 
-    def train(self):
+    def train(self, writer=None):
         self.training_steps += 1
 
         state, action, next_state, reward, not_done = self.replay_buffer.sample()
@@ -268,6 +268,7 @@ class Agent(object):
         #########################
         # Update Actor
         #########################
+        actor_loss = None
         if self.training_steps % self.hp.policy_freq == 0:
             actor = self.actor(state, fixed_zs)
             fixed_zsa = self.fixed_encoder.zsa(fixed_zs, actor)
@@ -280,6 +281,21 @@ class Agent(object):
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
+            
+        #########################
+        # TensorBoard logging
+        #########################
+        if writer is not None:
+            writer.add_scalar("loss/encoder", encoder_loss.item(), self.training_steps)
+            writer.add_scalar("loss/critic", critic_loss.item(), self.training_steps)
+            if actor_loss is not None:
+                writer.add_scalar("loss/actor", actor_loss.item(), self.training_steps)
+            writer.add_scalar("value/Q_mean", Q.mean().item(), self.training_steps)
+            writer.add_scalar("value/Q_target_mean", Q_target.mean().item(), self.training_steps)
+            writer.add_scalar("value/max_target", self.max_target, self.training_steps)
+            writer.add_scalar("value/min_target", self.min_target, self.training_steps)
+            writer.add_scalar("priority/mean", priority.mean().item(), self.training_steps)
+
 
         #########################
         # Update Iteration
