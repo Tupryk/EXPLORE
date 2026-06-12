@@ -13,7 +13,7 @@ from explore.models.TD7 import buffer
 class Hyperparameters:
 	# Generic
 	batch_size: int = 10000
-	buffer_size: int = 2e6
+	buffer_size: int = 4e6
 	discount: float = 0.95
 	target_update_rate: int = 250
 	exploration_noise: float = 0.05

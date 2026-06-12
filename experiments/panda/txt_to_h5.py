@@ -18,8 +18,10 @@ from explore.utils.vis import AdjMap
 # h5_file = "configs/stable/gobox.h5"
 # txt_file = "data/fixed_gobox_table.txt"
 # h5_file = "configs/stable/gobox_table.h5"
-txt_file = "data/finger_ramp.txt"
-h5_file = "configs/stable/finger_ramp_big.h5"
+# txt_file = "data/finger_ramp.txt"
+# h5_file = "configs/stable/finger_ramp_big.h5"
+txt_file = "data/fing_wall.txt"
+h5_file = "configs/stable/double_sphere.h5"
 
 # SAME_THRESH = 0.07
 SAME_THRESH = 0.0
@@ -57,10 +59,14 @@ new_data_pos = []
 new_data_ctrl = []
 for i, vec in tqdm(enumerate(data)):
     if i >= MAX_CONFIGS: break
-    ### FINGER RAMP ###
+    ### DOUBLE SPHERE ###
     state_vec = vec
-    state_vec[2] += 0.4
     ctrl_vec = state_vec[:3]
+
+    # ### FINGER RAMP ###
+    # state_vec = vec
+    # state_vec[2] += 0.4
+    # ctrl_vec = state_vec[:3]
 
     # ### FRANKA HOOK ###
     # state_vec = np.zeros(23)

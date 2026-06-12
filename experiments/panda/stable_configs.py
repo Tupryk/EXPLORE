@@ -6,9 +6,11 @@ import matplotlib.pyplot as plt
 
 from explore.env.mujoco_sim import MjSim
 
+h5_file = "configs/stable/double_sphere.h5"
+mujoco_xml = "configs/mujoco_/doubleSphere.xml"
 
-h5_file = "configs/stable/finger_ramp_big.h5"
-mujoco_xml = "configs/mujoco_/fingerRamp.xml"
+# h5_file = "configs/stable/finger_ramp_big.h5"
+# mujoco_xml = "configs/mujoco_/fingerRamp.xml"
 
 # h5_file = "configs/stable/gobox_table.h5"
 # mujoco_xml = "configs/mujoco_/unitree_go2/table_box_scene.xml"
@@ -67,19 +69,20 @@ print(stable_configs.shape)
 sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
 
 # for i, sc in enumerate(sampled_configs):
-for i, sc in enumerate(stable_configs):
+for i, sc in enumerate(sampled_configs):
     print(i)
     # if i < 2:
     #     continue
     # sim.pushConfig(sc)
     # print(sc)
     # print(stable_configs_ctrl[i])
-    q = stable_configs_ctrl[i].copy()
+    q = stable_configs[sc].copy()
+    ctrl = stable_configs_ctrl[sc].copy()
     # q[7] = 0
     # q[15] = 0
     # print(sc)
-    sim.pushConfig(sc, q)
+    sim.pushConfig(q, ctrl)
     # input()
     time.sleep(1.)
     sim.step(1., view=1.)
-    print("sum: ", sum([float(i) for i in sim.getContacts()]))
+    # print("sum: ", sum([float(i) for i in sim.getContacts()]))

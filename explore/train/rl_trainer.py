@@ -118,7 +118,7 @@ class RL_Trainer:
         self.logger.info(f"Model saved as {self.save_as}")
 
 
-def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, timesteps_before_training=25000):
+def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, timesteps_before_training=1):
     evals = []
     start_time = time.time()
     allow_train = False
@@ -136,6 +136,8 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, max_training_steps=300000, 
         # maybe_evaluate_and_print(RL_agent, eval_env, evals, t, start_time)
         if allow_train:
             actions = RL_agent.select_action(np.array(states))
+            print(actions)
+            print(actions.shape)
         else:
             actions = np.array([
                 env.action_space.sample()
