@@ -260,7 +260,7 @@ def maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, output_dir, eval
 
             if frames:
                 frames = [(frame.astype(float)*0.8 + goal_frame.astype(float)*0.2).astype(frame.dtype) for frame in frames]
-                imageio.mimsave(os.path.join(output_dir, f"eval_t{t}_ep{ep}.gif"), frames, fps=24, loop=0)
+                imageio.mimsave(os.path.join(output_dir, f"eval_t{t+1}_ep{ep+1}.gif"), frames, fps=24, loop=0)
 
         print(f"Average total reward over {eval_eps} episodes: {total_reward.mean():.3f} (success rate: {total_success.mean():.3f})")
         print("---------------------------------------")

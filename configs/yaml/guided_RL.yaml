@@ -19,7 +19,7 @@ env:
   verbose: 1
 
   tau_action: 0.05
-  stepsize: 0.1
+  stepsize: 0.05
   
   stable_configs_path: configs/stable/double_sphere.h5
   # stable_configs_path: configs/stable/fingerRamp_onRamp.h5
