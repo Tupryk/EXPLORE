@@ -1,7 +1,7 @@
 rl_method: "TD7"
 verbose: 1
 total_timesteps: 75000
-timesteps_before_training: 5000
+timesteps_before_training: 25000
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 net_arch: [256, 256]
@@ -19,7 +19,7 @@ env:
   verbose: 1
 
   tau_action: 0.05
-  stepsize: 0.05
+  stepsize: 0.1
   
   stable_configs_path: configs/stable/double_sphere.h5
   # stable_configs_path: configs/stable/fingerRamp_onRamp.h5
