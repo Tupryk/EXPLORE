@@ -170,7 +170,7 @@ def train_online(RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_tra
         dones_for_buffer = terminated
         dones_for_reset = np.logical_or(terminated, truncated)
 
-        RL_agent.replay_buffer.add_multiple(states, actions, next_states, rewards.reshape(-1, 1), dones_for_buffer.astype(float).reshape(-1, 1))
+        RL_agent.replay_buffer.add_multiple(states, actions, next_states, rewards, dones_for_buffer.astype(float))
         states, _ = env.reset(done=dones_for_reset)
         states[~dones_for_reset] = next_states[~dones_for_reset]
 

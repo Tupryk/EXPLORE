@@ -44,7 +44,7 @@ class StableConfigsEnv(gym.Env):
         self.schedule_buffer = 0
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
-        self.config_count = self.stable_configs["qpos"][:].shape[0]
+        self.config_count = self.stable_configs["qpos"].shape[0]
         if self.verbose:
             print("Total configs in h5: ", self.config_count)
         
