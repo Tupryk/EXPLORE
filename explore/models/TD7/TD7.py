@@ -40,17 +40,17 @@ class Hyperparameters:
     # Encoder Model
     zs_dim: int = 256
     enc_hdim: int = 256
-    enc_activ: Callable = F.elu
+    # enc_activ: Callable = F.elu
     encoder_lr: float = 1e-3
     
     # Critic Model
     critic_hdim: int = 256
-    critic_activ: Callable = F.elu
+    # critic_activ: Callable = F.elu
     critic_lr: float = 1e-3
     
     # Actor Model
     actor_hdim: int = 256
-    actor_activ: Callable = F.relu
+    # actor_activ: Callable = F.relu
     actor_lr: float = 1e-3
 
 
@@ -156,15 +156,15 @@ class Agent(object):
         print("TD7 is using: ", self.device)
         self.hp = hp
 
-        self.actor = Actor(state_dim, action_dim, hp.zs_dim, hp.actor_hdim, hp.actor_activ).to(self.device)
+        self.actor = Actor(state_dim, action_dim, hp.zs_dim, hp.actor_hdim).to(self.device)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=hp.actor_lr)
         self.actor_target = copy.deepcopy(self.actor)
 
-        self.critic = Critic(state_dim, action_dim, hp.zs_dim, hp.critic_hdim, hp.critic_activ).to(self.device)
+        self.critic = Critic(state_dim, action_dim, hp.zs_dim, hp.critic_hdim).to(self.device)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=hp.critic_lr)
         self.critic_target = copy.deepcopy(self.critic)
 
-        self.encoder = Encoder(state_dim, action_dim, hp.zs_dim, hp.enc_hdim, hp.enc_activ).to(self.device)
+        self.encoder = Encoder(state_dim, action_dim, hp.zs_dim, hp.enc_hdim).to(self.device)
         self.encoder_optimizer = torch.optim.Adam(self.encoder.parameters(), lr=hp.encoder_lr)
         self.fixed_encoder = copy.deepcopy(self.encoder)
         self.fixed_encoder_target = copy.deepcopy(self.encoder)
