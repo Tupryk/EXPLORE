@@ -6,8 +6,8 @@ output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
 TD7:
-  batch_size: 10000
-  buffer_size: 4e6
+  batch_size: 20000
+  buffer_size: 6e6
   discount: 0.95
   target_update_rate: 250
   exploration_noise: 0.05
@@ -54,15 +54,15 @@ env:
 
   tau_action: 0.05
   stepsize: [
-    .075, .05, .075,  # hip
-    .1, .1, .1,  # knee, ankle, ankle
-    .075, .05, .075,  # hip
-    .1, .1, .1,  # knee, ankle, ankle
-    .075, .05, .05,  # waist
-    .75, .75, .75,  # shoulder
-    .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
-    .05, .05, .05,  # shoulder
-    .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
+    .04, .025, .04,  # hip
+    .05, .05, .05,  # knee, ankle, ankle
+    .04, .025, .04,  # hip
+    .05, .05, .05,  # knee, ankle, ankle
+    .04, .025, .025,  # waist
+    .4, .4, .4,  # shoulder
+    .04, .05, .05, .05,  # elbow, wrist, wrist, wrist
+    .025, .025, .025,  # shoulder
+    .04, .05, .05, .05,  # elbow, wrist, wrist, wrist
   ]
   
   stable_configs_path: "configs/stable/humanoid_box_grasps.h5"
@@ -90,7 +90,7 @@ env:
     xml_path: "configs/mujoco_/unitree_g1/table_box_scene.xml"
     tau_sim: 0.005
     verbose: 1
-    
+
     njmax: 150
     nconmax: 100
     ccd_iterations: 200
