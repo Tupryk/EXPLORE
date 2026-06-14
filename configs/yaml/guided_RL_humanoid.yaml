@@ -1,0 +1,90 @@
+rl_method: "TD7"
+verbose: 1
+total_timesteps: 500000
+timesteps_before_training: 25000
+output_dir: ${hydra:runtime.output_dir}
+device: "cpu"
+
+TD7:
+  batch_size: 10000
+  buffer_size: 4e6
+  discount: 0.95
+  target_update_rate: 250
+  exploration_noise: 0.05
+  value_clip: [0., 2.]
+  
+  # TD3
+  target_policy_noise: 0.05
+  noise_clip: 0.1
+  policy_freq: 2
+  
+  # LAP
+  alpha: 0.4
+  min_priority: 1
+  
+  # TD3+BC
+  lmbda: 0.1
+  
+  # Checkpointing
+  max_eps_when_checkpointing: 20
+  steps_before_checkpointing: 75e4 
+  reset_weight: 0.9
+  
+  # Encoder Model
+  zs_dim: 512
+  enc_hdim: 512
+  encoder_lr: 1e-3
+  
+  # Critic Model
+  critic_hdim: 512
+  critic_lr: 1e-3
+  
+  # Actor Model
+  actor_hdim: 512
+  actor_lr: 1e-3
+
+env:
+  min_cost: 0.05
+  max_steps: 64
+  sparse_reward: false
+  schedule_alpha_end_step: 250000
+  schedule_alpha_block: 5000
+  use_csrl: true
+  verbose: 1
+
+  tau_action: 0.05
+  stepsize: [
+    .075, .05, .075,  # hip
+    .1, .1, .1,  # knee, ankle, ankle
+    .075, .05, .075,  # hip
+    .1, .1, .1,  # knee, ankle, ankle
+    .075, .05, .05,  # waist
+    .75, .75, .75,  # shoulder
+    .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
+    .05, .05, .05,  # shoulder
+    .075, .1, .1, .1,  # elbow, wrist, wrist, wrist
+  ]
+  
+  stable_configs_path: "configs/stable/humanoid_box_grasps.h5"
+
+  "q": [7,36]
+  "q_dot": [6,35]
+  "q_obj_dot": 35
+  "P": ["pelvis", "obj_col", "box_marker_0", "box_marker_1", "box_marker_2"]
+  "G": ["obj_col", "box_marker_0", "box_marker_1", "box_marker_2"]
+
+  "obs_pos_scale": 1.0
+  "obs_vel_scale": 0.1
+  "obs_ref_err_scale": 10.0
+
+  "q_weight": 0.2
+
+  sim_interface:
+    parallel_sims: 80
+    xml_path: "configs/mujoco_/unitree_g1/table_box_scene.xml"
+    tau_sim: 0.005
+    verbose: 1
+
+    camera: fixed_cam
+    render_w: 640
+    render_h: 480

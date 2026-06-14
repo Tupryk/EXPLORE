@@ -89,16 +89,8 @@ class StableConfigsEnv(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_dim,), dtype=np.float32)
         
         # Define action space
-        if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
-            min_ctrl = -1.0 * self.stepsize
-            max_ctrl = self.stepsize
-        else:
-            ctrl_ranges = self.sim.model.actuator_ctrlrange
-            min_ctrl = ctrl_ranges[:, 0].astype(np.float32)
-            max_ctrl = ctrl_ranges[:, 1].astype(np.float32)
-        
         ctrl_dim = self.sim.data.ctrl.shape[1]
-        self.action_space = spaces.Box(low=min_ctrl, high=max_ctrl, shape=(ctrl_dim,), dtype=np.float32)
+        self.action_space = spaces.Box(low=-1, high=-1, shape=(ctrl_dim,), dtype=np.float32)
 
         self._cost_buf = np.empty(self.sim_count, dtype=np.float32)
         self.d_t = np.zeros((self.sim_count,), dtype=np.float32)
@@ -193,7 +185,9 @@ class StableConfigsEnv(gym.Env):
         ### Simulation Step ###
         if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
             ctrl_np = self.sim.data.ctrl.numpy()
-            ctrl_target = action + ctrl_np
+            ctrl_target = action * self.stepsize + ctrl_np
+        else:
+            ctrl_target = action.copy()
         
         frames = self.sim.step(
             self.tau_action,

@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 from explore.env.mujoco_sim import MjSim
 
-h5_file = "configs/stable/double_sphere.h5"
-mujoco_xml = "configs/mujoco_/doubleSphere.xml"
+# h5_file = "configs/stable/double_sphere.h5"
+# mujoco_xml = "configs/mujoco_/doubleSphere.xml"
 
 # h5_file = "configs/stable/finger_ramp_big.h5"
 # mujoco_xml = "configs/mujoco_/fingerRamp.xml"
@@ -18,8 +18,8 @@ mujoco_xml = "configs/mujoco_/doubleSphere.xml"
 # h5_file = "configs/stable/gobox.h5"
 # mujoco_xml = "configs/mujoco_/unitree_go2/box_scene.xml"
 
-# h5_file = "configs/stable/humanoid_box_grasps.h5"
-# mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
+h5_file = "configs/stable/humanoid_box_grasps.h5"
+mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"
 
 # h5_file = "configs/stable/pandasTableConfigs.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
@@ -67,6 +67,7 @@ sim = MjSim(cfg, view=True)
 print("Total configs: ", stable_configs)
 print(stable_configs.shape)
 sampled_configs = np.random.randint(0, stable_configs.shape[0], (100))
+print("Ctrl-dim: ", stable_configs_ctrl[0].shape)
 
 # for i, sc in enumerate(sampled_configs):
 for i, sc in enumerate(sampled_configs):
