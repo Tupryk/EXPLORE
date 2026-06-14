@@ -26,8 +26,25 @@ class MjSim:
             explain_qpos(self.mj_model)
 
         ### WARP MODEL AND DATA ###
+        njmax = cfg.get("njmax", -1)
+        nconmax = cfg.get("nconmax", -1)
+        ccd_iterations = cfg.get("ccd_iterations", -1)
+        
+        if ccd_iterations != -1: self.mj_model.opt.ccd_iterations = ccd_iterations
+
         self.model = mjw.put_model(self.mj_model)
-        self.data = mjw.put_data(self.mj_model, self.mj_data, nworld=cfg.parallel_sims)
+
+        if njmax != -1:
+            self.data = mjw.put_data(
+                self.mj_model,
+                self.mj_data,
+                nworld=cfg.parallel_sims,
+                njmax=njmax,
+                nconmax=nconmax
+            )
+        else:
+            self.data = mjw.put_data(self.mj_model, self.mj_data, nworld=cfg.parallel_sims)
+        
         self.nworld = cfg.parallel_sims
 
         ### COST COMPUTATION ###

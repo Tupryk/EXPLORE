@@ -90,6 +90,10 @@ env:
     xml_path: "configs/mujoco_/unitree_g1/table_box_scene.xml"
     tau_sim: 0.005
     verbose: 1
+    
+    njmax: 150
+    nconmax: 100
+    ccd_iterations: 200
 
     camera: fixed_cam
     render_w: 640
