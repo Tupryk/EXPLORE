@@ -70,7 +70,13 @@ env:
   "q": [7,36]
   "q_dot": [6,35]
   "q_obj_dot": 35
-  "P": ["pelvis", "obj_col", "box_marker_0", "box_marker_1", "box_marker_2"]
+  "P": [
+    "pelvis",
+    "left_ankle_roll_joint", "right_ankle_roll_joint",
+    "left_rubber_hand_0", "right_rubber_hand_0",
+    "obj_col",
+    "box_marker_0", "box_marker_1", "box_marker_2"
+  ]
   "G": ["obj_col", "box_marker_0", "box_marker_1", "box_marker_2"]
 
   "obs_pos_scale": 1.0
