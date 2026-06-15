@@ -22,23 +22,6 @@
     <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
     
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
-
-    <body name="table" pos="1.0 1.5 0.5">
-      <geom type="box" size="0.5 0.4 0.04" />
-
-      <body name="leg1" pos="0.45 0.35 -0.25">
-        <geom type="box" size="0.03 0.03 0.25" />
-      </body>
-      <body name="leg2" pos="0.45 -0.35 -0.25">
-        <geom type="box" size="0.03 0.03 0.25" />
-      </body>
-      <body name="leg3" pos="-0.45 0.35 -0.25">
-        <geom type="box" size="0.03 0.03 0.25" />
-      </body>
-      <body name="leg4" pos="-0.45 -0.35 -0.25">
-        <geom type="box" size="0.03 0.03 0.25" />
-      </body>
-    </body>
     
     <body name="obj" pos="1.0 0.0 0.3">
       <freejoint />

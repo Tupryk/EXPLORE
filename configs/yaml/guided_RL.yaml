@@ -2,6 +2,7 @@ rl_method: "TD7"
 verbose: 1
 total_timesteps: 75000
 timesteps_before_training: 25000
+checkpoint_freq: 100000
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
@@ -53,12 +54,12 @@ env:
   use_csrl: true
   verbose: 1
   balance_for: 5
+  cont_balance: false
 
   tau_action: 0.05
-  stepsize: 0.1
+  stepsize: 0.05
   
   stable_configs_path: configs/stable/double_sphere.h5
-  # stable_configs_path: configs/stable/fingerRamp_onRamp.h5
 
   "q": [0,3]
   "q_dot": [0,3]

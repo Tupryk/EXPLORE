@@ -52,6 +52,7 @@ env:
   use_csrl: true
   verbose: 1
   balance_for: 5
+  cont_balance: false
 
   tau_action: 0.05
   stepsize: [
@@ -88,7 +89,7 @@ env:
 
   sim_interface:
     parallel_sims: 80
-    xml_path: "configs/mujoco_/unitree_g1/table_box_scene.xml"
+    xml_path: "configs/mujoco_/unitree_g1/box_scene.xml"
     tau_sim: 0.005
     verbose: 1
 
