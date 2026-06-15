@@ -28,6 +28,9 @@ class StableConfigsEnv(gym.Env):
         if isinstance(self.stepsize, ListConfig):
             self.stepsize = np.array(self.stepsize, dtype=np.float32)
         
+        self.balance_for = cfg.get("balance_for", 1)
+        self.balance_counter = np.zeros((self.sim_count,))
+        
         # State info
         self.q = cfg.q
         self.q_dot = cfg.q_dot
@@ -177,6 +180,7 @@ class StableConfigsEnv(gym.Env):
         state = self.get_state()
         
         self.d_t[reset_idx] = 0
+        self.balance_counter[reset_idx] = 0
         
         return state, info
 
@@ -202,23 +206,25 @@ class StableConfigsEnv(gym.Env):
         np.sqrt(self._cost_buf, out=self._cost_buf)
 
         goal_reached = self._cost_buf < self.min_cost
+        self.balance_counter[goal_reached] += 1
+        goal_balanced = self.balance_counter >= self.balance_for
         
         if self.sparse_reward:
-            rewards = goal_reached.astype(np.float32)
+            rewards = goal_balanced.astype(np.float32)
         
         else:
             d_t1 = np.clip(1.0 - self._cost_buf / (self.min_cost * 10.0), 0.0, 1.0)
-            rewards = d_t1 - self.d_t + goal_reached.astype(np.float32)
+            rewards = d_t1 - self.d_t + goal_balanced.astype(np.float32)
             self.d_t = d_t1
 
-        terminated = goal_reached
+        terminated = goal_balanced
         truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
 
         info = {
             "frames": frames,
             "states": [],
             "ctrls": [],
-            "goal_reached": goal_reached.astype(np.float32),
+            "goal_reached": goal_balanced.astype(np.float32),
             "reward": rewards
         }
 
