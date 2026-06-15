@@ -207,6 +207,7 @@ class StableConfigsEnv(gym.Env):
 
         goal_reached = self._cost_buf < self.min_cost
         self.balance_counter[goal_reached] += 1
+        self.balance_counter[~goal_reached] = 0
         goal_balanced = self.balance_counter >= self.balance_for
         
         if self.sparse_reward:
