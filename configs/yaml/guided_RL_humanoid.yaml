@@ -7,7 +7,7 @@ output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
 TD7:
-  batch_size: 20000
+  batch_size: 25000
   buffer_size: 6e6
   discount: 0.99
   target_update_rate: 250
@@ -84,7 +84,7 @@ env:
   "obs_vel_scale": 0.1
   "obs_ref_err_scale": 10.0
 
-  "q_weight": 0.01
+  "q_weight": 0.001
 
   sim_interface:
     parallel_sims: 80
