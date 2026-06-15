@@ -45,7 +45,7 @@ TD7:
 
 env:
   min_cost: 0.05
-  max_steps: 64
+  max_steps: 128
   sparse_reward: false
   schedule_alpha_end_step: 250000
   schedule_alpha_block: 5000

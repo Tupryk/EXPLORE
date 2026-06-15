@@ -52,6 +52,7 @@ env:
   schedule_alpha_block: 5000
   use_csrl: true
   verbose: 1
+  balance_for: 5
 
   tau_action: 0.05
   stepsize: 0.1
