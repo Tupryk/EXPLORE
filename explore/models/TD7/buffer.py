@@ -52,23 +52,20 @@ class LAP(object):
   
   
     def add_multiple(self, states, actions, next_states, rewards, dones):
-        assert states.ndim == 2
         n = states.shape[0]
-        if self.ptr+n>self.max_size:
-            self.ptr=0
+        indices = (self.ptr + np.arange(n)) % self.max_size
 
-        self.state[self.ptr : self.ptr + n] = states
-        self.action[self.ptr : self.ptr + n] = actions / self.normalize_actions
-        self.next_state[self.ptr : self.ptr + n] = next_states
-        self.reward[self.ptr : self.ptr + n] = rewards.reshape(n, 1)
-        self.not_done[self.ptr : self.ptr + n] = 1.0 - dones.reshape(n, 1)
+        self.state[indices] = states
+        self.action[indices] = actions / self.normalize_actions
+        self.next_state[indices] = next_states
+        self.reward[indices] = rewards
+        self.not_done[indices] = 1. - dones
 
         if self.prioritized:
-            self.priority[self.ptr : self.ptr + n] = self.max_priority
+            self.priority[indices] = self.max_priority
 
-        self.ptr += n
-        self.size = max(self.ptr, self.size)
-        assert self.size<=self.max_size
+        self.ptr = (self.ptr + n) % self.max_size
+        self.size = min(self.size + n, self.max_size)
 
 
     def sample(self):
