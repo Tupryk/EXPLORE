@@ -92,9 +92,9 @@ env:
     tau_sim: 0.005
     verbose: 1
 
-    njmax: 150
-    nconmax: 100
-    ccd_iterations: 200
+    njmax: 250
+    nconmax: 200
+    ccd_iterations: 250
 
     camera: fixed_cam
     render_w: 640
