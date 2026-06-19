@@ -76,6 +76,7 @@ class StableConfigsEnv(gym.Env):
         self.all_G_star = []
         self.phi_stable_configs = []
         for i in tqdm(range(self.config_count), total=self.config_count):
+            # TODO: Make this faster
             self.sim.pushConfig(
                 self.stable_configs["qpos"][i],
                 self.stable_configs["ctrl"][i]
@@ -248,7 +249,7 @@ class StableConfigsEnv(gym.Env):
         
         if self.expand_manifold:
             q = self.sim.numpy_dict["qpos"][:, self.q[0]:self.q[1]]
-            G = self.sim.numpy_dict["geom_xpos"][:, self.G, :].squeeze(1)
+            G = self.sim.numpy_dict["geom_xpos"][:, self.G, :].reshape(self.sim_count, -1)
             phi = np.concatenate([q * self.q_weight, G], axis=1)
             
             indices = (self.manifold_idx + np.arange(self.sim_count)) % (self.max_manifold - self.config_count)
