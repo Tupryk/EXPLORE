@@ -1,4 +1,5 @@
 import h5py
+import mujoco
 import hnswlib
 import numpy as np
 from tqdm import tqdm
@@ -76,17 +77,11 @@ class StableConfigsEnv(gym.Env):
         self.all_G_star = []
         self.phi_stable_configs = []
         for i in tqdm(range(self.config_count), total=self.config_count):
-            # TODO: Make this faster
-            self.sim.pushConfig(
-                self.stable_configs["qpos"][i],
-                self.stable_configs["ctrl"][i]
-            )
-            
-            self.sim.gen_numpy_dict()
-            self.sim.numpy_dict
+            self.sim.mj_data.qpos[:] = self.stable_configs["qpos"][i]
+            mujoco.mj_forward(self.sim.mj_model, self.sim.mj_data)
 
-            q = self.sim.numpy_dict["qpos"][0, self.q[0]:self.q[1]]
-            G = self.sim.numpy_dict["geom_xpos"][0, self.G, :].reshape(-1)
+            q = self.sim.mj_data.qpos[self.q[0]:self.q[1]]
+            G = self.sim.mj_data.geom_xpos[self.G, :].reshape(-1)
             phi = np.concatenate([q * self.q_weight, G])
             
             self.all_G_star.append(G)

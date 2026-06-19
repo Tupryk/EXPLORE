@@ -70,7 +70,11 @@ class RL_Trainer:
     def train_online(self, RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_training_steps=300000, timesteps_before_training=5000):
         start_time = time.time()
         allow_train = False
-        writer = SummaryWriter(log_dir=os.path.join(output_dir, "tb")) if output_dir else SummaryWriter()
+        
+        tb_dir = os.path.join(output_dir, "tb")
+        os.makedirs(tb_dir, exist_ok=True)
+        writer = SummaryWriter(log_dir=tb_dir) if output_dir else SummaryWriter()
+        
         states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
         ep_total_success = np.zeros(env.sim_count)
         ep_total_reward = np.zeros(env.sim_count)
