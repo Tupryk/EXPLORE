@@ -120,6 +120,7 @@ class MjSim:
             qvel:  [nworld, nv]
             ctrl:  [nworld, nu]
         """
+        self.next_frame_time = 0.0
         self.data.time.assign(wp.array(time, dtype=wp.float32))
         self.data.qpos.assign(wp.array(qpos, dtype=wp.float32))
         self.data.qvel.assign(wp.array(qvel, dtype=wp.float32))
