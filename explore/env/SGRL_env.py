@@ -248,7 +248,8 @@ class StableConfigsEnv(gym.Env):
             phi = np.concatenate([q * self.q_weight, G], axis=1)
             
             indices = (self.manifold_idx + np.arange(self.sim_count)) % (self.max_manifold - self.config_count)
-            self.sds.add_items(phi, ids=indices + self.config_count)
+            indices += self.config_count
+            self.sds.add_items(phi, ids=indices)
             self.manifold_idx = (self.manifold_idx + self.sim_count) % (self.max_manifold - self.config_count)
             
             self.manifold_time[indices] = self.sim.numpy_dict["time"][:]
