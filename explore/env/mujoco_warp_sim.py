@@ -66,6 +66,7 @@ class MjSim:
     def gen_numpy_dict(self):
         """GPU to CPU"""
         self.numpy_dict = {
+            "time": self.data.time.numpy().copy(),
             "qpos": self.data.qpos.numpy().copy(),
             "qvel": self.data.qvel.numpy().copy(),
             "ctrl": self.data.ctrl.numpy().copy(),

@@ -50,7 +50,7 @@ class StableConfigsEnv(gym.Env):
         self.schedule_buffer = 0
         
         self.expand_manifold = cfg.get("expand_manifold", False)
-        self.max_manifold = cfg.get("max_manifold", 1e6)
+        self.max_manifold = int(cfg.get("max_manifold", 1e6))
         self.manifold_idx = 0
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
@@ -58,8 +58,20 @@ class StableConfigsEnv(gym.Env):
         if self.verbose:
             print("Total configs in h5: ", self.config_count)
         
-        self.stable_qpos = self.stable_configs["qpos"][:]
-        self.stable_ctrl = self.stable_configs["ctrl"][:]
+        if self.expand_manifold:
+            self.manifold_time = np.zeros((self.max_manifold,))
+            self.manifold_qpos = np.zeros((self.max_manifold, self.sim.data.qpos.shape[1]))
+            self.manifold_qvel = np.zeros((self.max_manifold, self.sim.data.qvel.shape[1]))
+            self.manifold_ctrl = np.zeros((self.max_manifold, self.sim.data.ctrl.shape[1]))
+            
+            self.manifold_qpos[:self.config_count] = self.stable_configs["qpos"][:]
+            self.manifold_ctrl[:self.config_count] = self.stable_configs["ctrl"][:]
+            
+        else:
+            self.manifold_time = np.zeros((self.config_count,))
+            self.manifold_qpos = self.stable_configs["qpos"][:]
+            self.manifold_qvel = np.zeros((self.config_count, self.sim.data.qvel.shape[1]))
+            self.manifold_ctrl = self.stable_configs["ctrl"][:]
         
         self.all_G_star = []
         self.phi_stable_configs = []
@@ -87,7 +99,7 @@ class StableConfigsEnv(gym.Env):
 
         if self.use_csrl:
             if self.expand_manifold:
-                self.sds = hnswlib.Index(space="l2", dim=self.all_G_star.shape[1])
+                self.sds = hnswlib.Index(space="l2", dim=self.phi_stable_configs.shape[1])
                 self.sds.init_index(max_elements=self.max_manifold, ef_construction=200, M=16)
                 
                 self.manifold_idx = self.phi_stable_configs.shape[0]
@@ -170,20 +182,22 @@ class StableConfigsEnv(gym.Env):
                 query = query.reshape(1, -1)
                 
                 if self.expand_manifold:
-                    node_id, _ = self.sds.knn_query(query, k=1)
-                    node_id = node_id[0]
+                    ind = self.sds.knn_query(query, k=1)
                 else:
                     _, ind = self.sds.query(query, k=1)
                 new_s_cfg_idx.append(ind[0][0])
             s_cfg_idx = new_s_cfg_idx
 
-        start_qpos = self.stable_qpos[s_cfg_idx]
-        start_ctrl = self.stable_ctrl[s_cfg_idx]
-
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx, "reset_idx": reset_idx}
         if self.render:
             info["goal_frame"] = self.sim.render_state(self.stable_qpos[e_cfg_idx[0]])
-        self.sim.pushConfig(start_qpos, start_ctrl, reset_idx)
+        
+        self.sim.setState(
+            self.manifold_time[s_cfg_idx],
+            self.manifold_qpos[s_cfg_idx],
+            self.manifold_qvel[s_cfg_idx],
+            self.manifold_ctrl[s_cfg_idx]
+        )
 
         self.max_steps = np.clip(self.schedule_alpha, 0.1, 1.0) * self.max_steps_default
         self.G_star[reset_idx] = self.all_G_star[e_cfg_idx]
@@ -234,12 +248,17 @@ class StableConfigsEnv(gym.Env):
         
         if self.expand_manifold:
             q = self.sim.numpy_dict["qpos"][:, self.q[0]:self.q[1]]
-            G = self.sim.numpy_dict["geom_xpos"][:, self.G, :]
+            G = self.sim.numpy_dict["geom_xpos"][:, self.G, :].squeeze(1)
             phi = np.concatenate([q * self.q_weight, G], axis=1)
             
             indices = (self.manifold_idx + np.arange(self.sim_count)) % (self.max_manifold - self.config_count)
             self.sds.add_items(phi, ids=indices + self.config_count)
             self.manifold_idx = (self.manifold_idx + self.sim_count) % (self.max_manifold - self.config_count)
+            
+            self.manifold_time[indices] = self.sim.numpy_dict["time"][:]
+            self.manifold_qpos[indices] = self.sim.numpy_dict["qpos"][:]
+            self.manifold_qvel[indices] = self.sim.numpy_dict["qvel"][:]
+            self.manifold_ctrl[indices] = self.sim.numpy_dict["ctrl"][:]
 
         info = {
             "frames": frames,
