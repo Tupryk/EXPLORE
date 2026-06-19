@@ -55,14 +55,14 @@ class LAP(object):
         n = states.shape[0]
         indices = (self.ptr + np.arange(n)) % self.max_size
 
-        self.state[indices] = states
-        self.action[indices] = actions / self.normalize_actions
-        self.next_state[indices] = next_states
-        self.reward[indices] = rewards
-        self.not_done[indices] = 1. - dones
+        self.state[indices, :] = states
+        self.action[indices, :] = actions / self.normalize_actions
+        self.next_state[indices, :] = next_states
+        self.reward[indices, :] = rewards
+        self.not_done[indices, :] = 1. - dones
 
         if self.prioritized:
-            self.priority[indices] = self.max_priority
+            self.priority[indices, :] = self.max_priority
 
         self.ptr = (self.ptr + n) % self.max_size
         self.size = min(self.size + n, self.max_size)

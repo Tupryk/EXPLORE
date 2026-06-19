@@ -51,6 +51,8 @@ env:
   schedule_alpha_end_step: 250000
   schedule_alpha_block: 5000
   use_csrl: true
+  expand_manifold: true
+  max_manifold_size: 4e6
   verbose: 1
 
   tau_action: 0.05

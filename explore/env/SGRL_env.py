@@ -1,4 +1,5 @@
 import h5py
+import hnswlib
 import numpy as np
 from tqdm import tqdm
 import gymnasium as gym
@@ -42,11 +43,15 @@ class StableConfigsEnv(gym.Env):
         self.q_weight = cfg.q_weight
 
         # SGRL
-        self.use_csrl = cfg.use_csrl
+        self.use_csrl = cfg.get("use_csrl", True)
         self.schedule_alpha_step = 1. / (cfg.schedule_alpha_end_step / cfg.schedule_alpha_block)
         self.schedule_alpha_block = cfg.schedule_alpha_block
         self.schedule_alpha = self.schedule_alpha_step
         self.schedule_buffer = 0
+        
+        self.expand_manifold = cfg.get("expand_manifold", False)
+        self.max_manifold = cfg.get("max_manifold", 1e6)
+        self.manifold_idx = 0
         
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
         self.config_count = self.stable_configs["qpos"].shape[0]
@@ -81,10 +86,18 @@ class StableConfigsEnv(gym.Env):
         self.G_star = np.zeros((self.sim_count, self.all_G_star.shape[1]))
 
         if self.use_csrl:
-            self.originals_kd_tree = KDTree(self.phi_stable_configs)
+            if self.expand_manifold:
+                self.sds = hnswlib.Index(space="l2", dim=self.all_G_star.shape[1])
+                self.sds.init_index(max_elements=self.max_manifold, ef_construction=200, M=16)
+                
+                self.manifold_idx = self.phi_stable_configs.shape[0]
+                self.sds.add_items(self.phi_stable_configs, ids=list(range(0, self.manifold_idx)))
+                
+            else:
+                self.sds = KDTree(self.phi_stable_configs)
         
         # Define observation space
-        state = self.get_state()
+        state, _ = self.get_state()
         state_dim = state.shape[1]
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_dim,), dtype=np.float32)
         
@@ -97,7 +110,7 @@ class StableConfigsEnv(gym.Env):
         
         self.render = False
     
-    def get_state(self) -> np.ndarray:
+    def get_state(self) -> tuple[np.ndarray, dict]:
         self.sim.gen_numpy_dict()
         self.sim.numpy_dict
 
@@ -117,7 +130,7 @@ class StableConfigsEnv(gym.Env):
             (self.G_star - G) * self.obs_pos_scale
         ], axis=1)
         
-        return state
+        return state, self.sim.numpy_dict
 
     def reset(self, done=None, *, seed: int=None, options: dict={}) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
@@ -136,7 +149,7 @@ class StableConfigsEnv(gym.Env):
 
         if n_reset == 0:
             # TODO: Maybe avoid re-computing the state for sims that have not been reset.
-            state = self.get_state()
+            state, _ = self.get_state()
             return state, {}
 
         # Choose start and end configurations
@@ -155,7 +168,12 @@ class StableConfigsEnv(gym.Env):
                     self.phi_stable_configs[e_cfg_idx[i]] * (1. - t)
                 )
                 query = query.reshape(1, -1)
-                _, ind = self.originals_kd_tree.query(query, k=1)
+                
+                if self.expand_manifold:
+                    node_id, _ = self.sds.knn_query(query, k=1)
+                    node_id = node_id[0]
+                else:
+                    _, ind = self.sds.query(query, k=1)
                 new_s_cfg_idx.append(ind[0][0])
             s_cfg_idx = new_s_cfg_idx
 
@@ -174,7 +192,7 @@ class StableConfigsEnv(gym.Env):
         if self.verbose > 1:
             print(f"Reseting enviroment with start config {s_cfg_idx} and end config {e_cfg_idx}.")
 
-        state = self.get_state()
+        state, _ = self.get_state()
         
         self.d_t[reset_idx] = 0
         
@@ -194,7 +212,7 @@ class StableConfigsEnv(gym.Env):
             ctrl_target,
             render=self.render
         )
-        state = self.get_state()
+        state, state_dict = self.get_state()
         self.iter += 1
 
         ### Reward Computation ###
@@ -213,6 +231,15 @@ class StableConfigsEnv(gym.Env):
 
         terminated = goal_reached
         truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
+        
+        if self.expand_manifold:
+            q = self.sim.numpy_dict["qpos"][:, self.q[0]:self.q[1]]
+            G = self.sim.numpy_dict["geom_xpos"][:, self.G, :]
+            phi = np.concatenate([q * self.q_weight, G], axis=1)
+            
+            indices = (self.manifold_idx + np.arange(self.sim_count)) % (self.max_manifold - self.config_count)
+            self.sds.add_items(phi, ids=indices + self.config_count)
+            self.manifold_idx = (self.manifold_idx + self.sim_count) % (self.max_manifold - self.config_count)
 
         info = {
             "frames": frames,
