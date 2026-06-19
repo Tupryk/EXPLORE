@@ -86,7 +86,7 @@ env:
   "obs_vel_scale": 0.1
   "obs_ref_err_scale": 10.0
 
-  "q_weight": 0.01
+  "q_weight": 0.1
 
   sim_interface:
     parallel_sims: 80
