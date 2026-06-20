@@ -187,10 +187,11 @@ class StableConfigsEnv(gym.Env):
             info["goal_frame"] = self.sim.render_state(self.manifold_qpos[e_cfg_idx[0]])
         
         self.sim.setState(
-            np.zeros((self.sim_count,)),
+            np.zeros((reset_idx.shape[0],)),
             self.manifold_qpos[s_cfg_idx],
             self.manifold_qvel[s_cfg_idx],
-            self.manifold_ctrl[s_cfg_idx]
+            self.manifold_ctrl[s_cfg_idx],
+            reset_idx
         )
 
         self.max_steps = np.clip(self.schedule_alpha, 0.1, 1.0) * self.max_steps_default
