@@ -182,7 +182,7 @@ class RL_Trainer:
         writer.close()
 
 
-    def maybe_evaluate_and_print(self, RL_agent, eval_env, t, start_time, output_dir, eval_freq=25000, eval_eps=20):
+    def maybe_evaluate_and_print(self, RL_agent, eval_env, t, start_time, output_dir, eval_freq=100000, eval_eps=20):
         if (t+1) % eval_freq == 0:
             print("---------------------------------------")
             print(f"Evaluation at {t} time steps")
