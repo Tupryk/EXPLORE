@@ -8,7 +8,7 @@ from explore.train.rl_trainer import RL_Trainer
 # wp.init()
 # wp.set_device("cpu") 
 
-@hydra.main(version_base="1.3", config_path="../configs/yaml", config_name="guided_RL")
+@hydra.main(version_base="1.3", config_path="../configs/yaml", config_name="guided_RL_humanoid")
 def main(cfg: DictConfig):
     logger = get_logger(cfg)
     trainer = RL_Trainer(cfg, logger)

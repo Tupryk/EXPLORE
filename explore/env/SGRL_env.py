@@ -54,6 +54,11 @@ class StableConfigsEnv(gym.Env):
         self.max_manifold = int(cfg.get("max_manifold", 1e6))
         self.manifold_idx = 0
         
+        self.object_diffusion = cfg.get("object_diffusion", False)
+        
+        assert not (self.expand_manifold and self.object_diffusion)
+        assert not (self.use_csrl and self.object_diffusion)
+        
         self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
         self.config_count = self.stable_configs["qpos"].shape[0]
         if self.verbose:
@@ -91,7 +96,7 @@ class StableConfigsEnv(gym.Env):
         self.iter = np.zeros((self.sim_count,))
         self.G_star = np.zeros((self.sim_count, self.all_G_star.shape[1]))
 
-        if self.use_csrl:
+        if self.use_csrl and not self.object_diffusion:
             if self.expand_manifold:
                 self.sds = hnswlib.Index(space="l2", dim=self.phi_stable_configs.shape[1])
                 self.sds.init_index(max_elements=self.max_manifold, ef_construction=200, M=16)
@@ -183,7 +188,7 @@ class StableConfigsEnv(gym.Env):
             s_cfg_idx = new_s_cfg_idx
 
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx, "reset_idx": reset_idx}
-        if self.render:
+        if self.render and not self.object_diffusion:
             info["goal_frame"] = self.sim.render_state(self.manifold_qpos[e_cfg_idx[0]])
         
         self.sim.setState(
@@ -195,7 +200,28 @@ class StableConfigsEnv(gym.Env):
         )
 
         self.max_steps = np.clip(self.schedule_alpha, 0.1, 1.0) * self.max_steps_default
-        self.G_star[reset_idx] = self.all_G_star[e_cfg_idx]
+        if self.object_diffusion:
+            stds = np.array([2., 2., .3, 1., 1., 1., 1.])
+            offsets = np.array([0., 0., 1., 0., 0., 0., 0.])
+            
+            for i, ri in enumerate(reset_idx):
+                noised_cube = np.random.randn(7) * stds + offsets
+
+                t = self.schedule_alpha * (1. - np.random.uniform(0, 1))
+                cube_pos = self.manifold_qpos[s_cfg_idx[i]][-7:] * (1. - t) + noised_cube * t
+                
+                noised_qpos = self.manifold_qpos[s_cfg_idx[i]].copy()
+                noised_qpos[-7:] = cube_pos
+                self.sim.mj_data.qpos[:] = noised_qpos
+                mujoco.mj_forward(self.sim.mj_model, self.sim.mj_data)
+
+                G = self.sim.mj_data.geom_xpos[self.G, :].reshape(-1)
+                self.G_star[ri] = G
+            
+                if i == 0:
+                    info["goal_frame"] = self.sim.render_state(noised_qpos)
+        else:
+            self.G_star[reset_idx] = self.all_G_star[e_cfg_idx]
         self.iter[reset_idx] = 0
 
         if self.verbose > 1:

@@ -51,9 +51,10 @@ env:
   sparse_reward: true
   schedule_alpha_end_step: 50000
   schedule_alpha_block: 5000
-  use_csrl: true
-  expand_manifold: true
+  use_csrl: false
+  expand_manifold: false
   max_manifold_size: 4e6
+  object_diffusion: true
   verbose: 1
 
   tau_action: 0.05
