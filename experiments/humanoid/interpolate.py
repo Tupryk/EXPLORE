@@ -15,7 +15,7 @@ def view_state(model, data, qpos, viewer, seconds=1.):
 
 xml_path = "configs/mujoco_/unitree_g1/box_scene.xml"
 stable_path = "configs/stable/humanoid_box_grasps.h5"
-q_weight = 0.
+q_weight = 0.1
 q_id = [7, 36]
 G_id = ["obj_col", "box_marker_0", "box_marker_1", "box_marker_2"]
 
@@ -46,24 +46,24 @@ sds = KDTree(phi_stable_configs)
 s_cfg_idx = np.random.randint(0, config_count)
 e_cfg_idx = np.random.randint(0, config_count)
 
-# print("End ", e_cfg_idx)
-# view_state(model, data, stable_configs_qpos[e_cfg_idx], viewer)
+print("End ", e_cfg_idx)
+view_state(model, data, stable_configs_qpos[e_cfg_idx], viewer)
 print("Start ", s_cfg_idx)
 view_state(model, data, stable_configs_qpos[s_cfg_idx], viewer)
 
-# for i, t in enumerate(np.linspace(0., 1., 100)):
+for i, t in enumerate(np.linspace(0., 1., 100)):
 
-#     query = (
-#         phi_stable_configs[s_cfg_idx] * t +
-#         phi_stable_configs[e_cfg_idx] * (1. - t)
-#     )
-#     query = query.reshape(1, -1)
+    query = (
+        phi_stable_configs[s_cfg_idx] * t +
+        phi_stable_configs[e_cfg_idx] * (1. - t)
+    )
+    query = query.reshape(1, -1)
     
-#     _, ind = sds.query(query, k=1)
-#     projection_id = int(ind[0][0])
+    _, ind = sds.query(query, k=1)
+    projection_id = int(ind[0][0])
     
-#     print("Config ", i+1)
-#     view_state(model, data, stable_configs_qpos[projection_id], viewer, seconds=.1)
+    print("Config ", i+1)
+    view_state(model, data, stable_configs_qpos[projection_id], viewer, seconds=.1)
 
 # Humanoid locomanipulation through object diffusion
 # Problem: obj diffussion does not respect collisions

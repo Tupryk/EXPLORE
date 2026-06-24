@@ -45,13 +45,14 @@ TD7:
   actor_lr: 1e-3
 
 env:
-  min_cost: 0.05
+  min_cost: 0.02
   max_steps: 128
   sparse_reward: false
   schedule_alpha_end_step: 250000
   schedule_alpha_block: 5000
-  use_csrl: true
-  expand_manifold: true
+  use_csrl: false
+  expand_manifold: false
+  object_diffusion: true
   max_manifold_size: 4e6
   verbose: 1
 
