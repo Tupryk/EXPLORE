@@ -291,7 +291,7 @@ class StableConfigsEnv(gym.Env):
         }
 
         ### CSRL step ###
-        if self.use_csrl:
+        if self.use_csrl or self.object_diffusion:
             self.schedule_buffer += 1
             if self.schedule_buffer >= self.schedule_alpha_block:
                 self.schedule_buffer = 0
