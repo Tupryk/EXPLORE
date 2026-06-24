@@ -12,7 +12,7 @@ TD7:
   discount: 0.95
   target_update_rate: 250
   exploration_noise: 0.05
-  value_clip: [0., 2.]
+  value_clip: [-1., 2.]
   
   # TD3
   target_policy_noise: 0.05
@@ -62,17 +62,17 @@ env:
   
   stable_configs_path: configs/stable/double_sphere.h5
 
-  "q": [0,3]
-  "q_dot": [0,3]
-  "q_obj_dot": 3
-  "P": ["obj"]
-  "G": ["obj"]
+  q: [0,3]
+  q_dot: [0,3]
+  q_obj_dot: 3
+  P: ["obj"]
+  G: ["obj"]
 
-  "obs_pos_scale": 1.0
-  "obs_vel_scale": 0.05
-  "obs_ref_err_scale": 20.0
+  obs_pos_scale: 1.0
+  obs_vel_scale: 0.05
+  obs_ref_err_scale: 20.0
 
-  "q_weight": 0.2
+  q_weight: 0.2
 
   sim_interface:
     parallel_sims: 80

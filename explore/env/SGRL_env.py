@@ -29,7 +29,11 @@ class StableConfigsEnv(gym.Env):
         self.tau_action = cfg.tau_action
         if isinstance(self.stepsize, ListConfig):
             self.stepsize = np.array(self.stepsize, dtype=np.float32)
-        
+
+        self.manifold_dist_cutoff_min = cfg.get("manifold_dist_cutoff_min", -1.)
+        self.manifold_dist_cutoff_max = cfg.get("manifold_dist_cutoff_max", -1.)
+        assert (not self.sparse_reward) or self.manifold_dist_cutoff_max <= 0.
+
         # State info
         self.q = cfg.q
         self.q_dot = cfg.q_dot
@@ -53,6 +57,7 @@ class StableConfigsEnv(gym.Env):
         self.expand_manifold = cfg.get("expand_manifold", False)
         self.max_manifold = int(cfg.get("max_manifold", 1e6))
         self.manifold_idx = 0
+        assert (not self.expand_manifold) or self.manifold_dist_cutoff_max <= 0.
         
         self.object_diffusion = cfg.get("object_diffusion", False)
         
@@ -107,6 +112,9 @@ class StableConfigsEnv(gym.Env):
             else:
                 self.sds = KDTree(self.phi_stable_configs)
         
+        if self.manifold_dist_cutoff_max > 0.:
+            self.sds = KDTree(self.phi_stable_configs)
+
         # Define observation space
         state, _ = self.get_state()
         state_dim = state.shape[1]
@@ -118,6 +126,7 @@ class StableConfigsEnv(gym.Env):
 
         self._cost_buf = np.empty(self.sim_count, dtype=np.float32)
         self.d_t = np.zeros((self.sim_count,), dtype=np.float32)
+        self.md_t = np.zeros((self.sim_count,), dtype=np.float32)
         
         self.render = False
     
@@ -230,6 +239,7 @@ class StableConfigsEnv(gym.Env):
         state, _ = self.get_state()
         
         self.d_t[reset_idx] = 0
+        self.md_t[reset_idx] = 0
         
         return state, info
 
@@ -264,6 +274,17 @@ class StableConfigsEnv(gym.Env):
             rewards = d_t1 - self.d_t + goal_reached.astype(np.float32)
             self.d_t = d_t1
 
+            if self.manifold_dist_cutoff_max > 0.:
+                q = self.sim.numpy_dict["qpos"][:, self.q[0]:self.q[1]]
+                G = self.sim.numpy_dict["geom_xpos"][:, self.G, :].reshape(self.sim.nworld, -1)
+                phis = np.concatenate([q * self.q_weight, G], axis=1)
+                dist = self.sds.query(phis, k=1)[0].reshape(-1)
+
+                md_t1 = -np.clip((dist - self.manifold_dist_cutoff_min) / 
+                                (self.manifold_dist_cutoff_max - self.manifold_dist_cutoff_min), 0.0, 1.0)
+                rewards += md_t1 - self.md_t
+                self.md_t = md_t1
+        
         terminated = goal_reached
         truncated = np.full((self.sim_count,), self.iter >= self.max_steps, dtype=bool)
         
