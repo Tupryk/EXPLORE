@@ -45,15 +45,11 @@ TD7:
   actor_lr: 1e-3
 
 env:
+  # For StaGE: Max expansions from node or only expand a node once with n actions
   min_cost: 0.01
   max_steps: 64
   sparse_reward: true
-  schedule_alpha_end_step: 50000
-  schedule_alpha_block: 5000
-  use_csrl: false
-  expand_manifold: false
-  max_manifold_size: 4e6
-  object_diffusion: true
+  max_manifold_size: 100
   verbose: 1
 
   tau_action: 0.05
@@ -74,7 +70,7 @@ env:
   q_weight: 0.2
 
   sim_interface:
-    parallel_sims: 80
+    parallel_sims: 100
     xml_path: "configs/mujoco_/doubleSphere.xml"
     tau_sim: 0.005
     verbose: 1

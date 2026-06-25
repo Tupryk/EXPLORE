@@ -92,6 +92,6 @@ env:
     nconmax: 200
     ccd_iterations: 250
 
-    camera: fixed_cam
+    camera: "fixed_cam"
     render_w: 640
     render_h: 480

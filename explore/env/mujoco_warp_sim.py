@@ -89,6 +89,15 @@ class MjSim:
             ctrl:  [nworld, nu]
         """
         if indices is None:
+            if time.ndim == 1 and time.shape[0] != self.nworld:
+                time = np.broadcast_to(time[:1], (self.nworld,))
+            if qpos.ndim == 1:
+                qpos = np.broadcast_to(qpos, (self.nworld, qpos.shape[0]))
+            if qvel.ndim == 1:
+                qvel = np.broadcast_to(qvel, (self.nworld, qvel.shape[0]))
+            if ctrl.ndim == 1:
+                ctrl = np.broadcast_to(ctrl, (self.nworld, ctrl.shape[0]))
+        
             self.next_frame_time = 0.0
             self.data.time.assign(wp.array(time, dtype=wp.float32))
             self.data.qpos.assign(wp.array(qpos, dtype=wp.float32))
