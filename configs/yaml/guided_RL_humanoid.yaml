@@ -46,7 +46,7 @@ TD7:
 
 env:
   min_cost: 0.02
-  max_steps: 128
+  max_steps: 64
   manifold_dist_cutoff_min: 0.1
   manifold_dist_cutoff_max: 0.5
   sparse_reward: false
@@ -59,17 +59,7 @@ env:
   verbose: 1
 
   tau_action: 0.05
-  stepsize: [
-    .04, .025, .04,  # hip
-    .05, .05, .05,  # knee, ankle, ankle
-    .04, .025, .04,  # hip
-    .05, .05, .05,  # knee, ankle, ankle
-    .04, .025, .025,  # waist
-    .4, .4, .4,  # shoulder
-    .04, .05, .05, .05,  # elbow, wrist, wrist, wrist
-    .025, .025, .025,  # shoulder
-    .04, .05, .05, .05,  # elbow, wrist, wrist, wrist
-  ]
+  stepsize: 0.25
   
   stable_configs_path: "configs/stable/humanoid_box_grasps.h5"
 
