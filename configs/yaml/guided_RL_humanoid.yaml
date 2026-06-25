@@ -12,7 +12,7 @@ TD7:
   discount: 0.99
   target_update_rate: 250
   exploration_noise: 0.05
-  value_clip: [0., 2.]
+  value_clip: [-1., 2.]
   
   # TD3
   target_policy_noise: 0.05
