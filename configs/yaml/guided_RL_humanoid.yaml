@@ -1,14 +1,15 @@
 rl_method: "TD7"
 verbose: 1
 total_timesteps: 500000
-timesteps_before_training: 25000
+timesteps_before_training: 5000
 checkpoint_freq: 100000
+eval_freq: 100000
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
 TD7:
-  batch_size: 25000
-  buffer_size: 6e6
+  batch_size: 16000
+  buffer_size: 4e6
   discount: 0.99
   target_update_rate: 250
   exploration_noise: 0.05

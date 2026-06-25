@@ -17,7 +17,9 @@ class RL_Trainer:
         self.cfg = cfg
         self.logger = logger
         
-        self.checkpoint_freq = cfg.checkpoint_freq
+        self.checkpoint_freq = cfg.get("checkpoint_freq", 100_000)
+        self.eval_freq = cfg.get("eval_freq", 100_000)
+        self.eval_eps = cfg.get("eval_eps", 20)
         
         self.output_dir = cfg.output_dir
         self.total_timesteps = cfg.total_timesteps
@@ -56,24 +58,19 @@ class RL_Trainer:
     def train(self):
         self.logger.info("Starting training...")
 
-        self.train_online(
-            self.model, self.env, self.eval_env,
-            max_training_steps=self.total_timesteps,
-            timesteps_before_training=self.timesteps_before_training,
-            output_dir=self.output_dir
-        )
+        self.train_online(self.model, self.env, self.eval_env)
 
         self.model.save_checkpoint(path=self.save_as)
         self.logger.info(f"Model saved as {self.save_as}")
 
 
-    def train_online(self, RL_agent: TD7.Agent, env, eval_env, output_dir: str="", max_training_steps=300000, timesteps_before_training=5000):
+    def train_online(self, RL_agent: TD7.Agent, env, eval_env):
         start_time = time.time()
         allow_train = False
         
-        tb_dir = os.path.join(output_dir, "tb")
+        tb_dir = os.path.join(self.output_dir, "tb")
         os.makedirs(tb_dir, exist_ok=True)
-        writer = SummaryWriter(log_dir=tb_dir) if output_dir else SummaryWriter()
+        writer = SummaryWriter(log_dir=tb_dir) if self.output_dir else SummaryWriter()
         
         states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
         ep_total_success = np.zeros(env.sim_count)
@@ -90,10 +87,10 @@ class RL_Trainer:
         fail_timesteps_sum = 0
         fail_timesteps_count = 0
 
-        for t in tqdm(range(max_training_steps), total=max_training_steps):
+        for t in tqdm(range(self.total_timesteps), total=self.total_timesteps):
             
-            if output_dir:
-                self.maybe_evaluate_and_print(RL_agent, eval_env, t, start_time, output_dir=output_dir)
+            if self.output_dir:
+                self.maybe_evaluate_and_print(RL_agent, eval_env, t, start_time)
             
             if allow_train:
                 actions = RL_agent.select_action(np.array(states))
@@ -176,21 +173,21 @@ class RL_Trainer:
             if (t+1) % self.checkpoint_freq == 0:
                 RL_agent.save_checkpoint(path="checkpoints", tag=f"step_{t+1}")
 
-            if t >= timesteps_before_training:
+            if t >= self.timesteps_before_training:
                 allow_train = True
 
         writer.close()
 
 
-    def maybe_evaluate_and_print(self, RL_agent, eval_env, t, start_time, output_dir, eval_freq=100000, eval_eps=20):
-        if (t+1) % eval_freq == 0:
+    def maybe_evaluate_and_print(self, RL_agent, eval_env, t, start_time):
+        if (t+1) % self.eval_freq == 0:
             print("---------------------------------------")
-            print(f"Evaluation at {t} time steps")
+            print(f"Evaluation at {t+1} time steps")
             print(f"Total time passed: {round((time.time()-start_time)/60.,2)} min(s)")
-            total_success = np.zeros(eval_eps)
-            total_reward = np.zeros(eval_eps)
+            total_success = np.zeros(self.eval_eps)
+            total_reward = np.zeros(self.eval_eps)
 
-            for ep in range(eval_eps):
+            for ep in range(self.eval_eps):
                 state, info = eval_env.reset(options={"alpha": 1.0, "sample_uniform": False, "render": True})
                 done = False
                 goal_frame = info["goal_frame"]
@@ -207,7 +204,7 @@ class RL_Trainer:
 
                 if frames:
                     frames = [(frame.astype(float)*0.8 + goal_frame.astype(float)*0.2).astype(frame.dtype) for frame in frames]
-                    imageio.mimsave(os.path.join(output_dir, f"eval_t{t+1}_ep{ep+1}.gif"), frames, fps=24, loop=0)
+                    imageio.mimsave(os.path.join(self.output_dir, f"eval_t{t+1}_ep{ep+1}.gif"), frames, fps=24, loop=0)
 
-            print(f"Average total reward over {eval_eps} episodes: {total_reward.mean():.3f} (success rate: {total_success.mean():.3f})")
+            print(f"Average total reward over {self.eval_eps} episodes: {total_reward.mean():.3f} (success rate: {total_success.mean():.3f})")
             print("---------------------------------------")
