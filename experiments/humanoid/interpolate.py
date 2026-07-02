@@ -13,11 +13,15 @@ def view_state(model, data, qpos, viewer, seconds=1.):
     time.sleep(seconds)
 
 
-xml_path = "configs/mujoco_/unitree_g1/box_scene.xml"
-stable_path = "configs/stable/humanoid_box_grasps.h5"
-q_weight = 0.1
+xml_path = "configs/mujoco_/unitree_g1/g1_single.xml"
+stable_path = "configs/stable/humanoid_stand.h5"
+q_weight = 0.
 q_id = [7, 36]
-G_id = ["obj_col", "box_marker_0", "box_marker_1", "box_marker_2"]
+G_id = [
+    "pelvis",
+    "left_ankle_roll_joint", "right_ankle_roll_joint",
+    "left_rubber_hand_0", "right_rubber_hand_0",
+]
 
 model = mujoco.MjModel.from_xml_path(xml_path)
 data = mujoco.MjData(model)
