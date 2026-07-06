@@ -3,7 +3,7 @@ RRT:
   output_dir: ${hydra:runtime.output_dir}
   
   start_idx: 0
-  max_expansions_per_tree: 2500
+  max_expansions_per_tree: 10000
   max_configs: -1
   
   # The Big Three
@@ -16,7 +16,7 @@ RRT:
   target_min_dist: 1000000.
 
   # MPC actions
-  tau_action: 0.15
+  tau_action: 0.1
   stepsize: 0.25
 
   # Distance measurements
