@@ -7,12 +7,14 @@ from explore.datasets.StaGE import StaGE
 
 @hydra.main(version_base="1.3",
             config_path="../configs/yaml",
-            config_name="trajectory_generation")
+            config_name="StaGE_fingersBox")
 def main(cfg: DictConfig):
     
     file = h5py.File(cfg.configs_path, 'r')
+    qpos = file["qpos"] if "qpos" in file.keys() else file["q"]
+    ctrl = file["ctrl"]
 
-    S = StaGE(file["qpos"], file["ctrl"], cfg.RRT)
+    S = StaGE(qpos, ctrl, cfg.RRT)
     S.run()
 
 

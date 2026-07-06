@@ -1,0 +1,51 @@
+RRT:
+  verbose: 3
+  output_dir: ${hydra:runtime.output_dir}
+  
+  start_idx: [6]
+  max_expansions_per_tree: 2500
+  max_configs: -1
+  
+  knnK: 16
+
+  # Distance threshholds
+  min_cost: 0.005
+  path_diff_thresh: 0.05
+  target_min_dist: 1000000.
+
+  # MPC actions
+  tau_action: 0.2
+  stepsize: 0.1
+
+  # Distance measurements
+  q: [7, -1]
+  q_dot: [6, -1]
+  q_obj_dot: 0
+  P: [
+    "l_fing", "r_fing",
+    "box_marker_0", "box_marker_1", "box_marker_2"
+  ]
+  G: [
+    "box_marker_0", "box_marker_1", "box_marker_2"
+  ]
+
+  obs_pos_scale: 1.0
+  obs_vel_scale: 0.1
+  obs_ref_err_scale: 10.0
+
+  q_weight: 1.
+
+  sim_interface:
+    parallel_sims: 100
+    verbose: 1
+    xml_path: "configs/mujoco_/twoFingersCube.xml"
+    tau_sim: 0.005
+
+    njmax: 100
+    nconmax: 100
+
+    camera: "fixed_cam"
+    render_w: 640
+    render_h: 480
+
+configs_path: "configs/stable/twoFingersCube.h5"

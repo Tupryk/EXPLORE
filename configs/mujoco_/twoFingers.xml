@@ -35,7 +35,7 @@
           <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
           <body name="l_fing">
             <joint name="l_fing" damping="0.1" type="slide" axis="0 0 1" />
-            <geom type="sphere" size="0.05" rgba="0 1 1 1" mass="0.1"/>
+            <geom name="l_fing" type="sphere" size="0.05" rgba="0 1 1 1" mass="0.1"/>
           </body>
         </body>
       </body>
@@ -49,7 +49,7 @@
           <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
           <body name="r_fing">
             <joint name="r_fing" damping="0.1" type="slide" axis="0 0 1" />
-            <geom type="sphere" size="0.05" rgba="0 1 1 1" mass="0.1" />
+            <geom name="r_fing" type="sphere" size="0.05" rgba="0 1 1 1" mass="0.1" />
           </body>
         </body>
       </body>

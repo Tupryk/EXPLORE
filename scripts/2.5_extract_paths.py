@@ -6,6 +6,7 @@ import imageio
 import numpy as np
 from tqdm import tqdm
 from omegaconf import OmegaConf
+from omegaconf import ListConfig
 from sklearn.neighbors import KDTree
 
 from explore.utils.mj import geom_names2ids
@@ -14,20 +15,30 @@ from explore.datasets.utils import build_path
 
 
 def main():
-    out_path = "outputs/2026-07-06/17-21-37"
+    out_path = "outputs/2026-07-06/21-47-11"
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
-    tree_path = os.path.join(out_path, "trees/tree0.pkl")
     gif_path = os.path.join(out_path, "path_gifs")
     os.makedirs(gif_path, exist_ok=True)
     
     cfg = OmegaConf.load(config_path)
     
     file = h5py.File(cfg.configs_path, 'r')
-    manifold_qpos = file["qpos"]
+    manifold_qpos = file["qpos"] if "qpos" in file.keys() else file["q"]
     manifold_size = manifold_qpos.shape[0]
     
     cfg = cfg.RRT
+    
+    # Start states / tree roots
+    start_ids = cfg.get("start_idx", -1)
+    
+    if not isinstance(start_ids, ListConfig):
+        if start_ids == -1:
+            start_ids = list(range(manifold_size))
+        else:
+            start_ids = [start_ids]
+    
+    tree_path = os.path.join(out_path, f"trees/tree{start_ids[0]}.pkl")
     
     cfg.sim_interface.parallel_sims = 1
     sim = MjSim(cfg.sim_interface)
@@ -57,12 +68,11 @@ def main():
         if dist < cfg.min_cost:
             reached_count += 1
             
-            # Reconstruct path
-            path = build_path(tree, ind)
-            
-            # Render gif
-            if len(path) > 10:
-                
+            if tree[ind]["t"] > 1.5:
+                # Reconstruct path
+                path = build_path(tree, ind)
+
+                # Render gif
                 goal_frame = sim.render_state(manifold_qpos[i])
                 
                 node = path[0]
@@ -83,7 +93,7 @@ def main():
                     frames.extend(fs)
                 
                 frames = [(frame.astype(float)*0.8 + goal_frame.astype(float)*0.2).astype(frame.dtype) for frame in frames]
-                imageio.mimsave(os.path.join(gif_path, f"{cfg.start_idx}_to_{i}.gif"), frames, fps=24, loop=0)
+                imageio.mimsave(os.path.join(gif_path, f"{start_ids[0]}_to_{i}.gif"), frames, fps=24, loop=0)
                 
     print(f"{((reached_count/manifold_size)*100):.2f}% Coverage.")
 

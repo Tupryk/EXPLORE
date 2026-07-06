@@ -114,9 +114,8 @@ class StaGE:
         self.n_best_actions = cfg.get("n_best_actions", 16)
         self.knnK = cfg.get("knnK", 16)
         
-        # Start states and targets
+        # Start states / tree roots
         self.start_ids = cfg.get("start_idx", -1)
-        self.end_ids = cfg.get("end_idx", -1)
         
         if not isinstance(self.start_ids, ListConfig):
             if self.start_ids == -1:

@@ -6,9 +6,7 @@ RRT:
   max_expansions_per_tree: 10000
   max_configs: -1
   
-  # The Big Three
-  knnK: 16  # TODO: Makes no sense
-  disable_node_max_strikes: 1  # TODO: Makes no sense
+  knnK: 16
 
   # Distance threshholds
   min_cost: 0.1
@@ -39,11 +37,11 @@ RRT:
   sim_interface:
     parallel_sims: 500
     verbose: 1
-    xml_path: "configs/mujoco_/unitree_go2/parkour.xml"
+    xml_path: "configs/mujoco_/twoFingersCube.xml"
     tau_sim: 0.005
 
-    camera: fixed_cam
+    camera: "fixed_cam"
     render_w: 640
     render_h: 480
 
-configs_path: configs/stable/parkour.h5
+configs_path: "configs/stable/parkour.h5"
