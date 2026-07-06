@@ -69,18 +69,18 @@ for i, t in enumerate(np.linspace(0., 1., 100)):
     print("Config ", i+1)
     view_state(model, data, stable_configs_qpos[projection_id], viewer, seconds=.1)
 
-# Humanoid locomanipulation through object diffusion
-# Problem: obj diffussion does not respect collisions
-stds = np.array([2., 2., .3, 1., 1., 1., 1.])
-offsets = np.array([0., 0., 1., 0., 0., 0., 0.])
-noised_cube = np.random.randn(7) * stds + offsets
+# # Humanoid locomanipulation through object diffusion
+# # Problem: obj diffussion does not respect collisions
+# stds = np.array([2., 2., .3, 1., 1., 1., 1.])
+# offsets = np.array([0., 0., 1., 0., 0., 0., 0.])
+# noised_cube = np.random.randn(7) * stds + offsets
 
-for i, t in enumerate(np.linspace(0., 1., 100)):
+# for i, t in enumerate(np.linspace(0., 1., 100)):
 
-    cube_pos = stable_configs_qpos[s_cfg_idx][-7:] * (1. - t) + noised_cube * t
+#     cube_pos = stable_configs_qpos[s_cfg_idx][-7:] * (1. - t) + noised_cube * t
     
-    print("Config ", i+1)
-    noised_qpos = stable_configs_qpos[s_cfg_idx].copy()
-    noised_qpos[-7:] = cube_pos
+#     print("Config ", i+1)
+#     noised_qpos = stable_configs_qpos[s_cfg_idx].copy()
+#     noised_qpos[-7:] = cube_pos
     
-    view_state(model, data, noised_qpos, viewer, seconds=.1)
+#     view_state(model, data, noised_qpos, viewer, seconds=.1)

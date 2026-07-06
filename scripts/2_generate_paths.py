@@ -2,7 +2,7 @@ import h5py
 import hydra
 from omegaconf import DictConfig
 
-from explore.datasets.gen_paths import Search
+from explore.datasets.StaGE import StaGE
 
 
 @hydra.main(version_base="1.3",
@@ -12,8 +12,7 @@ def main(cfg: DictConfig):
     
     file = h5py.File(cfg.configs_path, 'r')
 
-    S = Search(file["qpos"], file["ctrl"], cfg.RRT)
-
+    S = StaGE(file["qpos"], file["ctrl"], cfg.RRT)
     S.run()
 
 

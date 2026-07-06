@@ -35,7 +35,7 @@ class MultiSearchNode:
         self.q_sequence = q_sequence
         self.failed_expansion_count = 0
 
-class Search:
+class StaGE:
 
     def __init__(self, configs: np.ndarray, configs_ctrl: np.ndarray, cfg: DictConfig):
         

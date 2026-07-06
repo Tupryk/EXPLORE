@@ -1,60 +1,57 @@
 RRT:
   verbose: 3
-  max_nodes_per_tree: 10000
-  sample_uniform_prob: 0.
-  horizon: 1
-  target_min_dist: 1000000.
-  target_prob: .2
-  sample_uniform: false
-  warm_start: false
-  threading: true  # Depending on the hardware this may lead to faster computations.
-  start_idx: 0
-  end_idx: -1
-  sampling_strategy: rs
-  cem_steps: 10  # Only for CEM
   output_dir: ${hydra:runtime.output_dir}
   
+  start_idx: 0
+  max_expansions_per_tree: 2500
+  max_configs: -1
+  
   # The Big Three
-  knnK: 16
-  n_best_actions: 16
-  disable_node_max_strikes: 1
+  knnK: 16  # TODO: Makes no sense
+  disable_node_max_strikes: 1  # TODO: Makes no sense
 
-  use_flow: false
-  flow_model:
-    arch: [256, 256]
-    learn_every: 500
-    device: "cuda"
-    nepochs: 20000
-    batch_size: 512
-    dataset_max_size: 12800
-    steps: 64
-    max_training_runs: 10
-
-  # Environment specific
+  # Distance threshholds
   min_cost: 0.1
   path_diff_thresh: 0.05
+  target_min_dist: 1000000.
 
-  stepsize: 0.25
+  # MPC actions
   tau_action: 0.1
-  
-  sample_count: 500
-  max_configs: -1
+  stepsize: 0.25
+
+  # Distance measurements
+  # q: [7, -1]
+  # q_dot: [6, -1]
+  # q_obj_dot: 0
+  # P: [
+  #   "FL", "FR", "RL", "RR",
+  # ]
+  # G: [
+  #   "FL", "FR", "RL", "RR",
+  # ]
+  q: [0,3]
+  q_dot: [0,3]
+  q_obj_dot: 3
+  P: ["obj"]
+  G: ["obj"]
+
+  obs_pos_scale: 1.0
+  obs_vel_scale: 0.1
+  obs_ref_err_scale: 10.0
+
+  q_weight: 0.
 
   sim_interface:
-    xml_path: "configs/mujoco_/unitree_go2/table_box_scene.xml"
-    tau_sim: 0.005
+    # parallel_sims: 500
+    parallel_sims: 100
     verbose: 1
-    geoms_in_cost: [
-        "FL", "FR", "RL", "RR",
-        "box_marker0", "box_marker1", "box_marker2"
-    ]
-    geoms_in_cost_weights: [
-        1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.,
-        4., 4., 4., 4., 4., 4., 4., 4., 4.
-    ]
-    vels_geoms_in_cost: True
+    # xml_path: "configs/mujoco_/unitree_go2/parkour.xml"
+    xml_path: "configs/mujoco_/doubleSphere.xml"
+    tau_sim: 0.005
+
     camera: fixed_cam
     render_w: 640
     render_h: 480
 
-configs_path: configs/stable/gobox_table.h5
+# configs_path: configs/stable/parkour.h5
+configs_path: "configs/stable/double_sphere.h5"

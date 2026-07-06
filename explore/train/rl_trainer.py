@@ -120,7 +120,7 @@ class RL_Trainer:
             states[~dones_for_reset] = next_states[~dones_for_reset]
 
             if allow_train:
-                    RL_agent.train(writer)
+                RL_agent.train(writer)
 
             if dones_for_reset.any():
                 for i in np.where(dones_for_reset)[0]:
