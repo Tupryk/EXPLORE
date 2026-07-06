@@ -16,42 +16,34 @@ RRT:
   target_min_dist: 1000000.
 
   # MPC actions
-  tau_action: 0.1
+  tau_action: 0.15
   stepsize: 0.25
 
   # Distance measurements
-  # q: [7, -1]
-  # q_dot: [6, -1]
-  # q_obj_dot: 0
-  # P: [
-  #   "FL", "FR", "RL", "RR",
-  # ]
-  # G: [
-  #   "FL", "FR", "RL", "RR",
-  # ]
-  q: [0,3]
-  q_dot: [0,3]
-  q_obj_dot: 3
-  P: ["obj"]
-  G: ["obj"]
+  q: [7, -1]
+  q_dot: [6, -1]
+  q_obj_dot: 0
+  P: [
+    "FL", "FR", "RL", "RR",
+  ]
+  G: [
+    "FL", "FR", "RL", "RR",
+  ]
 
   obs_pos_scale: 1.0
   obs_vel_scale: 0.1
   obs_ref_err_scale: 10.0
 
-  q_weight: 0.
+  q_weight: 0.1
 
   sim_interface:
-    # parallel_sims: 500
-    parallel_sims: 100
+    parallel_sims: 500
     verbose: 1
-    # xml_path: "configs/mujoco_/unitree_go2/parkour.xml"
-    xml_path: "configs/mujoco_/doubleSphere.xml"
+    xml_path: "configs/mujoco_/unitree_go2/parkour.xml"
     tau_sim: 0.005
 
     camera: fixed_cam
     render_w: 640
     render_h: 480
 
-# configs_path: configs/stable/parkour.h5
-configs_path: "configs/stable/double_sphere.h5"
+configs_path: configs/stable/parkour.h5

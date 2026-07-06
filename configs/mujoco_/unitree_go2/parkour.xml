@@ -20,7 +20,7 @@
   </asset>
 
   <worldbody>
-      <camera name="fixed_cam" pos="2.774 -3.206 3.059" xyaxes="0.756 0.654 -0.000 -0.383 0.442 0.811"/>
+      <camera name="fixed_cam" pos="-1.756 -1.782 2.071" xyaxes="0.600 -0.800 -0.000 0.420 0.315 0.851"/>
 
     <!-- <light name="key_light"
            pos="-2 -3 4" dir="0.4 0.6 -0.7"
