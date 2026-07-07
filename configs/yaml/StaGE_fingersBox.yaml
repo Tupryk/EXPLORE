@@ -2,14 +2,14 @@ RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [6]
+  start_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
   max_expansions_per_tree: 2500
   max_configs: -1
   
   knnK: 16
 
   # Distance threshholds
-  min_cost: 0.005
+  min_cost: 0.001
   path_diff_thresh: 0.05
   target_min_dist: 1000000.
 
@@ -41,8 +41,9 @@ RRT:
     xml_path: "configs/mujoco_/twoFingersCube.xml"
     tau_sim: 0.005
 
-    njmax: 100
-    nconmax: 100
+    njmax: 250
+    nconmax: 200
+    ccd_iterations: 250
 
     camera: "fixed_cam"
     render_w: 640
