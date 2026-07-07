@@ -30,7 +30,7 @@ def main():
     cfg = cfg.RRT
     
     # Start states / tree roots
-    start_ids = [1]
+    start_ids = cfg.get("start_idx", -1)
     
     if not isinstance(start_ids, ListConfig) and not isinstance(start_ids, list):
         if start_ids == -1:
@@ -39,6 +39,8 @@ def main():
             start_ids = [start_ids]
     
     for start_id in start_ids:
+
+        print(f"Analizing tree {start_id}...")
         tree_path = os.path.join(out_path, f"trees/tree{start_id}.pkl")
         
         with open(tree_path, "rb") as f:
