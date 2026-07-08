@@ -18,9 +18,9 @@ RRT:
   stepsize: 0.1
 
   # Distance measurements
-  q: [7, -1]
-  q_dot: [6, -1]
-  q_obj_dot: 0
+  q: [0, 6]
+  q_dot: [0, 6]
+  q_obj_dot: 6
   P: [
     "l_fing", "r_fing",
     "box_marker_0", "box_marker_1", "box_marker_2"
@@ -33,17 +33,17 @@ RRT:
   obs_vel_scale: 0.1
   obs_ref_err_scale: 10.0
 
-  q_weight: 1.
+  q_weight: .25
 
   sim_interface:
-    parallel_sims: 100
+    parallel_sims: 500
     verbose: 1
     xml_path: "configs/mujoco_/twoFingersCube.xml"
     tau_sim: 0.005
 
-    njmax: 250
-    nconmax: 200
-    ccd_iterations: 250
+    njmax: 100
+    nconmax: 100
+    ccd_iterations: 100
 
     camera: "fixed_cam"
     render_w: 640
