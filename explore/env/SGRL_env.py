@@ -286,7 +286,7 @@ class StableConfigsEnv(gym.Env):
                 self.md_t = md_t1
         
         terminated = goal_reached
-        truncated = (self.iter >= self.max_steps) | (self.sim.numpy_dict["qpos"][:, 2] < 0.35)
+        truncated = np.full((self.sim_count,), self.iter >= self.max_steps)
         
         if self.expand_manifold:
             # TODO: Maybe this should be delayed to when the model has learned something?
