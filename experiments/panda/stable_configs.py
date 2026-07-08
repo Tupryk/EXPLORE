@@ -45,14 +45,14 @@ from explore.env.mujoco_sim import MjSim
 # h5_file = "configs/stable/new_rnd_twoFingers.h5"
 # mujoco_xml = "configs/mujoco_/twoFingers.xml"
 
-h5_file = "configs/stable/twoFingersCube.h5"
-mujoco_xml = "configs/mujoco_/twoFingersCube.xml"
+# h5_file = "configs/stable/twoFingersCube.h5"
+# mujoco_xml = "configs/mujoco_/twoFingersCube.xml"
 
-# h5_file = "configs/stable/parkour.h5"
-# mujoco_xml = "configs/mujoco_/unitree_go2/parkour.xml"
+h5_file = "configs/stable/parkour.h5"
+mujoco_xml = "configs/mujoco_/unitree_go2/parkour.xml"
 
 file = h5py.File(h5_file, 'r')
-stable_configs = file["q"]
+stable_configs = file["qpos"]
 stable_configs_ctrl = file["ctrl"]
 
 # fig = plt.figure()
