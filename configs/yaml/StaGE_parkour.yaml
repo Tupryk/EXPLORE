@@ -36,9 +36,13 @@ RRT:
 
   sim_interface:
     parallel_sims: 500
-    verbose: 1
-    xml_path: "configs/mujoco_/twoFingersCube.xml"
+    xml_path: "configs/mujoco_/unitree_go2/parkour.xml"
     tau_sim: 0.005
+    verbose: 1
+
+    njmax: 75
+    nconmax: 75
+    ccd_iterations: 100
 
     camera: "fixed_cam"
     render_w: 640
