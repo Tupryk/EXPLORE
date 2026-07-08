@@ -18,8 +18,8 @@ RRT:
   stepsize: 0.25
 
   # Distance measurements
-  q: [7, -1]
-  q_dot: [6, -1]
+  q: [7, 19]
+  q_dot: [7, 18]
   q_obj_dot: 0
   P: [
     "FL", "FR", "RL", "RR",

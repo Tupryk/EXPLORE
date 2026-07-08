@@ -15,7 +15,7 @@ from explore.datasets.utils import build_path
 
 
 def main():
-    out_path = "outputs/2026-07-07/11-05-28"
+    out_path = "outputs/2026-07-06/11-05-28"
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")
