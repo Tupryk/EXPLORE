@@ -2,20 +2,19 @@ RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [0, 1, 2, 3]
-  max_expansions_per_tree: 10000
+  start_idx: [1, 2, 3]
+  max_expansions_per_tree: 2500
   max_configs: -1
   
-  knnK: 16
+  # StaGE params
+  remove_expanded: true
 
   # Distance threshholds
-  min_cost: 0.1
-  path_diff_thresh: 0.05
-  target_min_dist: 1000000.
+  min_cost: 0.05
 
   # MPC actions
-  tau_action: 0.1
-  stepsize: 0.25
+  tau_action: 0.05
+  stepsize: 0.1
 
   # Distance measurements
   q: [7, 19]
@@ -35,7 +34,7 @@ RRT:
   q_weight: 0.1
 
   sim_interface:
-    parallel_sims: 500
+    parallel_sims: 100
     xml_path: "configs/mujoco_/unitree_go2/parkour.xml"
     tau_sim: 0.005
     verbose: 1

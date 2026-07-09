@@ -2,8 +2,8 @@ RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [1]
-  max_expansions_per_tree: 2500
+  start_idx: [2]
+  max_expansions_per_tree: 10000
   max_configs: -1
   
   # StaGE params
@@ -15,8 +15,8 @@ RRT:
   target_min_dist: 1000000.
 
   # MPC actions
-  tau_action: 0.1
-  stepsize: 0.1
+  tau_action: 0.05
+  stepsize: 0.05
 
   # Distance measurements
   q: [0, 6]
