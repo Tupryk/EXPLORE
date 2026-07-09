@@ -109,10 +109,8 @@ class StaGE:
         # MPC
         self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
         
-        # The big three
-        self.disable_node_max_strikes = cfg.get("disable_node_max_strikes", 1)
-        self.n_best_actions = cfg.get("n_best_actions", 16)
-        self.knnK = cfg.get("knnK", 16)
+        # StaGE params
+        self.remove_expanded = cfg.get("remove_expanded", True)
         
         # Start states / tree roots
         self.start_ids = cfg.get("start_idx", -1)
@@ -124,6 +122,10 @@ class StaGE:
                 self.start_ids = [self.start_ids]
         
         self.start_ids = np.array(self.start_ids)
+        
+        # SDS
+        self.ef_construction = cfg.get("ANN_ef_construction", 200)
+        self.M = cfg.get("ANN_M", 16)
 
         if self.verbose:
             print(f"Starting search across {self.manifold_size} configs!")
@@ -178,8 +180,8 @@ class StaGE:
             self.sds_tree = hnswlib.Index(space="l2", dim=self.phi_stable_configs.shape[1])
             self.sds_tree.init_index(
                 max_elements=self.max_expansions_per_tree * self.sample_count + 1,
-                ef_construction=200,
-                M=16
+                ef_construction=self.ef_construction,
+                M=self.M
             )
             self.sds_tree.add_items(self.phi_stable_configs[start_idx].reshape(1, -1), ids=[0])
 
@@ -194,9 +196,11 @@ class StaGE:
                 target_id = np.random.randint(self.manifold_size)
                 
                 # Pick closest node from the k nearest nodes
-                ids, dists = self.sds_tree.knn_query(self.phi_stable_configs[target_id], k=min(len(tree), self.knnK))
+                ids, dists = self.sds_tree.knn_query(self.phi_stable_configs[target_id], k=1)
                 parent_id = np.random.choice(ids[0])
                 parent = tree[parent_id]
+                if self.remove_expanded:
+                    self.sds_tree.mark_deleted(parent_id)
 
                 # Simulate random actions
                 self.sim.setState(
@@ -224,9 +228,9 @@ class StaGE:
                 G = self.sim.numpy_dict["geom_xpos"][:, self.G, :].reshape(self.sample_count, -1)
                 phi = np.concatenate([q * self.q_weight, G], axis=1)
                 
+                start_id = len(tree)
                 for sim_i in range(self.sample_count):
-            
-                    new_node =  StaGE_Node(
+                    new_node = StaGE_Node(
                         parent_id,
                         self.sim.numpy_dict["time"][sim_i],
                         self.sim.numpy_dict["qpos"][sim_i],
@@ -238,8 +242,8 @@ class StaGE:
                     )
                     tree.append(new_node)
                     new_phis.append(phi[sim_i])
-                
-                self.sds_tree.add_items(new_phis, ids=list(range(len(tree) - self.sample_count, len(tree))))
+
+                self.sds_tree.add_items(new_phis, ids=list(range(start_id, len(tree))))
                 
                 if self.verbose > 3 and (expansion_step_id + 1) % 100 == 0:
                     process = psutil.Process(os.getpid())
