@@ -14,7 +14,7 @@ RRT:
 
   # MPC actions
   tau_action: 0.05
-  stepsize: 0.1
+  stepsize: 0.5
 
   # Distance measurements
   q: [0, 19]

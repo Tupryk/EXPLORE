@@ -15,7 +15,7 @@ from explore.datasets.utils import build_path
 
 
 def main():
-    out_path = "outputs/2026-07-09/16-56-22"
+    out_path = "outputs/2026-07-09/17-18-25"
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")
@@ -81,7 +81,7 @@ def main():
             if dist < cfg.min_cost:
                 reached_count += 1
                 
-                if tree[ind]["t"] > .1:
+                if tree[ind]["t"] > 1.:
                     # Reconstruct path
                     path = build_path(tree, ind)
 
