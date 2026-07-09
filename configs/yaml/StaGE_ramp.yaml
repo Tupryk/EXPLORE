@@ -37,7 +37,7 @@ RRT:
 
   sim_interface:
     parallel_sims: 100
-    xml_path: "configs/mujoco_/fingerRamp.xml"
+    xml_path: "configs/mujoco_/doubleSphere.xml"
     tau_sim: 0.005
     verbose: 1
 
@@ -45,4 +45,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/finger_ramp_big.h5"
+configs_path: "configs/stable/double_sphere.h5"

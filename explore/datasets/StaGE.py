@@ -219,7 +219,6 @@ class StaGE:
                     ctrl_target
                 )
                 self.sim.gen_numpy_dict()
-                self.sim.numpy_dict
                 
                 # Add resulting nodes to tree
                 new_phis = []
