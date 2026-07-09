@@ -15,7 +15,7 @@ from explore.datasets.utils import build_path
 
 
 def main():
-    out_path = "outputs/2026-07-06/11-05-28"
+    out_path = "outputs/2026-07-09/13-26-12"
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")
@@ -47,23 +47,32 @@ def main():
             tree: list[dict] = pickle.load(f)
         
         phis = [node["goal_phi"] for node in tree]
-        sds_tree = KDTree([p for p in phis if not np.any(np.isnan(p))])
+        # phis = [node["manifold_phi"] for node in tree]
+        # sds_tree = KDTree([p for p in phis if not np.any(np.isnan(p))])  # MuJoCo-Warp makes things NaN?
+        sds_tree = KDTree(phis)
 
         cfg.sim_interface.parallel_sims = 1
         sim = MjSim(cfg.sim_interface)
         G_ids = geom_names2ids(cfg.G, sim.mj_model)
+        q_ids = cfg.q
+        q_weight = cfg.q_weight
 
         all_G_star = []
-        
+        phi_stable_configs = []
         for i in range(manifold_size):
             sim.mj_data.qpos[:] = manifold_qpos[i]
             mujoco.mj_forward(sim.mj_model, sim.mj_data)
 
+            q = sim.mj_data.qpos[q_ids[0]:q_ids[1]]
             G = sim.mj_data.geom_xpos[G_ids, :].reshape(-1)
+            phi = np.concatenate([q * q_weight, G])
+            
             all_G_star.append(G)
+            phi_stable_configs.append(phi)
         
         reached_count = 0
         for i, manifold_point in tqdm(enumerate(all_G_star), total=len(all_G_star)):
+        # for i, manifold_point in tqdm(enumerate(phi_stable_configs), total=len(phi_stable_configs)):
             
             dist, ind = sds_tree.query([manifold_point], k=1)
             dist = dist[0][0]
@@ -72,7 +81,7 @@ def main():
             if dist < cfg.min_cost:
                 reached_count += 1
                 
-                if tree[ind]["t"] > 1.:
+                if tree[ind]["t"] > 100.:
                     # Reconstruct path
                     path = build_path(tree, ind)
 
