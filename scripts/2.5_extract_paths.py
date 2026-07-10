@@ -51,7 +51,7 @@ def main():
         # sds_tree = KDTree([p for p in phis if not np.any(np.isnan(p))])  # MuJoCo-Warp makes things NaN?
         for i, p in enumerate(phis):
             if np.any(np.isnan(p)):
-                print(f"Tree contains nan! Truncating to length {i}...")
+                print(f"Tree contains nan! Truncating to length {i} of {len(phis)}...")
                 phis = phis[:i]
                 break
 
