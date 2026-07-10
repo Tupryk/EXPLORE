@@ -53,6 +53,7 @@ def main():
             if np.any(np.isnan(p)):
                 print(f"Tree contains nan! Truncating to length {i}...")
                 phis = phis[:i]
+                break
 
         sds_tree = KDTree(phis)
 
