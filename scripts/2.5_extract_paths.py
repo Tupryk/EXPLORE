@@ -15,7 +15,7 @@ from explore.datasets.utils import build_path
 
 
 def main():
-    out_path = "outputs/2026-07-09/17-18-25"
+    out_path = "outputs/2026-07-09/17-55-00"
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")
@@ -49,6 +49,11 @@ def main():
         phis = [node["goal_phi"] for node in tree]
         # phis = [node["manifold_phi"] for node in tree]
         # sds_tree = KDTree([p for p in phis if not np.any(np.isnan(p))])  # MuJoCo-Warp makes things NaN?
+        for i, p in enumerate(phis):
+            if np.any(np.isnan(p)):
+                print(f"Tree contains nan! Truncating to length {i}...")
+                phis = phis[:i]
+
         sds_tree = KDTree(phis)
 
         cfg.sim_interface.parallel_sims = 1
@@ -81,7 +86,7 @@ def main():
             if dist < cfg.min_cost:
                 reached_count += 1
                 
-                if tree[ind]["t"] > 1.:
+                if tree[ind]["t"] > 2.5:
                     # Reconstruct path
                     path = build_path(tree, ind)
 
