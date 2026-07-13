@@ -41,10 +41,6 @@ RRT:
     tau_sim: 0.005
     verbose: 1
 
-    njmax: 75
-    nconmax: 75
-    ccd_iterations: 100
-
     camera: "fixed_cam"
     render_w: 640
     render_h: 480
