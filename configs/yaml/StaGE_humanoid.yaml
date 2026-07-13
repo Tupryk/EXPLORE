@@ -1,0 +1,52 @@
+RRT:
+  verbose: 3
+  output_dir: ${hydra:runtime.output_dir}
+  
+  start_idx: [1]
+  max_expansions_per_tree: 2500
+  max_configs: -1
+  
+  # StaGE params
+  remove_expanded: true
+
+  # Distance threshholds
+  min_cost: 0.1
+
+  # MPC actions
+  tau_action: 0.25
+  stepsize: 1.
+
+  # Distance measurements
+  q: [7,36]
+  q_dot: [6,35]
+  q_obj_dot: 0
+  P: [
+    "pelvis",
+    "left_ankle_roll_joint", "right_ankle_roll_joint",
+    "left_rubber_hand_0", "right_rubber_hand_0",
+    "box_marker_0", "box_marker_1", "box_marker_2"
+  ]
+  G: [
+    "box_marker_0", "box_marker_1", "box_marker_2"
+  ]
+  obs_pos_scale: 1.0
+  obs_vel_scale: 0.1
+  obs_ref_err_scale: 10.0
+
+  q_weight: 0.25
+
+  sim_interface:
+    parallel_sims: 1000
+    xml_path: "configs/mujoco_/unitree_g1/box_scene.xml"
+    tau_sim: 0.005
+    verbose: 1
+
+    njmax: 75
+    nconmax: 75
+    ccd_iterations: 100
+
+    camera: "fixed_cam"
+    render_w: 640
+    render_h: 480
+
+configs_path: "configs/stable/humanoid_box_grasps.h5"
