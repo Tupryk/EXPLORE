@@ -51,7 +51,7 @@ cfg = OmegaConf.create({
 
     "q_weight": 0.2,
 
-    "sim_interface": {    
+    "sim_interface": {
         "parallel_sims": 10,
         "xml_path": "configs/mujoco_/fingerRamp.xml",
         "verbose": 1

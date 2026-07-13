@@ -7,7 +7,7 @@ from explore.datasets.StaGE import StaGE
 
 @hydra.main(version_base="1.3",
             config_path="../configs/yaml",
-            config_name="StaGE_parkour")
+            config_name="StaGE_ramp")
 def main(cfg: DictConfig):
     
     file = h5py.File(cfg.configs_path, 'r')

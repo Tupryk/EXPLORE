@@ -10,12 +10,14 @@ from omegaconf import ListConfig
 from sklearn.neighbors import KDTree
 
 from explore.utils.mj import geom_names2ids
-from explore.env.mujoco_warp_sim import MjSim
+# from explore.env.mujoco_warp_sim import MjSim
+from explore.env.mujoco_threaded_sim import MjSim
 from explore.datasets.utils import build_path
 
 
 def main():
-    out_path = "outputs/2026-07-09/17-55-00"
+    # out_path = "outputs/2026-07-13/16-01-16"
+    out_path = "outputs/2026-07-13/16-57-48"
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")
@@ -49,15 +51,16 @@ def main():
         phis = [node["goal_phi"] for node in tree]
         # phis = [node["manifold_phi"] for node in tree]
         # sds_tree = KDTree([p for p in phis if not np.any(np.isnan(p))])  # MuJoCo-Warp makes things NaN?
-        for i, p in enumerate(phis):
-            if np.any(np.isnan(p)):
-                print(f"Tree contains nan! Truncating to length {i} of {len(phis)}...")
-                phis = phis[:i]
-                break
+        # for i, p in enumerate(phis):
+        #     if np.any(np.isnan(p)):
+        #         print(f"Tree contains nan! Truncating to length {i} of {len(phis)}...")
+        #         phis = phis[:i]
+        #         break
 
         sds_tree = KDTree(phis)
 
         cfg.sim_interface.parallel_sims = 1
+        cfg.sim_interface.verbose = 0
         sim = MjSim(cfg.sim_interface)
         G_ids = geom_names2ids(cfg.G, sim.mj_model)
         q_ids = cfg.q
@@ -87,7 +90,7 @@ def main():
             if dist < cfg.min_cost:
                 reached_count += 1
                 
-                if tree[ind]["t"] > 2.5:
+                if tree[ind]["t"] > 1:
                     # Reconstruct path
                     path = build_path(tree, ind)
 

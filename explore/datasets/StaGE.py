@@ -11,7 +11,8 @@ from sklearn.neighbors import KDTree
 from omegaconf import DictConfig, ListConfig
 
 from explore.utils.mj import geom_names2ids
-from explore.env.mujoco_warp_sim import MjSim
+# from explore.env.mujoco_warp_sim import MjSim
+from explore.env.mujoco_threaded_sim import MjSim
 
 
 class StaGE_Node:
@@ -138,7 +139,7 @@ class StaGE:
             -1,
             0.0,
             self.manifold_qpos[start_idx],
-            np.zeros((self.sim.data.qvel.shape[1],)),
+            np.zeros((self.sim.mj_data.qvel.shape[0],)),
             self.manifold_ctrl[start_idx],
             self.phi_stable_configs[start_idx],
             self.all_G_star[start_idx]
@@ -211,8 +212,7 @@ class StaGE:
                 )
 
                 action = np.random.uniform(-1, 1, size=(self.sample_count, self.ctrl_dim))
-                ctrl_np = self.sim.data.ctrl.numpy()
-                ctrl_target = action * self.stepsize + ctrl_np
+                ctrl_target = action * self.stepsize + parent.ctrl
                 
                 self.sim.step(
                     self.tau_action,
