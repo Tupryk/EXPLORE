@@ -16,7 +16,7 @@ from explore.datasets.utils import build_path
 
 
 def main():
-    out_path = "outputs/2026-07-13/17-38-08"
+    out_path = "outputs/2026-07-13/18-40-51"
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")
@@ -40,6 +40,7 @@ def main():
             start_ids = [start_ids]
     
     for start_id in start_ids:
+        if start_id < 6: continue
 
         print(f"Analizing tree {start_id}...")
         tree_path = os.path.join(out_path, f"trees/tree{start_id}.pkl")
@@ -89,7 +90,7 @@ def main():
             if dist < cfg.min_cost:
                 reached_count += 1
                 
-                if tree[ind]["t"] > 1.:
+                if tree[ind]["t"] > 2.5:
                     # Reconstruct path
                     path = build_path(tree, ind)
 
@@ -113,7 +114,8 @@ def main():
                         )
                         frames.extend(fs)
                     
-                    frames = [(frame.astype(float)*0.8 + goal_frame.astype(float)*0.2).astype(frame.dtype) for frame in frames]
+                    ratio = 0.4
+                    frames = [(frame.astype(float)*(1.-ratio) + goal_frame.astype(float)*ratio).astype(frame.dtype) for frame in frames]
                     imageio.mimsave(os.path.join(gif_path, f"{start_id}_to_{i}.gif"), frames, fps=24, loop=0)
                     
         print(f"{((reached_count/manifold_size)*100):.2f}% Coverage. ({reached_count} states reached)")

@@ -1,3 +1,53 @@
+total_timesteps: 500000
+timesteps_before_training: 5000
+checkpoint_freq: 100000
+eval_freq: 100000
+output_dir: ${hydra:runtime.output_dir}
+device: "cpu"
+
+TD7:
+  batch_size: 16000
+  buffer_size: 4e6
+  discount: 0.99
+  target_update_rate: 250
+  exploration_noise: 0.05
+  value_clip: [0., 2.]
+  
+  # TD3
+  target_policy_noise: 0.05
+  noise_clip: 0.1
+  policy_freq: 2
+  
+  # LAP
+  alpha: 0.4
+  min_priority: 1
+  
+  # TD3+BC
+  lmbda: 0.1
+  
+  # Checkpointing
+  max_eps_when_checkpointing: 20
+  steps_before_checkpointing: 75e4 
+  reset_weight: 0.9
+  
+  # Encoder Model
+  zs_dim: 512
+  enc_hdim: 512
+  encoder_lr: 1e-3
+  
+  # Critic Model
+  critic_hdim: 512
+  critic_lr: 1e-3
+  
+  # Actor Model
+  actor_hdim: 512
+  actor_lr: 1e-3
+
+env:
+  verbose: 1
+  tau_action: 0.05
+  stepsize: 0.1
+
 RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
@@ -44,5 +94,3 @@ RRT:
     camera: "fixed_cam"
     render_w: 640
     render_h: 480
-
-configs_path: "configs/stable/humanoid_box_grasps.h5"
