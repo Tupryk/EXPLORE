@@ -10,9 +10,9 @@ from omegaconf import ListConfig
 from sklearn.neighbors import KDTree
 
 from explore.utils.mj import geom_names2ids
+from explore.datasets.utils import build_path
 # from explore.env.mujoco_warp_sim import MjSim
 from explore.env.mujoco_threaded_sim import MjSim
-from explore.datasets.utils import build_path
 
 
 def main():

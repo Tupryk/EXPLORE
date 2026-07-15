@@ -22,6 +22,7 @@ class StaGE_Node:
                  qpos: np.ndarray,
                  qvel: np.ndarray,
                  ctrl: np.ndarray,
+                 geom_xpos: np.ndarray,
                  manifold_phi: np.ndarray,
                  goal_phi: np.ndarray,
                  target_config_idx: int=-1):
@@ -31,6 +32,7 @@ class StaGE_Node:
         self.qpos = qpos.copy()
         self.qvel = qvel.copy()
         self.ctrl = ctrl.copy()
+        self.geom_xpos = geom_xpos.copy()
         self.manifold_phi = manifold_phi
         self.goal_phi = goal_phi
         self.target_config_idx = target_config_idx
@@ -42,6 +44,7 @@ class StaGE:
         
         assert len(configs) == len(configs_ctrl)
         self.verbose = cfg.get("verbose", 0)
+        self.log_data = cfg.get("log_data", True)
         self.output_dir = cfg.output_dir
         
         # Slice config arrays if too long
@@ -114,7 +117,7 @@ class StaGE:
         self.remove_expanded = cfg.get("remove_expanded", True)
         
         # Start states / tree roots
-        self.start_ids = cfg.get("start_idx", -1)
+        self.start_ids = cfg.get("start_idx", np.random.randint(0, self.manifold_size))
         
         if not isinstance(self.start_ids, ListConfig):
             if self.start_ids == -1:
@@ -129,7 +132,7 @@ class StaGE:
         self.M = cfg.get("ANN_M", 16)
 
         if self.verbose:
-            print(f"Starting search across {self.manifold_size} configs!")
+            print(f"Starting search across {self.manifold_size} configs! Start configs: {self.start_ids}")
 
     def init_tree(self, start_idx) -> list[ StaGE_Node]:
         
@@ -253,7 +256,8 @@ class StaGE:
             if self.verbose > 3:
                 print(f"Storing tree {start_idx}")
             
-            self.store_tree(tree, tree_folder_path, f"tree{start_idx}")
+            if self.log_data:
+                self.store_tree(tree, tree_folder_path, f"tree{start_idx}")
     
         end_time = time.time()
         total_time = end_time - start_time
@@ -261,6 +265,9 @@ class StaGE:
         if self.verbose > 1:
             print(f"Total time taken: {total_time:.2f} seconds")
 
-        time_data_path = os.path.join(self.output_dir, "time_taken.txt")
-        with open(time_data_path, "w") as f:
-            f.write(f"{total_time}\n")
+        if self.log_data:
+            time_data_path = os.path.join(self.output_dir, "time_taken.txt")
+            with open(time_data_path, "w") as f:
+                f.write(f"{total_time}\n")
+            
+        return tree

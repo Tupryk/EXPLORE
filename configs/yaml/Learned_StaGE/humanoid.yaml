@@ -50,9 +50,9 @@ env:
 
 RRT:
   verbose: 3
+  log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
   max_expansions_per_tree: 10000
   max_configs: -1
   
@@ -86,7 +86,7 @@ RRT:
   q_weight: 0.25
 
   sim_interface:
-    parallel_sims: 1000
+    parallel_sims: 500
     xml_path: "configs/mujoco_/unitree_g1/box_scene.xml"
     tau_sim: 0.005
     verbose: 1
