@@ -130,9 +130,10 @@ def sample_agent_actions(
     ):
     
     obs = node_obs_state(node, G_start, S)
-    obs = np.broadcast_to(obs, (action_count, obs.shape[0])).copy()
     
-    actions = RL_agent.select_action(obs)
+    action = RL_agent.select_action(obs.reshape(1, -1), use_exploration=False)
+    action_noise = np.random.randn(action_count, S.ctrl_dim) * RL_agent.hp.exploration_noise
+    actions = action_noise + action
     
     return actions
 
