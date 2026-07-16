@@ -202,6 +202,8 @@ def main(cfg: DictConfig):
             print(f"Training {i+1}/{loop_count}...")
             for _ in tqdm(range(in_loop_training_steps), total=in_loop_training_steps):
                 RL_agent.train()
+
+    RL_agent.save_checkpoint(path="checkpoints", tag=f"learned_stage")
         
 
 if __name__ == "__main__":

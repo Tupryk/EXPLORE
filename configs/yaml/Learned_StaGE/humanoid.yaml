@@ -57,7 +57,7 @@ RRT:
   max_configs: -1
   
   # StaGE params
-  remove_expanded: true
+  remove_expanded: false
 
   # Distance threshholds
   min_cost: 0.1
