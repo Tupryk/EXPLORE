@@ -140,7 +140,7 @@ def sample_agent_actions(
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="ramp"
+    config_name="humanoid"
 )
 def main(cfg: DictConfig):
 
@@ -162,7 +162,7 @@ def main(cfg: DictConfig):
     agent_sampled_actions = cfg.agent_sampled_actions
     max_loops_before_training = cfg.max_loops_before_training
     
-    buffer_full = True
+    buffer_full = False
     for i in tqdm(range(loop_count), total=loop_count):
         
         # Generate a new tree with the policy
