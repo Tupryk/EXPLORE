@@ -83,6 +83,7 @@ class StaGE:
         # Manifold embedings
         self.all_G_star = []
         self.phi_stable_configs = []
+        self.geom_xposes = []
         
         for i in range(self.manifold_size):
             self.sim.mj_data.qpos[:] = self.manifold_qpos[i]
@@ -94,9 +95,11 @@ class StaGE:
             
             self.all_G_star.append(G)
             self.phi_stable_configs.append(phi)
+            self.geom_xposes.append(self.sim.mj_data.geom_xpos.copy())
 
         self.all_G_star = np.array(self.all_G_star)
         self.phi_stable_configs = np.array(self.phi_stable_configs)
+        self.geom_xposes = np.array(self.geom_xposes)
         self.sds_manifold = KDTree(self.phi_stable_configs)
 
         # Environment specific variables
@@ -144,6 +147,7 @@ class StaGE:
             self.manifold_qpos[start_idx],
             np.zeros((self.sim.mj_data.qvel.shape[0],)),
             self.manifold_ctrl[start_idx],
+            self.geom_xposes[start_idx],
             self.phi_stable_configs[start_idx],
             self.all_G_star[start_idx]
         )
@@ -171,7 +175,7 @@ class StaGE:
         with open(data_path, "wb") as f:
             pickle.dump(dict_tree, f)
         
-    def run(self):
+    def run(self, action_sampler=None) -> list[StaGE_Node]:
         
         tree_folder_path = os.path.join(self.output_dir, "trees")
         os.makedirs(tree_folder_path, exist_ok=True)
@@ -214,8 +218,12 @@ class StaGE:
                     parent.ctrl
                 )
 
-                action = np.random.uniform(-1, 1, size=(self.sample_count, self.ctrl_dim))
-                ctrl_target = action * self.stepsize + parent.ctrl
+                if action_sampler is None:
+                    actions = np.random.uniform(-1, 1, size=(self.sample_count, self.ctrl_dim))
+                else:
+                    actions = action_sampler(parent, self.all_G_star[target_id])
+                
+                ctrl_target = actions * self.stepsize + parent.ctrl
                 
                 self.sim.step(
                     self.tau_action,
@@ -238,6 +246,7 @@ class StaGE:
                         self.sim.numpy_dict["qpos"][sim_i],
                         self.sim.numpy_dict["qvel"][sim_i],
                         self.sim.numpy_dict["ctrl"][sim_i],
+                        self.sim.numpy_dict["geom_xpos"][sim_i],
                         phi[sim_i],
                         G[sim_i],
                         target_config_idx=target_id

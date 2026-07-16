@@ -104,3 +104,6 @@ class LAP(object):
         
         if self.prioritized:
             self.priority = torch.ones(self.size).to(self.device)
+            
+    def __len__(self):
+        return self.size

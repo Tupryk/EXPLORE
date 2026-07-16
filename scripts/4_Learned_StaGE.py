@@ -7,7 +7,6 @@ from omegaconf import DictConfig
 from explore.models.TD7 import TD7
 from sklearn.neighbors import KDTree
 from explore.datasets.utils import build_path
-from explore.env.SGRL_env import StableConfigsEnv
 from explore.datasets.StaGE import StaGE, StaGE_Node
 
 
@@ -70,9 +69,11 @@ def tree_to_buffer(
     rewards = []
     dones = []
     
+    success_nodes = []
     for i, node_id in enumerate(end_nodes):
         
-        path = build_path(tree, node_id)
+        path, ids = build_path(tree, node_id)
+        success_nodes.extend(ids)
 
         prev_node = path[0]
         
@@ -92,14 +93,61 @@ def tree_to_buffer(
             )
             
             prev_node = node
+    
+    success_size = len(states)
+    for i in range(len(tree)-1, -1, -1):
+        if len(states) >= success_size * 2: break
+        
+        if i in success_nodes:
+            continue
+        
+        path, _ = build_path(tree, node_id)
+
+        prev_node = path[0]
+        
+        target = np.random.randint(0, S.manifold_size)
+        G_target = S.all_G_star[target]
+        
+        for node in path[1:]:
             
+            dones.append(0.)
+            rewards.append(0.)
+            
+            states.append(
+                node_obs_state(prev_node, G_target, S)
+            )
+            actions.append(
+                node.ctrl - prev_node.ctrl
+            )
+            next_states.append(
+                node_obs_state(node, G_target, S)
+            )
+            
+            prev_node = node
+    
     return np.array(states), np.array(actions), np.array(next_states), np.array(rewards), np.array(dones)
+
+
+def sample_agent_actions(
+    RL_agent: TD7.Agent,
+    action_count: int,
+    node: StaGE_Node,
+    G_start: np.ndarray,
+    S: StaGE
+    ):
+    
+    obs = node_obs_state(node, G_start, S)
+    obs = np.broadcast_to(obs, (action_count, obs.shape[0])).copy()
+    
+    actions = RL_agent.select_action(obs)
+    
+    return actions
 
 
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="humanoid_box"
+    config_name="ramp"
 )
 def main(cfg: DictConfig):
 
@@ -110,48 +158,53 @@ def main(cfg: DictConfig):
 
     S = StaGE(qpos, ctrl, cfg.RRT)
     
-    tree = S.run()
-    end_nodes, reached_targets = get_tree_successful_nodes(tree, S.all_G_star)
-    
-    print(f"Initial connection ratio: {(len(reached_targets)/len(S.all_G_star) * 100.):.2f}%")
-    
-    if len(reached_targets) == 0:
-        print("Could not find initial connections! Run failed :'(")
-        return
-    
     # Init agent and environment
-    eval_cfg = StableConfigsEnv(cfg.env)
-    eval_cfg.verbose = 0
-    eval_cfg.sim_interface.parallel_sims = 1
-    eval_env = StableConfigsEnv(eval_cfg)
+    tree = S.init_tree(0)
+    obs = node_obs_state(tree[0], S.all_G_star[0], S)
+    RL_agent = TD7.Agent(obs.shape[0], S.ctrl_dim, 1., hp=cfg.TD7)
     
-    state_dim = eval_env.observation_space.shape[0]
-    action_dim = eval_env.action_space.shape[0] 
-    max_action = float(eval_env.action_space.high[0])
+    # Main loop
+    loop_count = cfg.loop_count
+    in_loop_training_steps = cfg.in_loop_training_steps
+    agent_sampled_actions = cfg.agent_sampled_actions
+    loops_before_training = cfg.loops_before_training
     
-    RL_agent = TD7.Agent(state_dim, action_dim, max_action, hp=cfg.TD7)
+    for i in tqdm(range(loop_count), total=loop_count):
+        
+        # Generate a new tree with the policy
+        print(f"Growing tree {i+1}/{loop_count}...")
+        S.start_ids = [np.random.randint(0, S.manifold_size)]
+        
+        if i < loops_before_training:
+            tree = S.run()
+        
+        else:
+            tree = S.run(lambda node, G_star: sample_agent_actions(RL_agent, agent_sampled_actions, node, G_star))
+        
+        # Load tree into buffer
+        end_nodes, reached_targets = get_tree_successful_nodes(tree, S.all_G_star)
+        print(f"Connection ratio for loop {i+1}/{loop_count}: {(len(reached_targets)/len(S.all_G_star) * 100.):.2f}%")
     
-    # Load tree into buffer
-    states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S.all_G_star)
-    
-    RL_agent.replay_buffer.add_multiple(
-        states,
-        actions,
-        next_states,
-        rewards.reshape(-1, 1),
-        dones.astype(float).reshape(-1, 1)
-    )
-    
-    # Train TD7
-    
-    # Iterate:
-    
-    # Get paths from tree and generate a buffer
-    
-    # Train policy
-    
-    # Use policy to expand tree
-    
+        print(f"Loading tree into buffer {i+1}/{loop_count}...")
+        states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S.all_G_star)
+        
+        RL_agent.replay_buffer.add_multiple(
+            states,
+            actions,
+            next_states,
+            rewards.reshape(-1, 1),
+            dones.reshape(-1, 1)
+        )
+        print(f"Buffer size: {len(RL_agent.replay_buffer)}")
+        
+        if i < loops_before_training:
+            continue
+        
+        # Train TD7
+        print(f"Training {i+1}/{loop_count}...")
+        for _ in tqdm(range(in_loop_training_steps), total=in_loop_training_steps):
+            RL_agent.train()
+        
 
 if __name__ == "__main__":
     main()

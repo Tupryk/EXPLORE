@@ -5,14 +5,14 @@ checkpoint_freq: 10
 eval_freq: 10
 
 agent_sampled_actions: 10
-loops_before_training: 5
+loops_before_training: 1
 
-loop_count: 100
+loop_count: 1000
 in_loop_training_steps: 100
 
 TD7:
-  batch_size: 16000
-  buffer_size: 4e6
+  batch_size: 2500
+  buffer_size: 1e6
   discount: 0.99
   target_update_rate: 250
   exploration_noise: 0.05
@@ -36,58 +36,58 @@ TD7:
   reset_weight: 0.9
   
   # Encoder Model
-  zs_dim: 512
-  enc_hdim: 512
+  zs_dim: 128
+  enc_hdim: 128
   encoder_lr: 1e-3
   
   # Critic Model
-  critic_hdim: 512
+  critic_hdim: 128
   critic_lr: 1e-3
   
   # Actor Model
-  actor_hdim: 512
+  actor_hdim: 128
   actor_lr: 1e-3
 
 RRT:
   verbose: 3
-  log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 10000
+  start_idx: [0]
+  max_expansions_per_tree: 2500
   max_configs: -1
   
   # StaGE params
   remove_expanded: true
 
   # Distance threshholds
-  min_cost: 0.1
+  min_cost: 0.01
+  path_diff_thresh: 0.05
+  target_min_dist: 1000000.
 
   # MPC actions
   tau_action: 0.1
-  stepsize: 0.5
+  stepsize: 0.1
 
   # Distance measurements
-  q: [7,36]
-  q_dot: [6,35]
-  q_obj_dot: 0
+  q: [0, 3]
+  q_dot: [0, 3]
+  q_obj_dot: 3
   P: [
-    "pelvis",
-    "left_ankle_roll_joint", "right_ankle_roll_joint",
-    "left_rubber_hand_0", "right_rubber_hand_0",
-    "box_marker_0", "box_marker_1", "box_marker_2"
+    "l_fing", "obj",
   ]
   G: [
-    "box_marker_0", "box_marker_1", "box_marker_2"
+    "obj",
   ]
+
   obs_pos_scale: 1.0
   obs_vel_scale: 0.1
   obs_ref_err_scale: 10.0
 
-  q_weight: 0.0
+  q_weight: 1.
 
   sim_interface:
-    parallel_sims: 50
-    xml_path: "configs/mujoco_/unitree_g1/box_scene.xml"
+    parallel_sims: 100
+    xml_path: "configs/mujoco_/doubleSphere.xml"
     tau_sim: 0.005
     verbose: 1
 
@@ -95,4 +95,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/humanoid_box_grasps.h5"
+configs_path: "configs/stable/double_sphere.h5"
