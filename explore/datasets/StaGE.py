@@ -182,7 +182,8 @@ class StaGE:
         
         start_time = time.time()
 
-        for i, start_idx in tqdm(enumerate(self.start_ids), total=len(self.start_ids)):
+        loop = tqdm(enumerate(self.start_ids), total=len(self.start_ids)) if len(self.start_ids) > 1 else enumerate(self.start_ids)
+        for i, start_idx in loop:
             
             tree = self.init_tree(start_idx)
             self.sds_tree = hnswlib.Index(space="l2", dim=self.phi_stable_configs.shape[1])
