@@ -81,7 +81,8 @@ def tree_to_buffer(
     tree: list[StaGE_Node],
     end_nodes: list[int],
     reached_targets: list[int],
-    S: StaGE
+    S: StaGE,
+    failure_ratio: float
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
     states, actions, next_states, rewards, dones = [], [], [], [], []
@@ -110,7 +111,7 @@ def tree_to_buffer(
 
     print("Second pass through...")
     for i in tqdm(range(len(tree) - 1, -1, -1), total=len(tree)):
-        if len(states) >= success_size * 2:
+        if len(states) >= success_size * failure_ratio:
             break
         if i in success_nodes:
             continue
@@ -181,7 +182,7 @@ def main(cfg: DictConfig):
         print(f"Connection ratio for loop {i+1}/{loop_count}: {(len(reached_targets)/len(S.all_G_star) * 100.):.2f}%")
     
         print(f"Loading tree into buffer {i+1}/{loop_count}...")
-        states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S)
+        states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S, cfg.failure_ratio)
         
         if len(states):
             RL_agent.replay_buffer.add_multiple(

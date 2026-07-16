@@ -5,10 +5,11 @@ checkpoint_freq: 10
 eval_freq: 10
 
 agent_sampled_actions: 10
-max_loops_before_training: 0
+max_loops_before_training: 10
+failure_ratio: 10.
 
 loop_count: 100
-in_loop_training_steps: 100
+in_loop_training_steps: 10
 
 TD7:
   batch_size: 16000
