@@ -114,7 +114,7 @@ def tree_to_buffer(
             break
         if i in success_nodes:
             continue
-        path, _ = build_path(tree, i)  # was buggy: used stale node_id from prior loop
+        path, _ = build_path(tree, i)
         target = np.random.randint(0, S.manifold_size)
         add_path(path, S.all_G_star[target], is_success=False)
 
