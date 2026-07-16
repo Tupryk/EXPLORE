@@ -17,7 +17,7 @@ def get_tree_successful_nodes(
     ) -> tuple[list, list]:
     
     print("Analyzing tree...")
-    phis = [node.phi for node in tree]
+    phis = [node.goal_phi for node in tree]
     sds_tree = KDTree(phis)
     
     end_nodes = []
@@ -55,78 +55,71 @@ def node_obs_state(node: StaGE_Node, G_star: np.ndarray, S: StaGE):
     return state
 
 
+def build_path(tree: list[dict], node_idx: int,
+               reverse: bool=True) -> list[dict]:
+
+    node = tree[node_idx]
+    path = []
+    ids = [node_idx]
+    
+    while True:
+        path.append(node)
+        if node.parent == -1: break
+        node = tree[node.parent]
+        ids.append(node.parent)
+    
+    if reverse:
+        path.reverse()
+        assert path[0] == tree[0]
+    else:
+        assert path[0] == tree[node_idx]
+
+    return path, ids
+
+
 def tree_to_buffer(
     tree: list[StaGE_Node],
     end_nodes: list[int],
     reached_targets: list[int],
     S: StaGE
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    
-    states = []
-    actions = []
-    next_states = []
-    
-    rewards = []
-    dones = []
-    
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+
+    states, actions, next_states, rewards, dones = [], [], [], [], []
     success_nodes = []
-    for i, node_id in enumerate(end_nodes):
-        
+
+    def add_path(path, G_target, is_success):
+        # compute obs state once per node instead of twice per edge
+        obs = [node_obs_state(node, G_target, S) for node in path]
+        n_edges = len(path) - 1
+        for j in range(n_edges):
+            is_last_success_edge = is_success and (j == n_edges - 1)
+            states.append(obs[j])
+            next_states.append(obs[j + 1])
+            actions.append(path[j + 1].ctrl - path[j].ctrl)
+            rewards.append(1. if is_last_success_edge else 0.)
+            dones.append(1. if is_last_success_edge else 0.)
+
+    print("First pass through...")
+    for i, node_id in tqdm(enumerate(end_nodes), total=len(end_nodes)):
         path, ids = build_path(tree, node_id)
         success_nodes.extend(ids)
+        add_path(path, S.all_G_star[reached_targets[i]], is_success=True)
 
-        prev_node = path[0]
-        
-        for node in path[1:]:
-            
-            dones.append(1. if i == len(path)-1 else 0.)
-            rewards.append(1. if i == len(path)-1 else 0.)
-            
-            states.append(
-                node_obs_state(prev_node, S.all_G_star[reached_targets[i]], S)
-            )
-            actions.append(
-                node.ctrl - prev_node.ctrl
-            )
-            next_states.append(
-                node_obs_state(node, S.all_G_star[reached_targets[i]], S)
-            )
-            
-            prev_node = node
-    
     success_size = len(states)
-    for i in range(len(tree)-1, -1, -1):
-        if len(states) >= success_size * 2: break
-        
+    success_nodes = set(success_nodes)  # O(1) membership checks below
+
+    print("Second pass through...")
+    for i in tqdm(range(len(tree) - 1, -1, -1), total=len(tree)):
+        if len(states) >= success_size * 2:
+            break
         if i in success_nodes:
             continue
-        
-        path, _ = build_path(tree, node_id)
-
-        prev_node = path[0]
-        
+        path, _ = build_path(tree, i)  # was buggy: used stale node_id from prior loop
         target = np.random.randint(0, S.manifold_size)
-        G_target = S.all_G_star[target]
-        
-        for node in path[1:]:
-            
-            dones.append(0.)
-            rewards.append(0.)
-            
-            states.append(
-                node_obs_state(prev_node, G_target, S)
-            )
-            actions.append(
-                node.ctrl - prev_node.ctrl
-            )
-            next_states.append(
-                node_obs_state(node, G_target, S)
-            )
-            
-            prev_node = node
-    
-    return np.array(states), np.array(actions), np.array(next_states), np.array(rewards), np.array(dones)
+        add_path(path, S.all_G_star[target], is_success=False)
 
+    return (np.array(states), np.array(actions), np.array(next_states),
+            np.array(rewards), np.array(dones))
 
 def sample_agent_actions(
     RL_agent: TD7.Agent,
@@ -167,43 +160,48 @@ def main(cfg: DictConfig):
     loop_count = cfg.loop_count
     in_loop_training_steps = cfg.in_loop_training_steps
     agent_sampled_actions = cfg.agent_sampled_actions
-    loops_before_training = cfg.loops_before_training
+    max_loops_before_training = cfg.max_loops_before_training
     
+    buffer_full = True
     for i in tqdm(range(loop_count), total=loop_count):
         
         # Generate a new tree with the policy
         print(f"Growing tree {i+1}/{loop_count}...")
         S.start_ids = [np.random.randint(0, S.manifold_size)]
         
-        if i < loops_before_training:
+        if i < max_loops_before_training and not buffer_full:
             tree = S.run()
         
         else:
-            tree = S.run(lambda node, G_star: sample_agent_actions(RL_agent, agent_sampled_actions, node, G_star))
+            tree = S.run(lambda node, G_star: sample_agent_actions(RL_agent, agent_sampled_actions, node, G_star, S))
         
         # Load tree into buffer
-        end_nodes, reached_targets = get_tree_successful_nodes(tree, S.all_G_star)
+        end_nodes, reached_targets = get_tree_successful_nodes(tree, S.all_G_star, S.min_cost)
         print(f"Connection ratio for loop {i+1}/{loop_count}: {(len(reached_targets)/len(S.all_G_star) * 100.):.2f}%")
     
         print(f"Loading tree into buffer {i+1}/{loop_count}...")
-        states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S.all_G_star)
+        states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S)
         
-        RL_agent.replay_buffer.add_multiple(
-            states,
-            actions,
-            next_states,
-            rewards.reshape(-1, 1),
-            dones.reshape(-1, 1)
-        )
-        print(f"Buffer size: {len(RL_agent.replay_buffer)}")
+        if len(states):
+            RL_agent.replay_buffer.add_multiple(
+                states,
+                actions,
+                next_states,
+                rewards.reshape(-1, 1),
+                dones.reshape(-1, 1)
+            )
+            buffer_full = len(RL_agent.replay_buffer) >= RL_agent.replay_buffer.max_size
+            print(f"Buffer size: {len(RL_agent.replay_buffer)}")
         
-        if i < loops_before_training:
-            continue
+        else:
+            print("WARNING: No connections found!")
         
-        # Train TD7
-        print(f"Training {i+1}/{loop_count}...")
-        for _ in tqdm(range(in_loop_training_steps), total=in_loop_training_steps):
-            RL_agent.train()
+        if i >= max_loops_before_training-1 or buffer_full:
+        
+            # Train TD7
+            print(f"Training {i+1}/{loop_count}...")
+            for _ in tqdm(range(in_loop_training_steps), total=in_loop_training_steps):
+                RL_agent.train()
         
 
 if __name__ == "__main__":

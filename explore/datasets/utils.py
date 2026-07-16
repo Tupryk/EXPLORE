@@ -102,13 +102,11 @@ def build_path(tree: list[dict], node_idx: int,
 
     node = tree[node_idx]
     path = []
-    ids = [node_idx]
     
     while True:
         path.append(node)
         if node["parent"] == -1: break
         node = tree[node["parent"]]
-        ids.append(node["parent"])
     
     if reverse:
         path.reverse()
@@ -118,7 +116,7 @@ def build_path(tree: list[dict], node_idx: int,
 
     if just_states:
         path = [node["state"] for node in path]
-    return path, ids
+    return path
 
 def generate_adj_map( trees: list[list[dict]],
     check_cached: str="", scene_quat_indices: list=[], verbose: int=1) -> tuple[list[list[float]], list[list[int]]]:

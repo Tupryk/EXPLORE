@@ -5,7 +5,7 @@ checkpoint_freq: 10
 eval_freq: 10
 
 agent_sampled_actions: 10
-loops_before_training: 1
+max_loops_before_training: 5
 
 loop_count: 1000
 in_loop_training_steps: 100
