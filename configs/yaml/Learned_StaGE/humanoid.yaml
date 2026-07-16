@@ -5,11 +5,11 @@ checkpoint_freq: 10
 eval_freq: 10
 
 agent_sampled_actions: 10
-max_loops_before_training: 10
+max_loops_before_training: 25
 failure_ratio: 10.
 
-loop_count: 100
-in_loop_training_steps: 10
+loop_count: 500
+in_loop_training_steps: 1000
 
 TD7:
   batch_size: 16000
@@ -39,22 +39,22 @@ TD7:
   # Encoder Model
   zs_dim: 512
   enc_hdim: 512
-  encoder_lr: 1e-3
+  encoder_lr: 3e-4
   
   # Critic Model
   critic_hdim: 512
-  critic_lr: 1e-3
+  critic_lr: 3e-4
   
   # Actor Model
   actor_hdim: 512
-  actor_lr: 1e-3
+  actor_lr: 3e-4
 
 RRT:
   verbose: 3
   log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 10000
+  max_expansions_per_tree: 5000
   max_configs: -1
   
   # StaGE params
