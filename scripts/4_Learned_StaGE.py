@@ -10,7 +10,6 @@ from omegaconf import DictConfig
 
 from explore.models.TD7 import TD7
 from sklearn.neighbors import KDTree
-from explore.datasets.utils import build_path
 from explore.env.SGRL_env import StableConfigsEnv
 from explore.datasets.StaGE import StaGE, StaGE_Node
 

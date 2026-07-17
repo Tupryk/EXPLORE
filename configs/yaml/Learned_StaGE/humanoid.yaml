@@ -3,7 +3,7 @@ device: "cpu"
 
 checkpoint_freq: 10
 eval_freq: 10
-eval_count: 10
+eval_count: 100
 
 agent_sampled_actions: 10
 max_loops_before_training: 25
