@@ -142,7 +142,7 @@ def sample_agent_actions(
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="humanoid"
+    config_name="ramp"
 )
 def main(cfg: DictConfig):
 

@@ -6,8 +6,9 @@ eval_freq: 10
 
 agent_sampled_actions: 10
 max_loops_before_training: 5
+failure_ratio: 10.
 
-loop_count: 1000
+loop_count: 100
 in_loop_training_steps: 100
 
 TD7:
@@ -83,10 +84,10 @@ RRT:
   obs_vel_scale: 0.1
   obs_ref_err_scale: 10.0
 
-  q_weight: 1.
+  q_weight: 0.25
 
   sim_interface:
-    parallel_sims: 100
+    parallel_sims: 10
     xml_path: "configs/mujoco_/doubleSphere.xml"
     tau_sim: 0.005
     verbose: 1

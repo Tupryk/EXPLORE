@@ -257,16 +257,16 @@ class StaGE:
 
                 self.sds_tree.add_items(new_phis, ids=list(range(start_id, len(tree))))
                 
-                if self.verbose > 3 and (expansion_step_id + 1) % 100 == 0:
-                    process = psutil.Process(os.getpid())
-                    print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
-                    print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
+            if self.verbose > 2:
+                process = psutil.Process(os.getpid())
+                print(f"RSS (resident memory): {process.memory_info().rss / 1024**2:.2f} MB")
+                print(f"VMS (virtual memory): {process.memory_info().vms / 1024**2:.2f} MB")
+            
             
             # Store information
-            if self.verbose > 3:
-                print(f"Storing tree {start_idx}")
-            
             if self.log_data:
+                if self.verbose > 3:
+                    print(f"Storing tree {start_idx}")
                 self.store_tree(tree, tree_folder_path, f"tree{start_idx}")
     
         end_time = time.time()
