@@ -1,14 +1,14 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-eval_freq: 250
+eval_freq: 500
 eval_count: 10
 
-agent_sampled_actions: 10
-max_loops_before_training: 200
+agent_sampled_actions: 25
+max_loops_before_training: 1000
 failure_ratio: 3.
 
-loop_count: 2500
+loop_count: 5000
 in_loop_training_steps: 10
 
 TD7:
@@ -39,15 +39,15 @@ TD7:
   # Encoder Model
   zs_dim: 512
   enc_hdim: 512
-  encoder_lr: 1e-3
+  encoder_lr: 3e-4
   
   # Critic Model
   critic_hdim: 512
-  critic_lr: 1e-3
+  critic_lr: 3e-4
   
   # Actor Model
   actor_hdim: 512
-  actor_lr: 1e-3
+  actor_lr: 3e-4
 
 RRT:
   verbose: 0
@@ -70,7 +70,7 @@ RRT:
   # Distance measurements
   q: [7,36]
   q_dot: [6,35]
-  q_obj_dot: 0
+  q_obj_dot: 35
   P: [
     "pelvis",
     "left_ankle_roll_joint", "right_ankle_roll_joint",
