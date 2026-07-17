@@ -59,8 +59,7 @@ def node_obs_state(node: StaGE_Node, G_star: np.ndarray, S: StaGE):
     return state
 
 
-def build_path(tree: list[dict], node_idx: int,
-               reverse: bool=True) -> list[dict]:
+def build_path(tree: list[dict], node_idx: int) -> list[dict]:
 
     node = tree[node_idx]
     path = []
@@ -69,14 +68,12 @@ def build_path(tree: list[dict], node_idx: int,
     while True:
         path.append(node)
         if node.parent == -1: break
-        node = tree[node.parent]
         ids.append(node.parent)
+        node = tree[node.parent]
     
-    if reverse:
-        path.reverse()
-        assert path[0] == tree[0]
-    else:
-        assert path[0] == tree[node_idx]
+    path.reverse()
+    ids.reverse()
+    assert path[0] == tree[0]
 
     return path, ids
 

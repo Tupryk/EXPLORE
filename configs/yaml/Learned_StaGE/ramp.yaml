@@ -9,12 +9,12 @@ agent_sampled_actions: 10
 max_loops_before_training: 5
 failure_ratio: 10.
 
-loop_count: 1000
-in_loop_training_steps: 10
+loop_count: 100
+in_loop_training_steps: 100
 
 TD7:
-  batch_size: 16000
-  buffer_size: 4e6
+  batch_size: 2500
+  buffer_size: 1e6
   discount: 0.99
   target_update_rate: 250
   exploration_noise: 0.05
