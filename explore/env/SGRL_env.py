@@ -9,7 +9,8 @@ from sklearn.neighbors import KDTree
 from omegaconf import DictConfig, ListConfig
 
 from explore.utils.mj import geom_names2ids
-from explore.env.mujoco_warp_sim import MjSim
+# from explore.env.mujoco_warp_sim import MjSim
+from explore.env.mujoco_threaded_sim import MjSim
 
 
 class StableConfigsEnv(gym.Env):
@@ -48,11 +49,12 @@ class StableConfigsEnv(gym.Env):
         self.q_weight = cfg.q_weight
 
         # SGRL
-        self.use_csrl = cfg.get("use_csrl", True)
-        self.schedule_alpha_step = 1. / (cfg.schedule_alpha_end_step / cfg.schedule_alpha_block)
-        self.schedule_alpha_block = cfg.schedule_alpha_block
-        self.schedule_alpha = self.schedule_alpha_step
-        self.schedule_buffer = 0
+        self.use_csrl = cfg.get("use_csrl", False)
+        if self.use_csrl:
+            self.schedule_alpha_step = 1. / (cfg.schedule_alpha_end_step / cfg.schedule_alpha_block)
+            self.schedule_alpha_block = cfg.schedule_alpha_block
+            self.schedule_alpha = self.schedule_alpha_step
+            self.schedule_buffer = 0
         
         self.expand_manifold = cfg.get("expand_manifold", False)
         self.max_manifold = int(cfg.get("max_manifold", 1e6))
@@ -70,16 +72,16 @@ class StableConfigsEnv(gym.Env):
             print("Total configs in h5: ", self.config_count)
         
         if self.expand_manifold:
-            self.manifold_qpos = np.zeros((self.max_manifold, self.sim.data.qpos.shape[1]))
-            self.manifold_qvel = np.zeros((self.max_manifold, self.sim.data.qvel.shape[1]))
-            self.manifold_ctrl = np.zeros((self.max_manifold, self.sim.data.ctrl.shape[1]))
+            self.manifold_qpos = np.zeros((self.max_manifold, self.sim.mj_data.qpos.shape[0]))
+            self.manifold_qvel = np.zeros((self.max_manifold, self.sim.mj_data.qvel.shape[0]))
+            self.manifold_ctrl = np.zeros((self.max_manifold, self.sim.mj_data.ctrl.shape[0]))
             
             self.manifold_qpos[:self.config_count] = self.stable_configs["qpos"][:]
             self.manifold_ctrl[:self.config_count] = self.stable_configs["ctrl"][:]
             
         else:
             self.manifold_qpos = self.stable_configs["qpos"][:]
-            self.manifold_qvel = np.zeros((self.config_count, self.sim.data.qvel.shape[1]))
+            self.manifold_qvel = np.zeros((self.config_count, self.sim.mj_data.qvel.shape[0]))
             self.manifold_ctrl = self.stable_configs["ctrl"][:]
         
         self.all_G_star = []
@@ -121,7 +123,7 @@ class StableConfigsEnv(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_dim,), dtype=np.float32)
         
         # Define action space
-        ctrl_dim = self.sim.data.ctrl.shape[1]
+        ctrl_dim = self.sim.mj_data.ctrl.shape[0]
         self.action_space = spaces.Box(low=-1, high=1, shape=(ctrl_dim,), dtype=np.float32)
 
         self._cost_buf = np.empty(self.sim_count, dtype=np.float32)
@@ -247,7 +249,7 @@ class StableConfigsEnv(gym.Env):
         
         ### Simulation Step ###
         if isinstance(self.stepsize, np.ndarray) or self.stepsize > 0.:
-            ctrl_np = self.sim.data.ctrl.numpy()
+            ctrl_np = self.sim.data_ctrl.copy()
             ctrl_target = action * self.stepsize + ctrl_np
         else:
             ctrl_target = action.copy()
