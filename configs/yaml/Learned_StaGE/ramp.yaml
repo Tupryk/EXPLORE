@@ -21,7 +21,7 @@ TD7:
   value_clip: [0., 1.]
   
   # TD3
-  target_policy_noise: 0.05
+  target_policy_noise: 0.2
   noise_clip: 0.1
   policy_freq: 2
   

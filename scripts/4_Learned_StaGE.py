@@ -223,6 +223,7 @@ def main(cfg: DictConfig):
     pseudo_timesteps = 0
     
     buffer_full = False
+    allow_training = False
     for i in tqdm(range(loop_count), total=loop_count):
         
         # Generate a new tree with the policy
