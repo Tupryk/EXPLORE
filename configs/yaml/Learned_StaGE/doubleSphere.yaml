@@ -1,15 +1,14 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-checkpoint_freq: 100
 eval_freq: 100
 eval_count: 10
 
 agent_sampled_actions: 10
-max_loops_before_training: 50
+max_loops_before_training: 200
 failure_ratio: 3.
 
-loop_count: 500
+loop_count: 1000
 in_loop_training_steps: 10
 
 TD7:
@@ -17,7 +16,7 @@ TD7:
   buffer_size: 1e6
   discount: 0.99
   target_update_rate: 250
-  exploration_noise: 0.2
+  exploration_noise: 0.15
   value_clip: [0., 1.]
   
   # TD3
@@ -51,7 +50,8 @@ TD7:
   actor_lr: 1e-3
 
 RRT:
-  verbose: 3
+  verbose: 0
+  log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
   max_expansions_per_tree: 250

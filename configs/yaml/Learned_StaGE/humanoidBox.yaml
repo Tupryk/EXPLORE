@@ -1,19 +1,18 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-checkpoint_freq: 10
-eval_freq: 10
-eval_count: 100
+eval_freq: 250
+eval_count: 10
 
 agent_sampled_actions: 10
-max_loops_before_training: 25
-failure_ratio: 10.
+max_loops_before_training: 200
+failure_ratio: 3.
 
-loop_count: 500
-in_loop_training_steps: 1000
+loop_count: 2500
+in_loop_training_steps: 10
 
 TD7:
-  batch_size: 16000
+  batch_size: 10000
   buffer_size: 4e6
   discount: 0.99
   target_update_rate: 250
@@ -21,7 +20,7 @@ TD7:
   value_clip: [0., 1.]
   
   # TD3
-  target_policy_noise: 0.05
+  target_policy_noise: 0.15
   noise_clip: 0.1
   policy_freq: 2
   
@@ -30,7 +29,7 @@ TD7:
   min_priority: 1
   
   # TD3+BC
-  lmbda: 0.1
+  lmbda: 0.01
   
   # Checkpointing
   max_eps_when_checkpointing: 20
@@ -40,22 +39,22 @@ TD7:
   # Encoder Model
   zs_dim: 512
   enc_hdim: 512
-  encoder_lr: 3e-4
+  encoder_lr: 1e-3
   
   # Critic Model
   critic_hdim: 512
-  critic_lr: 3e-4
+  critic_lr: 1e-3
   
   # Actor Model
   actor_hdim: 512
-  actor_lr: 3e-4
+  actor_lr: 1e-3
 
 RRT:
-  verbose: 3
+  verbose: 0
   log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 5000
+  max_expansions_per_tree: 1000
   max_configs: -1
   
   # StaGE params

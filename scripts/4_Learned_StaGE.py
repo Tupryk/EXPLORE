@@ -26,7 +26,7 @@ def get_tree_successful_nodes(
     
     end_nodes = []
     reached_targets = []
-    for i, manifold_point in tqdm(enumerate(all_G_star), total=len(all_G_star)):
+    for i, manifold_point in enumerate(all_G_star):
             
         dist, ind = sds_tree.query([manifold_point], k=1)
         dist = dist[0][0]
@@ -90,35 +90,55 @@ def tree_to_buffer(
     success_nodes = []
 
     def add_path(path, G_target, is_success):
-        # compute obs state once per node instead of twice per edge
         obs = [node_obs_state(node, G_target, S) for node in path]
+
         n_edges = len(path) - 1
         for j in range(n_edges):
-            is_last_success_edge = is_success and (j == n_edges - 1)
+
+            is_last_edge = is_success and (j == n_edges - 1)
+
             states.append(obs[j])
             next_states.append(obs[j + 1])
             actions.append((path[j + 1].ctrl - path[j].ctrl) / S.stepsize)
-            rewards.append(1. if is_last_success_edge else 0.)
-            dones.append(1. if is_last_success_edge else 0.)
 
-    print("First pass through...")
-    for i, node_id in tqdm(enumerate(end_nodes), total=len(end_nodes)):
+            rewards.append(1. if is_last_edge else 0.)
+            dones.append(1. if is_last_edge else 0.)
+
+    print("First pass through (successes + hindsight relabeling)...")
+    for i, node_id in enumerate(end_nodes):
         path, ids = build_path(tree, node_id)
         success_nodes.extend(ids)
+
         add_path(path, S.all_G_star[reached_targets[i]], is_success=True)
 
     success_size = len(states)
     success_nodes = set(success_nodes)  # O(1) membership checks below
 
-    print("Second pass through...")
-    for i in tqdm(range(len(tree) - 1, -1, -1), total=len(tree)):
-        if len(states) >= success_size * failure_ratio:
-            break
-        if i in success_nodes:
-            continue
-        path, _ = build_path(tree, i)
-        target = np.random.randint(0, S.manifold_size)
-        add_path(path, S.all_G_star[target], is_success=False)
+    print("Second pass through (uniform hard-negative sampling)...")
+    non_success_ids = [i for i in range(len(tree)) if i not in success_nodes]
+    n_neg = min(len(non_success_ids), int(success_size * failure_ratio))
+
+    if n_neg > 0:
+        chosen = np.random.choice(non_success_ids, size=n_neg, replace=False)
+
+        for i in chosen:
+            
+            chosen_node = tree[i]
+            assert chosen_node.parent != -1
+            chosen_node_parent = tree[chosen_node.parent]
+            
+            random_target_id = np.random.randint(0, S.manifold_size)
+            random_target = S.all_G_star[random_target_id]
+            
+            obs = node_obs_state(chosen_node, random_target, S)
+            obs_parent = node_obs_state(chosen_node_parent, random_target, S)
+
+            next_states.append(obs)
+            states.append(obs_parent)
+            actions.append((chosen_node.ctrl - chosen_node_parent.ctrl) / S.stepsize)
+
+            rewards.append(0.)
+            dones.append(0.)
 
     return (np.array(states), np.array(actions), np.array(next_states),
             np.array(rewards), np.array(dones))
@@ -195,7 +215,7 @@ def get_eval_env(cfg: DictConfig) -> StableConfigsEnv:
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="doubleSphere"
+    config_name="humanoidBox"
 )
 def main(cfg: DictConfig):
 
@@ -265,7 +285,7 @@ def main(cfg: DictConfig):
         if allow_training:
 
             print(f"Training {i+1}/{loop_count}...")
-            for _ in tqdm(range(in_loop_training_steps), total=in_loop_training_steps):
+            for _ in range(in_loop_training_steps):
                 RL_agent.train()
             
             if (i+1) % cfg.eval_freq == 0:
