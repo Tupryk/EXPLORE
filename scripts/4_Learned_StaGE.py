@@ -97,7 +97,7 @@ def tree_to_buffer(
             is_last_success_edge = is_success and (j == n_edges - 1)
             states.append(obs[j])
             next_states.append(obs[j + 1])
-            actions.append(path[j + 1].ctrl - path[j].ctrl)
+            actions.append((path[j + 1].ctrl - path[j].ctrl) / S.stepsize)
             rewards.append(1. if is_last_success_edge else 0.)
             dones.append(1. if is_last_success_edge else 0.)
 
@@ -137,6 +137,7 @@ def sample_agent_actions(
     action_noise = np.random.randn(action_count, S.ctrl_dim) * RL_agent.hp.exploration_noise
     actions = action_noise + action
     
+    actions = np.clip(actions, -1, 1)
     return actions
 
 
@@ -194,7 +195,7 @@ def get_eval_env(cfg: DictConfig) -> StableConfigsEnv:
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="humanoid"
+    config_name="doubleSphere"
 )
 def main(cfg: DictConfig):
 

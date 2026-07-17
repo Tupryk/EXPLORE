@@ -1,27 +1,27 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-checkpoint_freq: 10
-eval_freq: 10
+checkpoint_freq: 100
+eval_freq: 100
 eval_count: 10
 
 agent_sampled_actions: 10
-max_loops_before_training: 5
-failure_ratio: 10.
+max_loops_before_training: 50
+failure_ratio: 3.
 
-loop_count: 100
-in_loop_training_steps: 100
+loop_count: 500
+in_loop_training_steps: 10
 
 TD7:
-  batch_size: 2500
+  batch_size: 10000
   buffer_size: 1e6
   discount: 0.99
   target_update_rate: 250
-  exploration_noise: 0.05
+  exploration_noise: 0.2
   value_clip: [0., 1.]
   
   # TD3
-  target_policy_noise: 0.2
+  target_policy_noise: 0.05
   noise_clip: 0.1
   policy_freq: 2
   
@@ -38,24 +38,23 @@ TD7:
   reset_weight: 0.9
   
   # Encoder Model
-  zs_dim: 128
+  zs_dim: 256
   enc_hdim: 128
   encoder_lr: 1e-3
   
   # Critic Model
-  critic_hdim: 128
+  critic_hdim: 256
   critic_lr: 1e-3
   
   # Actor Model
-  actor_hdim: 128
+  actor_hdim: 256
   actor_lr: 1e-3
 
 RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [0]
-  max_expansions_per_tree: 2500
+  max_expansions_per_tree: 250
   max_configs: -1
   
   # StaGE params
@@ -67,25 +66,17 @@ RRT:
   target_min_dist: 1000000.
 
   # MPC actions
-  tau_action: 0.1
-  stepsize: 0.1
+  tau_action: 0.05
+  stepsize: 0.05
 
   # Distance measurements
-  q: [0, 3]
-  q_dot: [0, 3]
+  q: [0,3]
+  q_dot: [0,3]
   q_obj_dot: 3
-  P: [
-    "l_fing", "obj",
-  ]
-  G: [
-    "obj",
-  ]
+  P: ["obj"]
+  G: ["obj"]
 
-  obs_pos_scale: 1.0
-  obs_vel_scale: 0.1
-  obs_ref_err_scale: 10.0
-
-  q_weight: 0.25
+  q_weight: 0.2
 
   sim_interface:
     parallel_sims: 10
