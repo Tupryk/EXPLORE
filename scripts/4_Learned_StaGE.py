@@ -229,7 +229,7 @@ def main(cfg: DictConfig):
         print(f"Growing tree {i+1}/{loop_count}...")
         S.start_ids = [np.random.randint(0, S.manifold_size)]
         
-        if i < max_loops_before_training and not buffer_full:
+        if not allow_training:
             tree = S.run()
         
         else:
