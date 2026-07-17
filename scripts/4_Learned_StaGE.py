@@ -193,7 +193,7 @@ def main(cfg: DictConfig):
                 dones.reshape(-1, 1)
             )
             buffer_full = len(RL_agent.replay_buffer) >= RL_agent.replay_buffer.max_size
-            print(f"Buffer size: {len(RL_agent.replay_buffer)}")
+            print(f"Buffer size: {len(RL_agent.replay_buffer)} (added {len(states)})")
         
         else:
             print("WARNING: No connections found!")
