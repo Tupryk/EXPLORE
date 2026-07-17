@@ -29,7 +29,7 @@ TD7:
   min_priority: 1
   
   # TD3+BC
-  lmbda: 0.1
+  lmbda: 0.01
   
   # Checkpointing
   max_eps_when_checkpointing: 20
@@ -80,7 +80,7 @@ RRT:
 
   sim_interface:
     parallel_sims: 10
-    xml_path: "configs/mujoco_/doubleSphere.xml"
+    xml_path: "configs/mujoco_/fingerRamp.xml"
     tau_sim: 0.005
     verbose: 1
 
@@ -88,4 +88,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/double_sphere.h5"
+configs_path: "configs/stable/finger_ramp_big.h5"

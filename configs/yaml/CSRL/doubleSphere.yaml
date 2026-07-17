@@ -24,7 +24,7 @@ TD7:
   min_priority: 1
   
   # TD3+BC
-  lmbda: 0.01
+  lmbda: 0.1
   
   # Checkpointing
   max_eps_when_checkpointing: 20

@@ -127,8 +127,17 @@ def tree_to_buffer(
             assert chosen_node.parent != -1
             chosen_node_parent = tree[chosen_node.parent]
             
-            random_target_id = np.random.randint(0, S.manifold_size)
-            random_target = S.all_G_star[random_target_id]
+            found = False
+            for i in range(10):
+                random_target_id = np.random.randint(0, S.manifold_size)
+                random_target = S.all_G_star[random_target_id]
+
+                dist = np.linalg.norm(random_target - chosen_node.geom_xpos[S.G, :].reshape(-1))
+                if dist > S.min_cost:
+                    found = True
+                    break
+            
+            if not found: continue
             
             obs = node_obs_state(chosen_node, random_target, S)
             obs_parent = node_obs_state(chosen_node_parent, random_target, S)
@@ -215,7 +224,7 @@ def get_eval_env(cfg: DictConfig) -> StableConfigsEnv:
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="humanoidBox"
+    config_name="doubleSphere"
 )
 def main(cfg: DictConfig):
 
