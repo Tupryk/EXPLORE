@@ -194,7 +194,7 @@ def get_eval_env(cfg: DictConfig) -> StableConfigsEnv:
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="ramp"
+    config_name="humanoid"
 )
 def main(cfg: DictConfig):
 
@@ -227,7 +227,7 @@ def main(cfg: DictConfig):
     for i in tqdm(range(loop_count), total=loop_count):
         
         # Generate a new tree with the policy
-        print(f"Growing tree {i+1}/{loop_count}...")
+        print(f"Growing tree {i+1}/{loop_count} (Using policy: {allow_training})...")
         S.start_ids = [np.random.randint(0, S.manifold_size)]
         
         if not allow_training:

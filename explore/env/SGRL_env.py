@@ -210,7 +210,9 @@ class StableConfigsEnv(gym.Env):
             reset_idx
         )
 
-        self.max_steps = np.clip(self.schedule_alpha, 0.1, 1.0) * self.max_steps_default
+        self.max_steps = np.clip(self.schedule_alpha, 0.1, 1.0) if self.use_csrl else 1.0
+        self.max_steps *= self.max_steps_default
+        
         if self.object_diffusion:
             stds = np.array([2., 2., .3, 1., 1., 1., 1.])
             offsets = np.array([0., 0., 1., 0., 0., 0., 0.])
