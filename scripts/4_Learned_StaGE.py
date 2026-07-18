@@ -5,8 +5,7 @@ import hydra
 import imageio
 import numpy as np
 from tqdm import tqdm
-from omegaconf import open_dict
-from omegaconf import DictConfig
+from omegaconf import DictConfig, open_dict
 
 from explore.models.TD7 import TD7
 from sklearn.neighbors import KDTree
@@ -20,7 +19,6 @@ def get_tree_successful_nodes(
     min_cost: float
     ) -> tuple[list, list]:
     
-    print("Analyzing tree...")
     phis = [node.goal_phi for node in tree]
     sds_tree = KDTree(phis)
     
@@ -104,7 +102,7 @@ def tree_to_buffer(
             rewards.append(1. if is_last_edge else 0.)
             dones.append(1. if is_last_edge else 0.)
 
-    print("First pass through (successes + hindsight relabeling)...")
+    # First pass through (successes + hindsight relabeling)
     for i, node_id in enumerate(end_nodes):
         path, ids = build_path(tree, node_id)
         success_nodes.extend(ids)
@@ -114,7 +112,7 @@ def tree_to_buffer(
     success_size = len(states)
     success_nodes = set(success_nodes)  # O(1) membership checks below
 
-    print("Second pass through (uniform hard-negative sampling)...")
+    # Second pass through (uniform hard-negative sampling)
     non_success_ids = [i for i in range(len(tree)) if i not in success_nodes]
     n_neg = min(len(non_success_ids), int(success_size * failure_ratio))
 
@@ -270,7 +268,7 @@ def main(cfg: DictConfig):
         end_nodes, reached_targets = get_tree_successful_nodes(tree, S.all_G_star, S.min_cost)
         print(f"Connection ratio for loop {i+1}/{loop_count}: {(len(reached_targets)/len(S.all_G_star) * 100.):.2f}%")
     
-        print(f"Loading tree into buffer {i+1}/{loop_count}...")
+        # Loading tree into buffer
         states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S, cfg.failure_ratio)
         
         if len(states) != 0:
@@ -293,7 +291,6 @@ def main(cfg: DictConfig):
         # Train TD7
         if allow_training:
 
-            print(f"Training {i+1}/{loop_count}...")
             for _ in range(in_loop_training_steps):
                 RL_agent.train()
             

@@ -1,14 +1,14 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-eval_freq: 100
+eval_freq: 400
 eval_count: 10
 
 agent_sampled_actions: 10
-max_loops_before_training: 200
+max_loops_before_training: 250
 failure_ratio: 3.
 
-loop_count: 1000
+loop_count: 2500
 in_loop_training_steps: 10
 
 TD7:
@@ -38,7 +38,7 @@ TD7:
   
   # Encoder Model
   zs_dim: 256
-  enc_hdim: 128
+  enc_hdim: 256
   encoder_lr: 1e-3
   
   # Critic Model
@@ -54,7 +54,7 @@ RRT:
   log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 250
+  max_expansions_per_tree: 50
   max_configs: -1
   
   # StaGE params
@@ -62,8 +62,6 @@ RRT:
 
   # Distance threshholds
   min_cost: 0.01
-  path_diff_thresh: 0.05
-  target_min_dist: 1000000.
 
   # MPC actions
   tau_action: 0.05

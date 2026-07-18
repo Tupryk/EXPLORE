@@ -11,12 +11,10 @@ RRT:
 
   # Distance threshholds
   min_cost: 0.01
-  path_diff_thresh: 0.05
-  target_min_dist: 1000000.
 
   # MPC actions
   tau_action: 0.1
-  stepsize: 0.1
+  stepsize: 0.075
 
   # Distance measurements
   q: [0, 3]
