@@ -4,15 +4,15 @@ device: "cpu"
 eval_freq: 500
 eval_count: 10
 
-agent_sampled_actions: 25
+agent_sampled_actions: 50
 max_loops_before_training: 1000
 failure_ratio: 3.
 
 loop_count: 5000
-in_loop_training_steps: 10
+in_loop_training_steps: 25
 
 TD7:
-  batch_size: 10000
+  batch_size: 20000
   buffer_size: 4e6
   discount: 0.99
   target_update_rate: 250
