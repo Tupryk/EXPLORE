@@ -78,7 +78,7 @@ RRT:
   obs_vel_scale: 0.05
   obs_ref_err_scale: 20.0
 
-  q_weight: 0.2
+  q_weight: 0.
 
   sim_interface:
     parallel_sims: 10
