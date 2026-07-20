@@ -236,4 +236,3 @@ class MjSim:
         frames = [self.render_state(qpos) for qpos in qpos_snapshots]
 
         return frames
-    

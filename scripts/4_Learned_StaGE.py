@@ -114,6 +114,9 @@ def tree_to_buffer(
 
     # Second pass through (uniform hard-negative sampling)
     non_success_ids = [i for i in range(len(tree)) if i not in success_nodes]
+
+    # non_success_ids.extend(end_nodes)  # Avoid bias towards a certain region
+    
     n_neg = min(len(non_success_ids), int(success_size * failure_ratio))
 
     if n_neg > 0:
@@ -122,11 +125,11 @@ def tree_to_buffer(
         for i in chosen:
             
             chosen_node = tree[i]
-            assert chosen_node.parent != -1
+            if chosen_node.parent == -1: continue
             chosen_node_parent = tree[chosen_node.parent]
             
             found = False
-            for i in range(10):
+            for i in range(50):  # TODO: Make this less ackward maybe?
                 random_target_id = np.random.randint(0, S.manifold_size)
                 random_target = S.all_G_star[random_target_id]
 

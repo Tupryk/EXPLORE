@@ -169,4 +169,3 @@ class MjSim:
                 self.next_frame_time += self.frame_dt
             
         return frames
-            

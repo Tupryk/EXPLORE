@@ -1,15 +1,15 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-eval_freq: 400
+eval_freq: 500
 eval_count: 10
 
 agent_sampled_actions: 10
-max_loops_before_training: 250
+max_loops_before_training: 500
 failure_ratio: 3.
 
 loop_count: 2500
-in_loop_training_steps: 10
+in_loop_training_steps: 25
 
 TD7:
   batch_size: 10000
@@ -29,7 +29,7 @@ TD7:
   min_priority: 1
   
   # TD3+BC
-  lmbda: 0.01
+  lmbda: 0.1
   
   # Checkpointing
   max_eps_when_checkpointing: 20
@@ -54,7 +54,7 @@ RRT:
   log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 50
+  max_expansions_per_tree: 250
   max_configs: -1
   
   # StaGE params
@@ -78,7 +78,7 @@ RRT:
 
   sim_interface:
     parallel_sims: 10
-    xml_path: "configs/mujoco_/fingerRamp.xml"
+    xml_path: "configs/mujoco_/doubleSphere.xml"
     tau_sim: 0.005
     verbose: 1
 
@@ -86,4 +86,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/finger_ramp_big.h5"
+configs_path: "configs/stable/double_sphere.h5"
