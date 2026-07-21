@@ -56,6 +56,9 @@ class StableConfigsEnv(gym.Env):
             self.schedule_alpha = self.schedule_alpha_step
             self.schedule_buffer = 0
         
+        else:
+            self.schedule_alpha = 1.
+        
         self.expand_manifold = cfg.get("expand_manifold", False)
         self.max_manifold = int(cfg.get("max_manifold", 1e6))
         self.manifold_idx = 0

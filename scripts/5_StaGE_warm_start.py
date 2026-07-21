@@ -246,7 +246,7 @@ def get_env(cfg: DictConfig) -> StableConfigsEnv:
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="humanoidBox"
+    config_name="doubleSphere"
 )
 def main(cfg: DictConfig):
 
@@ -269,7 +269,7 @@ def main(cfg: DictConfig):
     
     # Main loop
     pbar = tqdm(total=int(cfg.min_buffer_size), desc="Filling replay buffer")
-    i = 0
+    total_trees = 0
     while True:
         # Generate a new tree with the policy
         S.start_ids = [np.random.randint(0, S.manifold_size)]
@@ -293,18 +293,23 @@ def main(cfg: DictConfig):
                 dones.reshape(-1, 1)
             )
         else:
-            tqdm.write(f"WARNING: No connections found in loop {i+1}!")
+            tqdm.write(f"WARNING: No connections found in loop {total_trees+1}!")
 
-        pbar.set_postfix({"conn%": f"{connection_ratio:.2f}", "loop": i + 1})
+        pbar.set_postfix({"conn%": f"{connection_ratio:.2f}", "loop": total_trees + 1})
         pbar.n = min(len(RL_agent.replay_buffer), cfg.min_buffer_size)
         pbar.refresh()
 
+        total_trees += 1
         if len(RL_agent.replay_buffer) >= cfg.min_buffer_size:
             break
 
-        i += 1
-
     pbar.close()
+    print("Total trees: ", total_trees)
+
+    print("Warm-starting policy...")
+    warm_start_timesteps = int(cfg.min_buffer_size / cfg.TD7.batch_size) * 100
+    for _ in tqdm(range(warm_start_timesteps)):
+        RL_agent.train()
 
     env = get_env(cfg)
     states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
@@ -312,7 +317,7 @@ def main(cfg: DictConfig):
     ep_total_reward = np.zeros(env.sim_count)
     ep_timesteps = np.zeros(env.sim_count, dtype=int)
 
-    mean_reward_every = 1000
+    mean_reward_every = 100
     rewards_count = 0
     success_sum = 0.
     reward_sum = 0.
@@ -387,7 +392,7 @@ def main(cfg: DictConfig):
             ep_timesteps[dones_for_reset] = 0
         
         if (t+1) % 25000 == 0:
-            eval_policy(RL_agent, eval_env, pseudo_timesteps, i, cfg.eval_count, eval_dir)
+            eval_policy(RL_agent, eval_env, t, i, cfg.eval_count, eval_dir)
         
     RL_agent.save_checkpoint(path="checkpoints", tag=f"learned_stage")
     
