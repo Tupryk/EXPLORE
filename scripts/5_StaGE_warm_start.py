@@ -130,6 +130,7 @@ def tree_to_buffer(
             if chosen_node.parent == -1: continue
             chosen_node_parent = tree[chosen_node.parent]
             chosen_node_G = chosen_node.geom_xpos[S.G, :].reshape(-1)
+            chosen_node_parent_G = chosen_node_parent.geom_xpos[S.G, :].reshape(-1)
             
             found = False
             for i in range(50):  # TODO: Make this less ackward maybe?
@@ -137,7 +138,8 @@ def tree_to_buffer(
                 random_target = S.all_G_star[random_target_id]
 
                 dist = np.linalg.norm(random_target - chosen_node_G)
-                if dist > S.min_cost:
+                dist_parent = np.linalg.norm(random_target - chosen_node_parent_G)
+                if dist > S.min_cost and dist_parent > S.min_cost:
                     found = True
                     break
             
@@ -246,7 +248,7 @@ def get_env(cfg: DictConfig) -> StableConfigsEnv:
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="doubleSphere"
+    config_name="humanoidBox"
 )
 def main(cfg: DictConfig):
 
