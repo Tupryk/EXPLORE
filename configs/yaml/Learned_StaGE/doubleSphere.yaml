@@ -8,7 +8,7 @@ agent_sampled_actions: 10
 max_loops_before_training: 100
 failure_ratio: 3.
 
-loop_count: 2500
+loop_count: 3000
 in_loop_training_steps: 25
 
 TD7:
