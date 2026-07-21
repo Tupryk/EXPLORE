@@ -5,7 +5,7 @@ eval_freq: 1000
 eval_count: 10
 
 agent_sampled_actions: 50
-max_loops_before_training: 25
+max_loops_before_training: 100
 failure_ratio: 3.
 
 loop_count: 10000
