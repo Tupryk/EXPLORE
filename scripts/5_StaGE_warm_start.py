@@ -225,10 +225,28 @@ def get_eval_env(cfg: DictConfig) -> StableConfigsEnv:
     return eval_env
 
 
+def get_env(cfg: DictConfig) -> StableConfigsEnv:
+
+    env_cfg = copy.deepcopy(cfg.RRT)
+    env_cfg.verbose = 0
+    env_cfg.sim_interface.parallel_sims = 80
+
+    with open_dict(env_cfg):
+        env_cfg.use_csrl = False
+        env_cfg.schedule_alpha_end_step = 100000
+        env_cfg.schedule_alpha_block = 5000
+    
+        env_cfg.max_steps = 64
+        env_cfg.stable_configs_path = cfg.configs_path
+
+    eval_env = StableConfigsEnv(env_cfg)
+    return eval_env
+
+
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="doubleSphere"
+    config_name="humanoidBox"
 )
 def main(cfg: DictConfig):
 
@@ -251,32 +269,24 @@ def main(cfg: DictConfig):
     
     # Main loop
     loop_count = cfg.loop_count
-    in_loop_training_steps = cfg.in_loop_training_steps
-    agent_sampled_actions = cfg.agent_sampled_actions
-    max_loops_before_training = cfg.max_loops_before_training
     pseudo_timesteps = 0
     
-    buffer_full = False
-    allow_training = False
-    for i in tqdm(range(loop_count), total=loop_count):
-        
+    pbar = tqdm(total=loop_count, desc="Growing trees")
+    i = 0
+    while True:
         # Generate a new tree with the policy
-        print(f"Growing tree {i+1}/{loop_count} (Using policy: {allow_training})...")
         S.start_ids = [np.random.randint(0, S.manifold_size)]
-        
-        if not allow_training:
-            tree = S.run()
-        
-        else:
-            tree = S.run(lambda node, G_star: sample_agent_actions(RL_agent, agent_sampled_actions, node, G_star, S))
-        
+        tree = S.run()
+
         # Load tree into buffer
         end_nodes, reached_targets = get_tree_successful_nodes(tree, S.all_G_star, S.min_cost)
-        print(f"Connection ratio for loop {i+1}/{loop_count}: {(len(reached_targets)/len(S.all_G_star) * 100.):.2f}%")
-    
+        connection_ratio = len(reached_targets) / len(S.all_G_star) * 100.
+
         # Loading tree into buffer
-        states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S, cfg.failure_ratio)
-        
+        states, actions, next_states, rewards, dones = tree_to_buffer(
+            tree, end_nodes, reached_targets, S, cfg.failure_ratio
+        )
+
         if len(states) != 0:
             RL_agent.replay_buffer.add_multiple(
                 states,
@@ -285,27 +295,109 @@ def main(cfg: DictConfig):
                 rewards.reshape(-1, 1),
                 dones.reshape(-1, 1)
             )
-            buffer_full = len(RL_agent.replay_buffer) >= RL_agent.replay_buffer.max_size
-            print(f"Buffer size: {len(RL_agent.replay_buffer)} (added {len(states)})")
             pseudo_timesteps += len(states)
-        
         else:
-            print(f"WARNING: No connections found!")
-        
-        allow_training = i >= max_loops_before_training-1 or buffer_full
-        
-        # Train TD7
-        if allow_training:
+            tqdm.write(f"WARNING: No connections found in loop {i+1}!")
 
-            for _ in range(in_loop_training_steps):
-                RL_agent.train()
-            
-            if (i+1) % cfg.eval_freq == 0:
-                RL_agent.save_checkpoint(path=eval_dir, tag=f"policy_{i+1}")
-                eval_policy(RL_agent, eval_env, pseudo_timesteps, i, cfg.eval_count, eval_dir)
+        pbar.set_postfix({
+            "conn%": f"{connection_ratio:.2f}",
+            "buffer": len(RL_agent.replay_buffer),
+            "added": len(states),
+        })
+        pbar.update(1)
 
+        if len(RL_agent.replay_buffer) >= cfg.min_buffer_size:
+            break
+
+        i += 1
+
+    pbar.close()
+
+    env = get_env(cfg)
+    states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
+    ep_total_success = np.zeros(env.sim_count)
+    ep_total_reward = np.zeros(env.sim_count)
+    ep_timesteps = np.zeros(env.sim_count, dtype=int)
+
+    mean_reward_every = 1000
+    rewards_count = 0
+    success_sum = 0.
+    reward_sum = 0.
+    success_timesteps_sum = 0
+    success_timesteps_count = 0
+    fail_timesteps_sum = 0
+    fail_timesteps_count = 0
+
+    total_training_steps = int(cfg.total_training_steps)
+    for t in tqdm(range(total_training_steps), total=total_training_steps):
+        
+        actions = RL_agent.select_action(np.array(states))
+
+        next_states, rewards, terminated, truncated, info = env.step(actions)
+
+        ep_total_success += info["goal_reached"]
+        ep_total_reward += rewards
+        ep_timesteps += 1
+
+        dones_for_buffer = terminated
+        dones_for_reset = np.logical_or(terminated, truncated)
+
+        RL_agent.replay_buffer.add_multiple(
+            states,
+            actions,
+            next_states,
+            rewards.reshape(-1, 1),
+            dones_for_buffer.astype(float).reshape(-1, 1)
+        )
+        states, _ = env.reset(done=dones_for_reset)
+        states[~dones_for_reset] = next_states[~dones_for_reset]
+
+        RL_agent.train()
+
+        if dones_for_reset.any():
+            for i in np.where(dones_for_reset)[0]:
+                success_sum += ep_total_success[i]
+                reward_sum += ep_total_reward[i]
+                rewards_count += 1
+                
+                if ep_total_success[i]:
+                    success_timesteps_sum += ep_timesteps[i]
+                    success_timesteps_count += 1
+                else:
+                    fail_timesteps_sum += ep_timesteps[i]
+                    fail_timesteps_count += 1
+                
+                if rewards_count % mean_reward_every == 0:
+                    avg_success_t = (success_timesteps_sum / success_timesteps_count) if success_timesteps_count > 0 else float('nan')
+                    avg_fail_t = (fail_timesteps_sum / fail_timesteps_count) if fail_timesteps_count > 0 else float('nan')
+                    
+                    avg_success_rate = success_sum / mean_reward_every
+
+                    print(f"Avg. success rate: {avg_success_rate:.3f}")
+                    print(f"Avg. reward: {(reward_sum / mean_reward_every):.3f}")
+                    print(f"Avg. success T: {avg_success_t:.1f}")
+                    print(f"Avg. fail T: {avg_fail_t:.1f}")
+                    print(f"Episodes: {rewards_count}")
+                    print(f"Alpha: {env.schedule_alpha:.3f}")
+
+                    success_sum = 0
+                    reward_sum = 0
+
+                    success_timesteps_sum = 0
+                    success_timesteps_count = 0
+                    
+                    fail_timesteps_sum = 0
+                    fail_timesteps_count = 0
+
+            ep_total_success[dones_for_reset] = 0
+            ep_total_reward[dones_for_reset] = 0
+            ep_timesteps[dones_for_reset] = 0
+        
+        if (t+1) % 25000 == 0:
+            eval_policy(RL_agent, eval_env, pseudo_timesteps, i, cfg.eval_count, eval_dir)
+        
     RL_agent.save_checkpoint(path="checkpoints", tag=f"learned_stage")
-        
+    
 
 if __name__ == "__main__":
     main()

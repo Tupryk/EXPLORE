@@ -6,9 +6,11 @@ eval_count: 10
 
 agent_sampled_actions: 10
 max_loops_before_training: 100
+min_buffer_size: 50000
 failure_ratio: 3.
 
 loop_count: 3000
+total_training_steps: 75000
 in_loop_training_steps: 25
 
 TD7:
@@ -33,7 +35,7 @@ TD7:
   
   # Checkpointing
   max_eps_when_checkpointing: 20
-  steps_before_checkpointing: 75e4 
+  steps_before_checkpointing: 75e4
   reset_weight: 0.9
   
   # Encoder Model
@@ -65,7 +67,7 @@ RRT:
 
   # MPC actions
   tau_action: 0.05
-  stepsize: 0.025
+  stepsize: 0.04
 
   # Distance measurements
   q: [0,3]
