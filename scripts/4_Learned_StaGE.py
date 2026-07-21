@@ -40,7 +40,9 @@ def get_tree_successful_nodes(
 def node_obs_state(node: StaGE_Node, G_star: np.ndarray, S: StaGE):
     q = node.qpos[S.q[0]:S.q[1]]
     q_dot = node.qvel[S.q_dot[0]:S.q_dot[1]]
-    q_obj_dot = node.qvel[S.q_obj_dot:S.q_obj_dot+6]
+    q_obj_dot = np.concatenate([
+        node.qvel[i:i+6] for i in S.q_obj_dot
+    ])
     r = node.ctrl
     P = node.geom_xpos[S.P, :].reshape(-1)
     G = node.geom_xpos[S.G, :].reshape(-1)
@@ -225,7 +227,7 @@ def get_eval_env(cfg: DictConfig) -> StableConfigsEnv:
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="doubleSphere"
+    config_name="humanoidBox"
 )
 def main(cfg: DictConfig):
 

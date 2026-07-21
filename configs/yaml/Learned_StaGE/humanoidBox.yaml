@@ -5,7 +5,7 @@ eval_freq: 1000
 eval_count: 10
 
 agent_sampled_actions: 50
-max_loops_before_training: 250
+max_loops_before_training: 25
 failure_ratio: 3.
 
 loop_count: 10000
@@ -54,7 +54,7 @@ RRT:
   log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 1000
+  max_expansions_per_tree: 500
   max_configs: -1
   
   # StaGE params
@@ -70,7 +70,7 @@ RRT:
   # Distance measurements
   q: [7,36]
   q_dot: [6,35]
-  q_obj_dot: 35
+  q_obj_dot: [0, 35]
   P: [
     "pelvis",
     "left_ankle_roll_joint", "right_ankle_roll_joint",

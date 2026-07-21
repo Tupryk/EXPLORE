@@ -61,7 +61,7 @@ env:
 
   q: [7, 19]
   q_dot: [6, 18]
-  q_obj_dot: 0
+  q_obj_dot: [0]
   P: [
     "FL", "FR", "RL", "RR",
   ]

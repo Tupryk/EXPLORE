@@ -61,7 +61,7 @@ env:
 
   q: [7,36]
   q_dot: [6,35]
-  q_obj_dot: 0
+  q_obj_dot: [0]
   P: [
     "pelvis",
     "left_ankle_roll_joint", "right_ankle_roll_joint",

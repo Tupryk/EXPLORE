@@ -60,7 +60,7 @@ env:
 
   q: [0,3]
   q_dot: [0,3]
-  q_obj_dot: 3
+  q_obj_dot: [3]
   P: ["obj"]
   G: ["obj"]
 

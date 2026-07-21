@@ -138,7 +138,9 @@ class StableConfigsEnv(gym.Env):
 
         q = self.sim.numpy_dict["qpos"][:, self.q[0]:self.q[1]]
         q_dot = self.sim.numpy_dict["qvel"][:, self.q_dot[0]:self.q_dot[1]]
-        q_obj_dot = self.sim.numpy_dict["qvel"][:, self.q_obj_dot:self.q_obj_dot+6]
+        q_obj_dot = np.concatenate([
+            self.sim.numpy_dict["qvel"][:, i:i+6] for i in self.q_obj_dot
+        ], axis=1)
         r = self.sim.numpy_dict["ctrl"]
         P = self.sim.numpy_dict["geom_xpos"][:, self.P, :].reshape(self.sim.nworld, -1)
         G = self.sim.numpy_dict["geom_xpos"][:, self.G, :].reshape(self.sim.nworld, -1)
