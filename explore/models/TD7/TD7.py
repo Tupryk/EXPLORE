@@ -174,6 +174,8 @@ class Agent(object):
 
         self.replay_buffer = buffer.LAP(state_dim, action_dim, self.device, hp.buffer_size, hp.batch_size, 
             max_action, normalize_actions=True, prioritized=True)
+        self.stage_replay_buffer = buffer.LAP(state_dim, action_dim, self.device, hp.buffer_size, hp.batch_size, 
+            max_action, normalize_actions=True, prioritized=True)
 
         self.max_action = max_action
         self.offline = offline
@@ -214,7 +216,21 @@ class Agent(object):
     def train(self, writer=None):
         self.training_steps += 1
 
-        state, action, next_state, reward, not_done = self.replay_buffer.sample()
+        have_main = len(self.replay_buffer)
+        have_stage = len(self.stage_replay_buffer)
+
+        if have_main:
+            state, action, next_state, reward, not_done = self.replay_buffer.sample()
+        if have_stage:
+            s2, a2, ns2, r2, nd2 = self.stage_replay_buffer.sample()
+            if have_main:
+                state = torch.cat([state, s2], dim=0)
+                action = torch.cat([action, a2], dim=0)
+                next_state = torch.cat([next_state, ns2], dim=0)
+                reward = torch.cat([reward, r2], dim=0)
+                not_done = torch.cat([not_done, nd2], dim=0)
+            else:
+                state, action, next_state, reward, not_done = s2, a2, ns2, r2, nd2
 
         #########################
         # Update Encoder

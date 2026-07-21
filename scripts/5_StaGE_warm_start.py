@@ -2,6 +2,7 @@ import os
 import h5py
 import copy
 import hydra
+import pickle
 import imageio
 import numpy as np
 from tqdm import tqdm
@@ -234,7 +235,7 @@ def get_env(cfg: DictConfig) -> StableConfigsEnv:
     env_cfg.sim_interface.parallel_sims = 80
 
     with open_dict(env_cfg):
-        env_cfg.use_csrl = False
+        env_cfg.use_csrl = True
         env_cfg.schedule_alpha_end_step = 100000
         env_cfg.schedule_alpha_block = 5000
     
@@ -248,7 +249,7 @@ def get_env(cfg: DictConfig) -> StableConfigsEnv:
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="humanoidBox"
+    config_name="doubleSphere"
 )
 def main(cfg: DictConfig):
 
@@ -304,6 +305,10 @@ def main(cfg: DictConfig):
         total_trees += 1
         if len(RL_agent.replay_buffer) >= cfg.min_buffer_size:
             break
+
+    stage_buffer_path = os.path.join(cfg.output_dir, f"stage_buffer.pkl")
+    with open(stage_buffer_path, "wb") as f:
+        pickle.dump(RL_agent.replay_buffer, f)
 
     pbar.close()
     print("Total trees: ", total_trees)
