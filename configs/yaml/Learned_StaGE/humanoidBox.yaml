@@ -1,26 +1,26 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-eval_freq: 500
+eval_freq: 1000
 eval_count: 10
 
 agent_sampled_actions: 50
-max_loops_before_training: 1000
+max_loops_before_training: 250
 failure_ratio: 3.
 
 loop_count: 5000
 in_loop_training_steps: 25
 
 TD7:
-  batch_size: 20000
+  batch_size: 10000
   buffer_size: 4e6
-  discount: 0.99
+  discount: 0.95
   target_update_rate: 250
   exploration_noise: 0.2
   value_clip: [0., 1.]
   
   # TD3
-  target_policy_noise: 0.15
+  target_policy_noise: 0.05
   noise_clip: 0.1
   policy_freq: 2
   
@@ -42,11 +42,11 @@ TD7:
   encoder_lr: 1e-3
   
   # Critic Model
-  critic_hdim: 512
+  critic_hdim: 256
   critic_lr: 1e-3
   
   # Actor Model
-  actor_hdim: 512
+  actor_hdim: 256
   actor_lr: 1e-3
 
 RRT:

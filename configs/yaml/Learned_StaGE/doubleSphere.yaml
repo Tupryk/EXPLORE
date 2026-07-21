@@ -5,7 +5,7 @@ eval_freq: 500
 eval_count: 10
 
 agent_sampled_actions: 10
-max_loops_before_training: 500
+max_loops_before_training: 100
 failure_ratio: 3.
 
 loop_count: 2500
@@ -14,7 +14,7 @@ in_loop_training_steps: 25
 TD7:
   batch_size: 10000
   buffer_size: 1e6
-  discount: 0.99
+  discount: 0.95
   target_update_rate: 250
   exploration_noise: 0.15
   value_clip: [0., 1.]
@@ -65,7 +65,7 @@ RRT:
 
   # MPC actions
   tau_action: 0.05
-  stepsize: 0.05
+  stepsize: 0.025
 
   # Distance measurements
   q: [0,3]
