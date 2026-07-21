@@ -56,7 +56,7 @@ RRT:
   log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 500
+  max_expansions_per_tree: 1000
   max_configs: -1
   
   # StaGE params

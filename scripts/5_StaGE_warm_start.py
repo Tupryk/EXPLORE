@@ -268,10 +268,7 @@ def main(cfg: DictConfig):
     RL_agent = TD7.Agent(obs.shape[0], S.ctrl_dim, 1., hp=cfg.TD7)
     
     # Main loop
-    loop_count = cfg.loop_count
-    pseudo_timesteps = 0
-    
-    pbar = tqdm(total=loop_count, desc="Growing trees")
+    pbar = tqdm(total=int(cfg.min_buffer_size), desc="Filling replay buffer")
     i = 0
     while True:
         # Generate a new tree with the policy
@@ -295,16 +292,12 @@ def main(cfg: DictConfig):
                 rewards.reshape(-1, 1),
                 dones.reshape(-1, 1)
             )
-            pseudo_timesteps += len(states)
         else:
             tqdm.write(f"WARNING: No connections found in loop {i+1}!")
 
-        pbar.set_postfix({
-            "conn%": f"{connection_ratio:.2f}",
-            "buffer": len(RL_agent.replay_buffer),
-            "added": len(states),
-        })
-        pbar.update(1)
+        pbar.set_postfix({"conn%": f"{connection_ratio:.2f}", "loop": i + 1})
+        pbar.n = min(len(RL_agent.replay_buffer), cfg.min_buffer_size)
+        pbar.refresh()
 
         if len(RL_agent.replay_buffer) >= cfg.min_buffer_size:
             break
