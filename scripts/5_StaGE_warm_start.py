@@ -399,7 +399,7 @@ def main(cfg: DictConfig):
             ep_timesteps[dones_for_reset] = 0
         
         if (t+1) % 25000 == 0:
-            eval_policy(RL_agent, eval_env, t+1, t+1, cfg.eval_count, eval_dir)
+            eval_policy(RL_agent, eval_env, t+1, t, cfg.eval_count, eval_dir)
         
     RL_agent.save_checkpoint(path="checkpoints", tag=f"learned_stage")
     
