@@ -2,7 +2,7 @@ rl_method: "TD7"
 verbose: 1
 total_timesteps: 75000
 timesteps_before_training: 5000
-checkpoint_freq: 100000
+checkpoint_freq: 25000
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
