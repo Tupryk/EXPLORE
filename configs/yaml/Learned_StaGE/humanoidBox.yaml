@@ -4,10 +4,10 @@ device: "cpu"
 eval_freq: 1000
 eval_count: 10
 
-agent_sampled_actions: 50
-max_loops_before_training: 100
-min_buffer_size: 1800000
-failure_ratio: 3.
+agent_sampled_actions: 25
+max_loops_before_training: 1000
+min_buffer_size: 3800000
+failure_ratio: 0.5
 
 loop_count: 10000
 total_training_steps: 3e5
