@@ -33,7 +33,7 @@ def main(cfg: DictConfig):
     # Init agent and environment
     tree = S.init_tree(0)
     obs = node_obs_state(tree[0], S.all_G_star[0], S)
-    RL_agent = TD7.Agent(obs.shape[0], S.ctrl_dim, 1., hp=cfg.TD7)
+    RL_agent = TD7.Agent(obs.shape[0], S.ctrl_dim, 1., offline=cfg.TD7.offline_loss, hp=cfg.TD7)
     
     # Main loop
     pbar = tqdm(total=int(cfg.min_buffer_size), desc="Filling replay buffer")

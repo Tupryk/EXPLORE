@@ -101,7 +101,7 @@ def tree_to_buffer(
             rewards.append(1. if is_last_edge else 0.)
             dones.append(1. if is_last_edge else 0.)
 
-    # First pass through (successes + hindsight relabeling)
+    # Successes
     for i, node_id in enumerate(end_nodes):
         path, ids = build_path(tree, node_id)
         success_nodes.extend(ids)
@@ -111,7 +111,7 @@ def tree_to_buffer(
     success_size = len(states)
     success_nodes = set(success_nodes)  # O(1) membership checks below
 
-    # Second pass through (uniform hard-negative sampling)
+    # Failures
     non_success_ids = [i for i in range(len(tree)) if i not in success_nodes]
 
     non_success_ids.extend(end_nodes)  # Avoid bias towards a certain region
@@ -123,35 +123,27 @@ def tree_to_buffer(
 
         for i in chosen:
             
-            chosen_node = tree[i]
-            if chosen_node.parent == -1: continue
-            chosen_node_parent = tree[chosen_node.parent]
-            chosen_node_G = chosen_node.geom_xpos[S.G, :].reshape(-1)
-            chosen_node_parent_G = chosen_node_parent.geom_xpos[S.G, :].reshape(-1)
+            if tree[i].parent == -1: continue
             
-            found = False
-            for i in range(50):  # TODO: Make this less ackward maybe?
-                random_target_id = np.random.randint(0, S.manifold_size)
-                random_target = S.all_G_star[random_target_id]
+            random_target_id = np.random.randint(0, S.manifold_size)
+            random_target = S.all_G_star[random_target_id]
 
-                dist = np.linalg.norm(random_target - chosen_node_G)
-                dist_parent = np.linalg.norm(random_target - chosen_node_parent_G)
-                if dist > S.min_cost and dist_parent > S.min_cost:
-                    found = True
+            path, _ = build_path(tree, i)
+
+            found_goal = False
+
+            for path_node in path:
+                path_node_G = path_node.geom_xpos[S.G, :].reshape(-1)
+                dist = np.linalg.norm(random_target - path_node_G)
+
+                if dist <= S.min_cost:
+                    found_goal = True
                     break
             
-            if not found: continue
+            if found_goal: continue
+
+            add_path(path, random_target, is_success=False)
             
-            obs = node_obs_state(chosen_node, random_target, S)
-            obs_parent = node_obs_state(chosen_node_parent, random_target, S)
-
-            next_states.append(obs)
-            states.append(obs_parent)
-            actions.append((chosen_node.ctrl - chosen_node_parent.ctrl) / S.stepsize)
-
-            rewards.append(0.)
-            dones.append(0.)
-
     return (np.array(states), np.array(actions), np.array(next_states),
             np.array(rewards), np.array(dones))
 

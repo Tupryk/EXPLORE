@@ -6,7 +6,7 @@ eval_count: 10
 
 agent_sampled_actions: 50
 max_loops_before_training: 100
-min_buffer_size: 2e6
+min_buffer_size: 1800000
 failure_ratio: 3.
 
 loop_count: 10000
@@ -31,6 +31,7 @@ TD7:
   min_priority: 1
   
   # TD3+BC
+  offline_loss: True
   lmbda: 0.1
   
   # Checkpointing

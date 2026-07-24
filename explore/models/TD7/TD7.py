@@ -129,6 +129,11 @@ class Critic(nn.Module):
         self.q5 = nn.Linear(hdim, hdim)
         self.q6 = nn.Linear(hdim, 1)
 
+        # Zero-init the output heads so initial Q-values start at 0
+        for layer in (self.q3, self.q6):
+            nn.init.zeros_(layer.weight)
+            nn.init.zeros_(layer.bias)
+
 
     def forward(self, state, action, zsa, zs):
         sa = torch.cat([state, action], 1)

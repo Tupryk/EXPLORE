@@ -1,12 +1,12 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-eval_freq: 500
+eval_freq: 1000
 eval_count: 10
 
 agent_sampled_actions: 10
-max_loops_before_training: 100
-min_buffer_size: 1e6
+max_loops_before_training: 1000
+min_buffer_size: 800000
 failure_ratio: 3.
 
 loop_count: 3000
@@ -31,6 +31,7 @@ TD7:
   min_priority: 1
   
   # TD3+BC
+  offline_loss: True
   lmbda: 0.1
   
   # Checkpointing

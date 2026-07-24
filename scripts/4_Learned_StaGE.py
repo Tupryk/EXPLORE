@@ -32,7 +32,7 @@ def main(cfg: DictConfig):
     # Init agent and environment
     tree = S.init_tree(0)
     obs = node_obs_state(tree[0], S.all_G_star[0], S)
-    RL_agent = TD7.Agent(obs.shape[0], S.ctrl_dim, 1., hp=cfg.TD7)
+    RL_agent = TD7.Agent(obs.shape[0], S.ctrl_dim, 1., offline=cfg.TD7.offline_loss, hp=cfg.TD7)
     
     # Main loop
     loop_count = cfg.loop_count
@@ -46,7 +46,7 @@ def main(cfg: DictConfig):
     for i in tqdm(range(loop_count), total=loop_count):
         
         # Generate a new tree with the policy
-        print(f"Growing tree {i+1}/{loop_count} (Using policy: {allow_training})...")
+        print(f"\nGrowing tree {i+1}/{loop_count} (Using policy: {allow_training})...")
         S.start_ids = [np.random.randint(0, S.manifold_size)]
         
         if not allow_training:
