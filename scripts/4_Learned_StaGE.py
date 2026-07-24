@@ -70,7 +70,7 @@ def main(cfg: DictConfig):
                 rewards.reshape(-1, 1),
                 dones.reshape(-1, 1)
             )
-            buffer_full = len(RL_agent.replay_buffer) >= RL_agent.replay_buffer.max_size
+            buffer_full = len(RL_agent.replay_buffer) >= cfg.min_buffer_size
             print(f"Buffer size: {len(RL_agent.replay_buffer)} (added {len(states)})")
             pseudo_timesteps += len(states)
         
