@@ -39,6 +39,7 @@ def main(cfg: DictConfig):
     in_loop_training_steps = cfg.in_loop_training_steps
     agent_sampled_actions = cfg.agent_sampled_actions
     max_loops_before_training = cfg.max_loops_before_training
+    on_policy = cfg.on_policy
     pseudo_timesteps = 0
     
     buffer_full = False
@@ -46,10 +47,10 @@ def main(cfg: DictConfig):
     for i in tqdm(range(loop_count), total=loop_count):
         
         # Generate a new tree with the policy
-        print(f"\nGrowing tree {i+1}/{loop_count} (Using policy: {allow_training})...")
+        print(f"\nGrowing tree {i+1}/{loop_count} (Using policy: {allow_training and on_policy}; Training: {allow_training})...")
         S.start_ids = [np.random.randint(0, S.manifold_size)]
         
-        if not allow_training:
+        if not allow_training or not on_policy:
             tree = S.run()
         
         else:
