@@ -211,25 +211,34 @@ class MjSim:
 
     def step(self, tau_action: float, ctrl_target: np.ndarray, render: bool = False):
         
-        if ctrl_target.ndim == 1: ctrl_target = ctrl_target.reshape(1, -1)
-        
-        futures = [
-            self.executor.submit(
-                self.step_seq,
+        if ctrl_target.ndim == 1:
+            ctrl_target = ctrl_target.reshape(1, -1)
+
+            self.step_seq(
                 tau_action,
-                ctrl_target[
-                    sim_idx * self.worlds_per_sim
-                    :
-                    (sim_idx + 1) * self.worlds_per_sim
-                ],
-                sim_idx,
+                ctrl_target,
+                0,
                 render
             )
-            for sim_idx in range(self.sim_count)
-        ]
-        qpos_snapshots = []
-        for future in as_completed(futures):
-            qpos_snapshots.extend(future.result())
+        else:
+            
+            futures = [
+                self.executor.submit(
+                    self.step_seq,
+                    tau_action,
+                    ctrl_target[
+                        sim_idx * self.worlds_per_sim
+                        :
+                        (sim_idx + 1) * self.worlds_per_sim
+                    ],
+                    sim_idx,
+                    render
+                )
+                for sim_idx in range(self.sim_count)
+            ]
+            qpos_snapshots = []
+            for future in as_completed(futures):
+                qpos_snapshots.extend(future.result())
 
         # Actual GL rendering happens here, on the main thread that owns the
         # renderer's GL context -- never inside step_seq() / worker threads.

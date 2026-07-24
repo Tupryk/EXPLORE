@@ -13,7 +13,7 @@ loop_count: 10000
 total_training_steps: 3e5
 in_loop_training_steps: 25
 
-on_policy: false
+on_policy: true
 
 TD7:
   batch_size: 10000

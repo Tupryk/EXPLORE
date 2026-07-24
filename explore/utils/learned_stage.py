@@ -116,7 +116,7 @@ def tree_to_buffer(
 
     non_success_ids.extend(end_nodes)  # Avoid bias towards a certain region
     
-    n_neg = min(len(non_success_ids), int(success_size * failure_ratio))
+    n_neg = min(len(non_success_ids), int(success_size * (failure_ratio + 1.0)))
 
     if n_neg > 0:
         chosen = np.random.choice(non_success_ids, size=n_neg, replace=False)
