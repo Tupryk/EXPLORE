@@ -11,7 +11,7 @@ failure_ratio: 0.5
 
 loop_count: 10000
 total_training_steps: 3e5
-in_loop_training_steps: 25
+in_loop_training_steps: 100
 
 on_policy: true
 

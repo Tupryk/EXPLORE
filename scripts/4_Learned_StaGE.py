@@ -14,7 +14,7 @@ from explore.utils.learned_stage import *
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/Learned_StaGE",
-    config_name="doubleSphere"
+    config_name="humanoidBox"
 )
 def main(cfg: DictConfig):
 
