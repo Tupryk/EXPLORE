@@ -81,7 +81,7 @@ RRT:
   obs_vel_scale: 0.05
   obs_ref_err_scale: 20.0
 
-  q_weight: 0.0
+  q_weight: 0.1
 
   sim_interface:
     parallel_sims: 10
@@ -93,4 +93,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/double_sphere.h5"
+configs_path: "configs/stable/double_sphere_clean.h5"
