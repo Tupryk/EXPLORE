@@ -1,13 +1,13 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-eval_freq: 1000
+eval_freq: 500
 eval_count: 10
 
 agent_sampled_actions: 10
 max_loops_before_training: 1000
 min_buffer_size: 800000
-failure_ratio: 1.0
+failure_ratio: 0.0
 
 loop_count: 3000
 total_training_steps: 75000

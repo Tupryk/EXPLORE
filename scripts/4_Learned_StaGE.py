@@ -4,6 +4,7 @@ import hydra
 import numpy as np
 from tqdm import tqdm
 from omegaconf import DictConfig
+from torch.utils.tensorboard import SummaryWriter
 
 from explore.models.TD7 import TD7
 from explore.datasets.StaGE import StaGE
@@ -24,6 +25,11 @@ def main(cfg: DictConfig):
 
     eval_dir = os.path.join(cfg.output_dir, "eval_gifs")
     os.makedirs(eval_dir, exist_ok=True)
+
+    tb_dir = os.path.join(cfg.output_dir, "tb")
+    os.makedirs(tb_dir, exist_ok=True)
+    writer = SummaryWriter(log_dir=tb_dir) if cfg.output_dir else SummaryWriter()
+    print(f"tensorboard --logdir {tb_dir}")
 
     eval_env = get_eval_env(cfg)
 
@@ -58,7 +64,10 @@ def main(cfg: DictConfig):
         
         # Load tree into buffer
         end_nodes, reached_targets = get_tree_successful_nodes(tree, S.all_G_star, S.min_cost)
-        print(f"Connection ratio for loop {i+1}/{loop_count}: {(len(reached_targets)/len(S.all_G_star) * 100.):.2f}%")
+        con_ratio = len(reached_targets) / S.manifold_size
+        print(f"Connection ratio for loop {i+1}/{loop_count}: {(con_ratio * 100.):.2f}%")
+
+        writer.add_scalar("rollout/avg_success_rate", con_ratio, i)
     
         # Loading tree into buffer
         states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S, cfg.failure_ratio)
