@@ -41,11 +41,11 @@ TD7:
   encoder_lr: 1e-3
   
   # Critic Model
-  critic_hdim: 512
+  critic_hdim: 256
   critic_lr: 1e-3
   
   # Actor Model
-  actor_hdim: 512
+  actor_hdim: 256
   actor_lr: 1e-3
 
 env:
@@ -64,7 +64,7 @@ env:
 
   q: [7,36]
   q_dot: [6,35]
-  q_obj_dot: [0]
+  q_obj_dot: [0, 35]
   P: [
     "pelvis",
     "left_ankle_roll_joint", "right_ankle_roll_joint",
@@ -84,7 +84,7 @@ env:
   sim_interface:
     parallel_sims: 80
     xml_path: "configs/mujoco_/unitree_g1/box_scene.xml"
-    tau_sim: 0.005
+    tau_sim: 0.001
     verbose: 1
 
     camera: "fixed_cam"
