@@ -193,6 +193,7 @@ class StableConfigsEnv(gym.Env):
                 self.sg_batch_size = int(min(self.sg_batch_size, 1e6))
             else:
                 self.sg_batch_size *= 2
+                self.sg_batch_size = int(min(self.sg_batch_size, 1e6))
 
             if self.verbose:
                 print(f"Sampling {self.sg_batch_size} new start and goal pairs.")
