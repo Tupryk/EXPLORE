@@ -1,10 +1,13 @@
 rl_method: "TD7"
 verbose: 1
 total_timesteps: 75000
-timesteps_before_training: 10000
-checkpoint_freq: 25000
+timesteps_before_training: 1000
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
+
+checkpoint_freq: 75000
+eval_freq: 25000
+eval_eps: 10
 
 TD7:
   batch_size: 10000
@@ -47,7 +50,7 @@ TD7:
 
 env:
   min_cost: 0.01
-  max_steps: 64
+  max_steps: 24
   sparse_reward: true
   schedule_alpha_end_step: 50000
   schedule_alpha_block: 5000
@@ -74,7 +77,7 @@ env:
   sim_interface:
     parallel_sims: 80
     xml_path: "configs/mujoco_/doubleSphere.xml"
-    tau_sim: 0.005
+    tau_sim: 0.001
     verbose: 1
 
     camera: "fixed_cam"

@@ -12,6 +12,9 @@
         <position forcerange="-150 150" kp="1000" kv="10" ctrlrange="-10 10"/>
         <!-- <position forcerange="-150 150"/> -->
     </default>
+    <default class="geom_fric">
+      <geom friction=".8 0.1 0.1" />
+    </default>
   </default>
 
   <actuator>
@@ -32,25 +35,25 @@
           <inertial pos="0 0 0" mass="0.01" diaginertia="1e-5 1e-5 1e-5" />
           <body name="l_fing">
             <joint name="l_fing" damping="0.1" type="slide" axis="0 0 1" />
-            <geom type="sphere" size="0.05" rgba="0 1 1 1" mass="0.1"/>
+            <geom type="sphere" size="0.05" rgba="0 1 1 1" mass="0.1" class="geom_fric" />
           </body>
         </body>
       </body>
     </body>
     <body name="base">
       <body name="table" pos="0.0 0.0 0.1">
-        <geom type="box" size="0.5 0.5 0.05" />
+        <geom type="box" size="0.5 0.5 0.05" class="geom_fric" />
         <body name="wall" pos="0.45 0.0 0.3">
-          <geom type="box" size="0.05 0.5 0.25" />
+          <geom type="box" size="0.05 0.5 0.25" class="geom_fric" />
         </body>
         <body name="box" pos="-0.05 -0.35 0.25">
-          <geom type="box" size="0.45 0.15 0.2" />
+          <geom type="box" size="0.45 0.15 0.2" class="geom_fric" />
         </body>
       </body>
     </body>
     <body name="obj" pos="0.0 0.0 0.3">
       <freejoint />
-      <geom type="sphere" size="0.1" rgba="1 .5 0 1" mass="0.2"/>
+      <geom type="sphere" size="0.1" rgba="1 .5 0 1" mass="0.2" class="geom_fric" />
     </body>
   </worldbody>
 </mujoco>
