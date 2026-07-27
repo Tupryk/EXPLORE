@@ -50,7 +50,7 @@ TD7:
 
 env:
   min_cost: 0.01
-  max_steps: 24
+  max_steps: 32
   sparse_reward: true
   schedule_alpha_end_step: 50000
   schedule_alpha_block: 5000
@@ -58,7 +58,7 @@ env:
   verbose: 1
 
   tau_action: 0.05
-  stepsize: 0.1
+  stepsize: 0.05
   
   stable_configs_path: "configs/stable/double_sphere_clean.h5"
 
