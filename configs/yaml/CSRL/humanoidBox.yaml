@@ -25,6 +25,7 @@ TD7:
   min_priority: 1
   
   # TD3+BC
+  offline_loss: False
   lmbda: 0.1
   
   # Checkpointing

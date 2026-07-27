@@ -370,7 +370,7 @@ class Agent(object):
     def save_checkpoint(self, path: str = "checkpoints", tag: str = ""):
         os.makedirs(path, exist_ok=True)
         
-        tag = f"_{tag}" if tag else f"_step{self.training_steps}"
+        tag = f"_{tag}" if tag else f"_step{self.training_steps+1}"
         
         torch.save({
             "training_steps": self.training_steps,

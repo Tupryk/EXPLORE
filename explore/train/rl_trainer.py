@@ -50,7 +50,7 @@ class RL_Trainer:
             action_dim = self.env.action_space.shape[0] 
             max_action = float(self.env.action_space.high[0])
             
-            self.model = TD7.Agent(state_dim, action_dim, max_action, hp=cfg.TD7)
+            self.model = TD7.Agent(state_dim, action_dim, max_action, offline=cfg.TD7.offline_loss, hp=cfg.TD7)
 
         else:
             raise Exception(f"RL method '{self.rl_method}' not available.")
