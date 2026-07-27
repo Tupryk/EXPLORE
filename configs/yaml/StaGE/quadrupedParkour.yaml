@@ -43,6 +43,8 @@ RRT:
     nconmax: 75
     ccd_iterations: 100
 
+    joint_vel_ids: [0,18]
+
     camera: "fixed_cam"
     render_w: 640
     render_h: 480

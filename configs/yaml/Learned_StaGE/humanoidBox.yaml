@@ -97,6 +97,8 @@ RRT:
     tau_sim: 0.005
     verbose: 1
 
+    joint_vel_ids: [6,35]
+
     camera: "fixed_cam"
     render_w: 640
     render_h: 480

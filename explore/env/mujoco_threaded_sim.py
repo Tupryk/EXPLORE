@@ -24,6 +24,8 @@ class MjSim:
             print(self.mj_data.qpos)
             explain_qpos(self.mj_model)
 
+        self.joint_vel_ids = cfg.joint_vel_ids
+
         ### PARALLEL SIMS ###
         self.nworld = cfg.parallel_sims
         self.sim_count = cfg.get("sim_count", 10)
@@ -189,11 +191,18 @@ class MjSim:
 
             mujoco.mj_forward(self.mj_model, self.data[sim_idx])
             prev_ctrl = self.data_ctrl[nworld_idx]
+            v0 = self.data[sim_idx].qvel[self.joint_vel_ids[0]:self.joint_vel_ids[1]].copy()
+
+            lmbda = 2 * tau_action
+            action = 2 * (ctrl_target - prev_ctrl)
+
+            accel_coef = (action - 2 * lmbda * v0) / (2 * lmbda**2)
 
             for k in range(steps):
-                perc = (k + 1) / steps
-                interpolated_ctrl = prev_ctrl * (1 - perc) + ctrl_target * perc
-                self.data[sim_idx].ctrl[:] = interpolated_ctrl
+                dt = (k + 1) * self.tau_sim
+                r_t = prev_ctrl + v0 * dt + accel_coef * dt**2
+
+                self.data[sim_idx].ctrl[:] = r_t
                 mujoco.mj_step(self.mj_model, self.data[sim_idx])
 
                 if render and nworld_idx == 0 and self.data[sim_idx].time >= self.next_frame_time:

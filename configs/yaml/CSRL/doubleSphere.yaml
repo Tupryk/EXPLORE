@@ -6,7 +6,7 @@ output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
 checkpoint_freq: 75000
-eval_freq: 25000
+eval_freq: 7500
 eval_eps: 10
 
 TD7:
@@ -79,6 +79,8 @@ env:
     xml_path: "configs/mujoco_/doubleSphere.xml"
     tau_sim: 0.001
     verbose: 1
+
+    joint_vel_ids: [0,3]
 
     camera: "fixed_cam"
     render_w: 640
