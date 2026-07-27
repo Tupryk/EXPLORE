@@ -132,7 +132,9 @@ class StableConfigsEnv(gym.Env):
         self._cost_buf = np.empty(self.sim_count, dtype=np.float32)
         self.d_t = np.zeros((self.sim_count,), dtype=np.float32)
         self.md_t = np.zeros((self.sim_count,), dtype=np.float32)
-        
+
+        self.update_sg_batch = True
+        self.sg_batch_size = 0
         self.render = False
     
     def get_state(self) -> tuple[np.ndarray, dict]:
@@ -159,6 +161,51 @@ class StableConfigsEnv(gym.Env):
         
         return state, self.sim.numpy_dict
 
+    def recompute_start_goal_pairs(self, options: dict={}):
+        self.starts = np.random.randint(0, self.config_count, (self.sg_batch_size,))
+        self.ends = np.random.randint(0, self.config_count, (self.sg_batch_size,))
+
+        if self.use_csrl:
+            new_s_cfg_idx = []
+            for i in range(self.sg_batch_size):
+                if "sample_uniform" in options and not options["sample_uniform"]:
+                    t = self.schedule_alpha
+                else:
+                    t = self.schedule_alpha * (1. - np.random.uniform(0, 1))
+                query = (
+                    self.phi_stable_configs[self.starts[i]] * t +
+                    self.phi_stable_configs[self.ends[i]] * (1. - t)
+                )
+                query = query.reshape(1, -1)
+                
+                if self.expand_manifold:
+                    ind = self.sds.knn_query(query, k=1)
+                else:
+                    _, ind = self.sds.query(query, k=1)
+                new_s_cfg_idx.append(int(ind[0][0]))
+            self.starts = np.array(new_s_cfg_idx, dtype=np.int32)
+
+    def get_starts_goals(self, pair_count: int, options: dict={}) -> tuple[list[int], list[int]]:
+
+        if self.update_sg_batch:
+            if self.sg_batch_size == 0:
+                self.sg_batch_size = self.schedule_alpha_block * self.sim_count / (0.1 * self.max_steps_default)
+                self.sg_batch_size = int(min(self.sg_batch_size, 1e6))
+            else:
+                self.sg_batch_size *= 2
+
+            if self.verbose:
+                print(f"Sampling {self.sg_batch_size} new start and goal pairs.")
+
+            self.recompute_start_goal_pairs(options=options)
+            self.update_sg_batch = False
+
+        ids = np.random.randint(0, self.sg_batch_size, (pair_count,))
+        s_cfg_idx = self.starts[ids]
+        e_cfg_idx = self.ends[ids]
+
+        return s_cfg_idx, e_cfg_idx
+
     def reset(self, done=None, *, seed: int=None, options: dict={}) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
 
@@ -180,28 +227,7 @@ class StableConfigsEnv(gym.Env):
             return state, {}
 
         # Choose start and end configurations
-        s_cfg_idx = np.random.randint(0, self.config_count, (n_reset,))
-        e_cfg_idx = np.random.randint(0, self.config_count, (n_reset,))
-
-        if self.use_csrl:
-            new_s_cfg_idx = []
-            for i in range(n_reset):
-                if "sample_uniform" in options and not options["sample_uniform"]:
-                    t = self.schedule_alpha
-                else:
-                    t = self.schedule_alpha * (1. - np.random.uniform(0, 1))
-                query = (
-                    self.phi_stable_configs[s_cfg_idx[i]] * t +
-                    self.phi_stable_configs[e_cfg_idx[i]] * (1. - t)
-                )
-                query = query.reshape(1, -1)
-                
-                if self.expand_manifold:
-                    ind = self.sds.knn_query(query, k=1)
-                else:
-                    _, ind = self.sds.query(query, k=1)
-                new_s_cfg_idx.append(int(ind[0][0]))
-            s_cfg_idx = new_s_cfg_idx
+        s_cfg_idx, e_cfg_idx = self.get_starts_goals(n_reset, options=options)
 
         info = {"start_config_idx": s_cfg_idx, "end_config_idx": e_cfg_idx, "reset_idx": reset_idx}
         if self.render and not self.object_diffusion:
@@ -326,6 +352,7 @@ class StableConfigsEnv(gym.Env):
             if self.schedule_buffer >= self.schedule_alpha_block:
                 self.schedule_buffer = 0
                 self.schedule_alpha += self.schedule_alpha_step
+                self.update_sg_batch = True
                 if self.schedule_alpha > 1.0:
                     self.schedule_alpha = 1.0
     
