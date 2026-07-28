@@ -60,7 +60,7 @@ env:
   tau_action: 0.05
   stepsize: 0.05
   
-  stable_configs_path: "configs/stable/double_sphere.h5"
+  stable_configs_path: "configs/stable/double_sphere_csrl.h5"
 
   q: [0,3]
   q_dot: [0,3]
