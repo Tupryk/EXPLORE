@@ -187,23 +187,29 @@ class StableConfigsEnv(gym.Env):
 
     def get_starts_goals(self, pair_count: int, options: dict={}) -> tuple[list[int], list[int]]:
 
-        if self.update_sg_batch:
-            if self.sg_batch_size == 0:
-                self.sg_batch_size = self.schedule_alpha_block * self.sim_count / (0.1 * self.max_steps_default)
-                self.sg_batch_size = int(min(self.sg_batch_size, 1e6))
-            else:
-                self.sg_batch_size *= 2
-                self.sg_batch_size = int(min(self.sg_batch_size, 1e6))
+        if self.use_csrl:
 
-            if self.verbose:
-                print(f"Sampling {self.sg_batch_size} new start and goal pairs.")
+            if self.update_sg_batch:
+                if self.sg_batch_size == 0:
+                    self.sg_batch_size = self.schedule_alpha_block * self.sim_count / (0.1 * self.max_steps_default)
+                    self.sg_batch_size = int(min(self.sg_batch_size, 1e6))
+                else:
+                    self.sg_batch_size *= 2
+                    self.sg_batch_size = int(min(self.sg_batch_size, 1e6))
 
-            self.recompute_start_goal_pairs(options=options)
-            self.update_sg_batch = False
+                if self.verbose:
+                    print(f"Sampling {self.sg_batch_size} new start and goal pairs.")
 
-        ids = np.random.randint(0, self.sg_batch_size, (pair_count,))
-        s_cfg_idx = self.starts[ids]
-        e_cfg_idx = self.ends[ids]
+                self.recompute_start_goal_pairs(options=options)
+                self.update_sg_batch = False
+
+            ids = np.random.randint(0, self.sg_batch_size, (pair_count,))
+            s_cfg_idx = self.starts[ids]
+            e_cfg_idx = self.ends[ids]
+
+        else:
+            s_cfg_idx = np.random.randint(0, self.config_count, (pair_count,))
+            e_cfg_idx = np.random.randint(0, self.config_count, (pair_count,))
 
         return s_cfg_idx, e_cfg_idx
 
