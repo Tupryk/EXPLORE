@@ -47,7 +47,8 @@ def main(cfg: DictConfig):
     max_loops_before_training = cfg.max_loops_before_training
     on_policy = cfg.on_policy
     pseudo_timesteps = 0
-    
+    min_traj_len = cfg.RRT.get("min_traj_len", 0.0)
+
     buffer_full = False
     allow_training = False
     for i in tqdm(range(loop_count), total=loop_count):
@@ -70,7 +71,8 @@ def main(cfg: DictConfig):
         writer.add_scalar("rollout/avg_success_rate", con_ratio, i)
     
         # Loading tree into buffer
-        states, actions, next_states, rewards, dones = tree_to_buffer(tree, end_nodes, reached_targets, S, cfg.failure_ratio)
+        states, actions, next_states, rewards, dones = tree_to_buffer(
+            tree, end_nodes, reached_targets, S, cfg.failure_ratio, min_traj_len=min_traj_len)
         
         if len(states) != 0:
             RL_agent.replay_buffer.add_multiple(

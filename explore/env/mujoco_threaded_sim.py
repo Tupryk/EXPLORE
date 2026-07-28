@@ -161,7 +161,7 @@ class MjSim:
         self.mj_data.qpos[:] = qpos
         mujoco.mj_forward(self.mj_model, self.mj_data)
         self.renderer.update_scene(self.mj_data, self.camera)
-        return self.renderer.render()
+        return self.renderer.render().copy()
 
     def step_seq(self, tau_action: float, ctrl_targets: np.ndarray, sim_idx: int, render: bool = False) -> list[np.ndarray]:
         """
@@ -223,7 +223,7 @@ class MjSim:
         if ctrl_target.ndim == 1:
             ctrl_target = ctrl_target.reshape(1, -1)
 
-            self.step_seq(
+            qpos_snapshots = self.step_seq(
                 tau_action,
                 ctrl_target,
                 0,

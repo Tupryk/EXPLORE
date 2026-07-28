@@ -80,7 +80,8 @@ def tree_to_buffer(
     end_nodes: list[int],
     reached_targets: list[int],
     S: StaGE,
-    failure_ratio: float
+    failure_ratio: float,
+    min_traj_len: float=0.0
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
     states, actions, next_states, rewards, dones = [], [], [], [], []
@@ -103,16 +104,17 @@ def tree_to_buffer(
 
     # Successes
     for i, node_id in enumerate(end_nodes):
-        path, ids = build_path(tree, node_id)
-        success_nodes.extend(ids)
+        if tree[node_id]["time"] <= min_traj_len:
+            path, ids = build_path(tree, node_id)
+            success_nodes.extend(ids)
 
-        add_path(path, S.all_G_star[reached_targets[i]], is_success=True)
+            add_path(path, S.all_G_star[reached_targets[i]], is_success=True)
 
     success_size = len(states)
     success_nodes = set(success_nodes)  # O(1) membership checks below
 
     # Failures
-    non_success_ids = [i for i in range(len(tree)) if i not in success_nodes]
+    non_success_ids = [i for i in range(len(tree)) if i not in success_nodes and tree[i]["time"] >= min_traj_len]
 
     non_success_ids.extend(end_nodes)  # Avoid bias towards a certain region
     

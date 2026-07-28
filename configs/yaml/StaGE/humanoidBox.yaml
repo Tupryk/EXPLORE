@@ -7,19 +7,19 @@ RRT:
   max_configs: -1
   
   # StaGE params
-  remove_expanded: true
+  remove_expanded: false
 
   # Distance threshholds
   min_cost: 0.1
 
   # MPC actions
-  tau_action: 0.25
-  stepsize: 1.0
+  tau_action: 0.05
+  stepsize: 0.25
 
   # Distance measurements
   q: [7,36]
   q_dot: [6,35]
-  q_obj_dot: 0
+  q_obj_dot: [0,35]
   P: [
     "pelvis",
     "left_ankle_roll_joint", "right_ankle_roll_joint",
@@ -33,10 +33,10 @@ RRT:
   obs_vel_scale: 0.1
   obs_ref_err_scale: 10.0
 
-  q_weight: 0.25
+  q_weight: 0.0
 
   sim_interface:
-    parallel_sims: 1000
+    parallel_sims: 50
     xml_path: "configs/mujoco_/unitree_g1/box_scene.xml"
     tau_sim: 0.005
     verbose: 1

@@ -1,6 +1,7 @@
 import os
 import h5py
 import pickle
+os.environ["MUJOCO_GL"] = "egl"
 import mujoco
 import imageio
 import numpy as np
@@ -16,7 +17,9 @@ from explore.env.mujoco_threaded_sim import MjSim
 
 
 def main():
-    out_path = "outputs/2026-07-13/18-40-51"
+
+    out_path = "outputs/2026-07-28/11-07-18"
+    min_traj_time = 1.0
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")
@@ -40,7 +43,6 @@ def main():
             start_ids = [start_ids]
     
     for start_id in start_ids:
-        if start_id < 6: continue
 
         print(f"Analizing tree {start_id}...")
         tree_path = os.path.join(out_path, f"trees/tree{start_id}.pkl")
@@ -90,7 +92,7 @@ def main():
             if dist < cfg.min_cost:
                 reached_count += 1
                 
-                if tree[ind]["t"] > 2.5:
+                if tree[ind]["t"] > min_traj_time:
                     # Reconstruct path
                     path = build_path(tree, ind)
 

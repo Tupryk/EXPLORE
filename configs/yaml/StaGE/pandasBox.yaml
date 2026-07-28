@@ -22,7 +22,7 @@ RRT:
   # Distance measurements
   q: [0, 9]
   q_dot: [0, 9]
-  q_obj_dot: 9
+  q_obj_dot: [9]
   P: ["obj"]
   G: ["obj"]
 

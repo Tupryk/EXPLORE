@@ -19,7 +19,7 @@ RRT:
   # Distance measurements
   q: [0, 3]
   q_dot: [0, 3]
-  q_obj_dot: 3
+  q_obj_dot: [3]
   P: [
     "l_fing", "obj",
   ]
