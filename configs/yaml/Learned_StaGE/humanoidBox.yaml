@@ -6,8 +6,8 @@ eval_count: 10
 
 agent_sampled_actions: 25
 max_loops_before_training: 1000
-min_buffer_size: 1000000
-warm_up_steps: 100000
+min_buffer_size: 4000000
+warm_up_steps: 40000
 min_traj_len: 0.75
 failure_ratio: 1.0
 
