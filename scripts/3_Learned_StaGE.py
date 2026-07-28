@@ -47,11 +47,13 @@ def main(cfg: DictConfig):
     max_loops_before_training = cfg.max_loops_before_training
     on_policy = cfg.on_policy
     pseudo_timesteps = 0
+    warm_up_steps = cfg.get("warm_up_steps", 0)
     min_traj_len = cfg.get("min_traj_len", 0.0)
     print("min_traj_len: ", min_traj_len)
 
     buffer_full = False
     allow_training = False
+    first_training = True
     for i in tqdm(range(loop_count), total=loop_count):
         
         # Generate a new tree with the policy
@@ -94,6 +96,11 @@ def main(cfg: DictConfig):
         
         # Train TD7
         if allow_training:
+
+            if first_training:
+                for i in range(warm_up_steps):
+                    RL_agent.train()
+            first_training = False
 
             for _ in range(in_loop_training_steps):
                 RL_agent.train()
