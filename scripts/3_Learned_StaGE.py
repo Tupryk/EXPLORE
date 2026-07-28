@@ -98,7 +98,7 @@ def main(cfg: DictConfig):
         if allow_training:
 
             if first_training:
-                for i in range(warm_up_steps):
+                for _ in range(warm_up_steps):
                     RL_agent.train()
             first_training = False
 
