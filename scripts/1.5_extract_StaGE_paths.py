@@ -18,8 +18,8 @@ from explore.env.mujoco_threaded_sim import MjSim
 
 def main():
 
-    out_path = "outputs/2026-07-28/11-07-18"
-    min_traj_time = 1.0
+    out_path = "outputs/2026-07-28/11-43-25"
+    min_traj_time = 0.75
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")

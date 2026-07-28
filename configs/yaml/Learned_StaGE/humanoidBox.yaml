@@ -7,10 +7,10 @@ eval_count: 10
 agent_sampled_actions: 25
 max_loops_before_training: 1000
 min_buffer_size: 250000
-min_traj_len: 1.0
+min_traj_len: 0.75
 failure_ratio: 1.0
 
-loop_count: 10000
+loop_count: 5000
 total_training_steps: 3e5
 in_loop_training_steps: 100
 
@@ -60,7 +60,7 @@ RRT:
   log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 10000
+  max_expansions_per_tree: 2500
   max_configs: -1
   
   # StaGE params
@@ -90,7 +90,7 @@ RRT:
   obs_vel_scale: 0.1
   obs_ref_err_scale: 10.0
 
-  q_weight: 0.0
+  q_weight: 0.1
 
   sim_interface:
     parallel_sims: 50
