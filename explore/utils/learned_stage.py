@@ -173,7 +173,8 @@ def eval_policy(
     total_timesteps: int,
     loop_id: int,
     eval_count: int,
-    output_dir: str
+    output_dir: str,
+    gif_name: str=""
     ):
 
     print("---------------------------------------")
@@ -198,7 +199,10 @@ def eval_policy(
 
         if frames:
             frames = [(frame.astype(float)*0.8 + goal_frame.astype(float)*0.2).astype(frame.dtype) for frame in frames]
-            imageio.mimsave(os.path.join(output_dir, f"eval_t{loop_id+1}_ep{ep+1}.gif"), frames, fps=24, loop=0)
+            if gif_name:
+                imageio.mimsave(os.path.join(output_dir, f"{gif_name}_ep{ep+1}.gif"), frames, fps=24, loop=0)
+            else:
+                imageio.mimsave(os.path.join(output_dir, f"eval_t{loop_id+1}_ep{ep+1}.gif"), frames, fps=24, loop=0)
 
     print(f"Average total reward over {eval_count} episodes: {total_reward.mean():.3f} (success rate: {total_success.mean():.3f})")
     print("---------------------------------------")

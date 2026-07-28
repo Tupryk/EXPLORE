@@ -7,7 +7,9 @@ eval_count: 10
 agent_sampled_actions: 10
 max_loops_before_training: 1000
 min_buffer_size: 800000
-failure_ratio: 0.5
+warm_up_steps: 8000
+min_traj_len: 0.5
+failure_ratio: 1.0
 
 loop_count: 3000
 total_training_steps: 75000
@@ -20,7 +22,7 @@ TD7:
   buffer_size: 1e6
   discount: 0.95
   target_update_rate: 250
-  exploration_noise: 0.15
+  exploration_noise: 0.05
   value_clip: [0., 1.]
   
   # TD3
@@ -59,7 +61,7 @@ RRT:
   log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 100
+  max_expansions_per_tree: 250
   max_configs: -1
   
   # StaGE params
@@ -70,7 +72,7 @@ RRT:
 
   # MPC actions
   tau_action: 0.05
-  stepsize: 0.04
+  stepsize: 0.1
 
   # Distance measurements
   q: [0,3]
@@ -83,7 +85,7 @@ RRT:
   obs_vel_scale: 0.05
   obs_ref_err_scale: 20.0
 
-  q_weight: 0.1
+  q_weight: 0.5
 
   sim_interface:
     parallel_sims: 10
@@ -97,4 +99,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/double_sphere_clean.h5"
+configs_path: "configs/stable/double_sphere_csrl.h5"

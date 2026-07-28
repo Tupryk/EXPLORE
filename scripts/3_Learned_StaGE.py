@@ -98,8 +98,11 @@ def main(cfg: DictConfig):
         if allow_training:
 
             if first_training:
-                for _ in range(warm_up_steps):
+                print(f"Warm starting policy for {warm_up_steps} steps...")
+                for _ in tqdm(range(warm_up_steps), total=warm_up_steps):
                     RL_agent.train()
+                RL_agent.save_checkpoint(path=eval_dir, tag=f"warm_policy")
+                eval_policy(RL_agent, eval_env, pseudo_timesteps, i, cfg.eval_count, eval_dir, gif_name="warm_policy")
             first_training = False
 
             for _ in range(in_loop_training_steps):
