@@ -47,7 +47,8 @@ def main(cfg: DictConfig):
     max_loops_before_training = cfg.max_loops_before_training
     on_policy = cfg.on_policy
     pseudo_timesteps = 0
-    min_traj_len = cfg.RRT.get("min_traj_len", 0.0)
+    min_traj_len = cfg.get("min_traj_len", 0.0)
+    print("min_traj_len: ", min_traj_len)
 
     buffer_full = False
     allow_training = False

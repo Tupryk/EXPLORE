@@ -104,7 +104,7 @@ def tree_to_buffer(
 
     # Successes
     for i, node_id in enumerate(end_nodes):
-        if tree[node_id]["time"] <= min_traj_len:
+        if tree[node_id].time <= min_traj_len:
             path, ids = build_path(tree, node_id)
             success_nodes.extend(ids)
 
@@ -114,7 +114,7 @@ def tree_to_buffer(
     success_nodes = set(success_nodes)  # O(1) membership checks below
 
     # Failures
-    non_success_ids = [i for i in range(len(tree)) if i not in success_nodes and tree[i]["time"] >= min_traj_len]
+    non_success_ids = [i for i in range(len(tree)) if i not in success_nodes and tree[i].time >= min_traj_len]
 
     non_success_ids.extend(end_nodes)  # Avoid bias towards a certain region
     

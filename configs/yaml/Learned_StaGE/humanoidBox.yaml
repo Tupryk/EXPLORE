@@ -1,7 +1,7 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-eval_freq: 1000
+eval_freq: 500
 eval_count: 10
 
 agent_sampled_actions: 25
@@ -70,8 +70,8 @@ RRT:
   min_cost: 0.1
 
   # MPC actions
-  tau_action: 0.1
-  stepsize: 0.5
+  tau_action: 0.05
+  stepsize: 0.25
 
   # Distance measurements
   q: [7,36]
