@@ -309,6 +309,7 @@ class StableConfigsEnv(gym.Env):
         goal_reached = self._cost_buf < self.min_cost
         
         if self.sparse_reward:
+            # rewards = goal_reached.astype(np.float32) - 1.
             rewards = goal_reached.astype(np.float32)
         
         else:

@@ -34,9 +34,10 @@ def main(cfg: DictConfig):
     tree = S.init_tree(0)
     obs = node_obs_state(tree[0], S.all_G_star[0], S)
     RL_agent = TD7.Agent(obs.shape[0], S.ctrl_dim, 1., offline=cfg.TD7.offline_loss, hp=cfg.TD7)
+    offline_buffer_size = cfg.TD7.offline_buffer_size
     
     # Main loop
-    pbar = tqdm(total=int(cfg.min_buffer_size), desc="Filling replay buffer")
+    pbar = tqdm(total=int(offline_buffer_size), desc="Filling replay buffer")
     total_trees = 0
     while True:
         # Generate a new tree with the policy
@@ -53,7 +54,7 @@ def main(cfg: DictConfig):
         )
 
         if len(states) != 0:
-            RL_agent.replay_buffer.add_multiple(
+            RL_agent.replay_buffer.add_multiple_to_offline(
                 states,
                 actions,
                 next_states,
@@ -64,11 +65,11 @@ def main(cfg: DictConfig):
             tqdm.write(f"WARNING: No connections found in loop {total_trees+1}!")
 
         pbar.set_postfix({"conn%": f"{connection_ratio:.2f}", "loop": total_trees + 1})
-        pbar.n = min(len(RL_agent.replay_buffer), cfg.min_buffer_size)
+        pbar.n = min(len(RL_agent.replay_buffer), offline_buffer_size)
         pbar.refresh()
 
         total_trees += 1
-        if len(RL_agent.replay_buffer) >= cfg.min_buffer_size:
+        if len(RL_agent.replay_buffer) >= offline_buffer_size:
             break
 
     stage_buffer_path = os.path.join(cfg.output_dir, f"stage_buffer.pkl")
@@ -78,12 +79,12 @@ def main(cfg: DictConfig):
     pbar.close()
     print("Total trees: ", total_trees)
 
-    print("Warm-starting policy...")
-    warm_start_timesteps = int(cfg.min_buffer_size / cfg.TD7.batch_size) * 100
-    for _ in tqdm(range(warm_start_timesteps)):
-        RL_agent.train()
+    # print("Warm-starting policy...")
+    # warm_start_timesteps = int(offline_buffer_size / cfg.TD7.batch_size) * 100
+    # for _ in tqdm(range(warm_start_timesteps)):
+    #     RL_agent.train()
 
-    env = get_env(cfg)
+    env = get_env(cfg, use_csrl=False)
     states, _ = env.reset(done=np.ones(env.sim_count, dtype=bool))
     ep_total_success = np.zeros(env.sim_count)
     ep_total_reward = np.zeros(env.sim_count)

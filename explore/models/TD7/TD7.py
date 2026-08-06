@@ -28,6 +28,10 @@ class Hyperparameters:
     # LAP
     alpha: float = 0.4
     min_priority: float = 1
+
+    # Offline to Online
+    buffer_offline_ratio: float = 0.5
+    offline_buffer_size: int = None
     
     # TD3+BC
     lmbda: float = 0.1
@@ -129,10 +133,10 @@ class Critic(nn.Module):
         self.q5 = nn.Linear(hdim, hdim)
         self.q6 = nn.Linear(hdim, 1)
 
-        # Zero-init the output heads so initial Q-values start at 0
-        for layer in (self.q3, self.q6):
-            nn.init.zeros_(layer.weight)
-            nn.init.zeros_(layer.bias)
+        # # Zero-init the output heads so initial Q-values start at 0
+        # for layer in (self.q3, self.q6):
+        #     nn.init.zeros_(layer.weight)
+        #     nn.init.zeros_(layer.bias)
 
 
     def forward(self, state, action, zsa, zs):
@@ -178,7 +182,7 @@ class Agent(object):
         self.checkpoint_encoder = copy.deepcopy(self.encoder)
 
         self.replay_buffer = buffer.LAP(state_dim, action_dim, self.device, hp.buffer_size, hp.batch_size, 
-            max_action, normalize_actions=True, prioritized=True)
+            max_action, normalize_actions=True, prioritized=True, offline_max_size=hp.offline_buffer_size, offline_ratio=hp.buffer_offline_ratio)
 
         self.max_action = max_action
         self.offline = offline

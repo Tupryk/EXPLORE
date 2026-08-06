@@ -9,7 +9,7 @@ max_loops_before_training: 1000
 min_buffer_size: 800000
 warm_up_steps: 8000
 min_traj_len: 0.5
-failure_ratio: 1.0
+failure_ratio: 0.0
 
 loop_count: 3000
 total_training_steps: 75000
@@ -33,9 +33,13 @@ TD7:
   # LAP
   alpha: 0.4
   min_priority: 1
+
+  # Offline to Online
+  offline_buffer_size: 5e6
+  buffer_offline_ratio: 0.5
   
   # TD3+BC
-  offline_loss: True
+  offline_loss: False
   lmbda: 0.1
   
   # Checkpointing

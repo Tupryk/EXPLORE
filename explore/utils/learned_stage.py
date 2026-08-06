@@ -99,6 +99,7 @@ def tree_to_buffer(
             next_states.append(obs[j + 1])
             actions.append((path[j + 1].ctrl - path[j].ctrl) / S.stepsize)
 
+            # rewards.append(0. if is_last_edge else -1.)
             rewards.append(1. if is_last_edge else 0.)
             dones.append(1. if is_last_edge else 0.)
 
@@ -222,18 +223,18 @@ def get_eval_env(cfg: DictConfig) -> StableConfigsEnv:
     return eval_env
 
 
-def get_env(cfg: DictConfig) -> StableConfigsEnv:
+def get_env(cfg: DictConfig, use_csrl: bool=True) -> StableConfigsEnv:
 
     env_cfg = copy.deepcopy(cfg.RRT)
     env_cfg.verbose = 0
     env_cfg.sim_interface.parallel_sims = 80
 
     with open_dict(env_cfg):
-        env_cfg.use_csrl = True
+        env_cfg.use_csrl = use_csrl
         env_cfg.schedule_alpha_end_step = 100000
         env_cfg.schedule_alpha_block = 5000
     
-        env_cfg.max_steps = 64
+        env_cfg.max_steps = 48
         env_cfg.stable_configs_path = cfg.configs_path
 
     eval_env = StableConfigsEnv(env_cfg)
