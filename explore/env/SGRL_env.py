@@ -69,7 +69,9 @@ class StableConfigsEnv(gym.Env):
         assert not (self.expand_manifold and self.object_diffusion)
         assert not (self.use_csrl and self.object_diffusion)
         
-        self.stable_configs = h5py.File(cfg.stable_configs_path, 'r')
+        self.stable_configs = dict(h5py.File(cfg.stable_configs_path, 'r'))
+        if not "qpos" in self.stable_configs.keys():
+            self.stable_configs["qpos"] = self.stable_configs["q"]
         self.config_count = self.stable_configs["qpos"].shape[0]
         if self.verbose:
             print("Total configs in h5: ", self.config_count)

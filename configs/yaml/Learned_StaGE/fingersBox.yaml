@@ -1,25 +1,25 @@
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-eval_freq: 25000
+eval_freq: 50000
 eval_count: 10
 
 agent_sampled_actions: 10
 max_loops_before_training: 1000
 min_buffer_size: 800000
 warm_up_steps: 8000
-min_traj_len: 0.5
+min_traj_len: 0.2
 failure_ratio: 0.0
 
 loop_count: 3000
-total_training_steps: 75000
+total_training_steps: 300000
 in_loop_training_steps: 25
 
 on_policy: true
 
 TD7:
   batch_size: 10000
-  buffer_size: 1e6
+  buffer_size: 4e6
   discount: 0.95
   target_update_rate: 250
   exploration_noise: 0.05
@@ -48,8 +48,8 @@ TD7:
   reset_weight: 0.9
   
   # Encoder Model
-  zs_dim: 256
-  enc_hdim: 256
+  zs_dim: 512
+  enc_hdim: 512
   encoder_lr: 1e-3
   
   # Critic Model
@@ -72,35 +72,40 @@ RRT:
   remove_expanded: false
 
   # Distance threshholds
-  min_cost: 0.01
+  min_cost: 0.02
 
   # MPC actions
   tau_action: 0.05
-  stepsize: 0.1
+  stepsize: 0.15
 
   # Distance measurements
-  q: [0,3]
-  q_dot: [0,3]
-  q_obj_dot: [3]
-  P: ["obj"]
-  G: ["obj"]
+  q: [0, 6]
+  q_dot: [0, 6]
+  q_obj_dot: [6]
+  P: [
+    "l_fing", "r_fing",
+    "obj", "box_marker_0", "box_marker_1", "box_marker_2"
+  ]
+  G: [
+    "obj", "box_marker_0", "box_marker_1", "box_marker_2"
+  ]
 
   obs_pos_scale: 1.0
-  obs_vel_scale: 0.05
-  obs_ref_err_scale: 20.0
+  obs_vel_scale: 0.1
+  obs_ref_err_scale: 10.0
 
-  q_weight: 0.5
+  q_weight: 0.25
 
   sim_interface:
     parallel_sims: 10
-    xml_path: "configs/mujoco_/doubleSphere.xml"
+    xml_path: "configs/mujoco_/twoFingersCube.xml"
     tau_sim: 0.005
     verbose: 1
 
-    joint_vel_ids: [0,3]
+    joint_vel_ids: [0,6]
 
     camera: "fixed_cam"
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/double_sphere_csrl.h5"
+configs_path: "configs/stable/twoFingersCube.h5"

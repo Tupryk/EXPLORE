@@ -10,7 +10,7 @@ RRT:
   remove_expanded: True
 
   # Distance threshholds
-  min_cost: 0.01
+  min_cost: 0.02
 
   # MPC actions
   tau_action: 0.05
@@ -22,17 +22,17 @@ RRT:
   q_obj_dot: [6]
   P: [
     "l_fing", "r_fing",
-    "box_marker_0", "box_marker_1", "box_marker_2"
+    "obj", "box_marker_0", "box_marker_1", "box_marker_2"
   ]
   G: [
-    "box_marker_0", "box_marker_1", "box_marker_2"
+    "obj", "box_marker_0", "box_marker_1", "box_marker_2"
   ]
 
   obs_pos_scale: 1.0
   obs_vel_scale: 0.1
   obs_ref_err_scale: 10.0
 
-  q_weight: .25
+  q_weight: 0.25
 
   sim_interface:
     parallel_sims: 100
