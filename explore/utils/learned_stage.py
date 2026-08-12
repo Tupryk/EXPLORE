@@ -97,7 +97,7 @@ def tree_to_buffer(
 
             states.append(obs[j])
             next_states.append(obs[j + 1])
-            actions.append((path[j + 1].ctrl - path[j].ctrl) / S.stepsize)
+            actions.append(path[j + 1].action)
 
             # rewards.append(0. if is_last_edge else -1.)
             rewards.append(1. if is_last_edge else 0.)

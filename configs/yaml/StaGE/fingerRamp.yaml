@@ -1,0 +1,48 @@
+RRT:
+  verbose: 3
+  output_dir: ${hydra:runtime.output_dir}
+  
+  start_idx: -1
+  max_expansions_per_tree: 2500
+  max_configs: -1
+  
+  # StaGE params
+  remove_expanded: true
+
+  # Distance threshholds
+  min_cost: 0.01
+
+  # MPC actions
+  tau_action: 0.05
+  stepsize: 0.1
+
+  # Distance measurements
+  q: [0, 3]
+  q_dot: [0, 3]
+  q_obj_dot: [3]
+  P: [
+    "l_fing", "obj",
+  ]
+  G: [
+    "obj",
+  ]
+
+  obs_pos_scale: 1.0
+  obs_vel_scale: 0.1
+  obs_ref_err_scale: 10.0
+
+  q_weight: 0.5
+
+  sim_interface:
+    parallel_sims: 20 
+    xml_path: "configs/mujoco_/fingerRamp.xml"
+    tau_sim: 0.005
+    verbose: 1
+
+    joint_vel_ids: [0,3]
+
+    camera: "fixed_cam"
+    render_w: 640
+    render_h: 480
+
+configs_path: "configs/stable/finger_ramp_big.h5"

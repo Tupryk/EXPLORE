@@ -18,8 +18,8 @@ from explore.env.mujoco_threaded_sim import MjSim
 
 def main():
 
-    out_path = "outputs/2026-07-28/14-03-42"
-    min_traj_time = 1.25
+    out_path = "outputs/2026-08-12/14-13-50"
+    min_traj_time = 1.0
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")
@@ -108,18 +108,27 @@ def main():
                     )
                     
                     frames = []
+                    prev_ctrl = node["ctrl"]
                     for node in path[1:]:
                         fs = sim.step(
                             cfg.tau_action,
-                            node["ctrl"],
+                            prev_ctrl + node["action"] * cfg.stepsize,
                             render=True
                         )
+                        # sim.setState(
+                        #     np.array([node["t"]]),
+                        #     node["qpos"],
+                        #     node["qvel"],
+                        #     node["ctrl"],
+                        #     reset_frame_time=False
+                        # )
                         frames.extend(fs)
+                        prev_ctrl = node["ctrl"]
                     
                     ratio = 0.4
                     frames = [(frame.astype(float)*(1.-ratio) + goal_frame.astype(float)*ratio).astype(frame.dtype) for frame in frames]
                     imageio.mimsave(os.path.join(gif_path, f"{start_id}_to_{i}.gif"), frames, fps=24, loop=0)
-                    
+                
         print(f"{((reached_count/manifold_size)*100):.2f}% Coverage. ({reached_count} states reached)")
 
 

@@ -90,7 +90,8 @@ class MjSim:
         qpos: np.ndarray,
         qvel: np.ndarray,
         ctrl: np.ndarray,
-        indices: np.ndarray = None
+        indices: np.ndarray = None,
+        reset_frame_time: bool = True
     ):
         """
         Args:
@@ -131,7 +132,8 @@ class MjSim:
             self.data_geom_xpos = np.zeros(
                 (self.nworld, self.mj_data.geom_xpos.shape[0], 3)
             )
-            self.next_frame_time = 0.0
+            if reset_frame_time:
+                self.next_frame_time = 0.0
 
         else:
             self.data_time[indices] = time
@@ -140,7 +142,8 @@ class MjSim:
             self.data_ctrl[indices] = ctrl
 
             self.data_geom_xpos[indices] = 0.0
-            if 0 in indices: self.next_frame_time = 0.0
+            if reset_frame_time:
+                if 0 in indices: self.next_frame_time = 0.0
 
     def getState(self):
         """

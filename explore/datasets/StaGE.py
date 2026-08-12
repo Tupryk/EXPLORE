@@ -23,6 +23,7 @@ class StaGE_Node:
                  qvel: np.ndarray,
                  ctrl: np.ndarray,
                  geom_xpos: np.ndarray,
+                 action: np.ndarray,
                  manifold_phi: np.ndarray,
                  goal_phi: np.ndarray,
                  target_config_idx: int=-1):
@@ -33,6 +34,7 @@ class StaGE_Node:
         self.qvel = qvel.copy()
         self.ctrl = ctrl.copy()
         self.geom_xpos = geom_xpos.copy()
+        self.action = action
         self.manifold_phi = manifold_phi
         self.goal_phi = goal_phi
         self.target_config_idx = target_config_idx
@@ -148,6 +150,7 @@ class StaGE:
             np.zeros((self.sim.mj_data.qvel.shape[0],)),
             self.manifold_ctrl[start_idx],
             self.geom_xposes[start_idx],
+            np.zeros((self.sim.mj_data.ctrl.shape[0],)),
             self.phi_stable_configs[start_idx],
             self.all_G_star[start_idx]
         )
@@ -164,6 +167,7 @@ class StaGE:
                 "qpos": node.qpos,
                 "qvel": node.qvel,
                 "ctrl": node.ctrl,
+                "action": node.action,
                 "manifold_phi": node.manifold_phi,
                 "goal_phi": node.goal_phi,
                 "target_config_idx": node.target_config_idx,
@@ -248,6 +252,7 @@ class StaGE:
                         self.sim.numpy_dict["qvel"][sim_i],
                         self.sim.numpy_dict["ctrl"][sim_i],
                         self.sim.numpy_dict["geom_xpos"][sim_i],
+                        actions[sim_i],
                         phi[sim_i],
                         G[sim_i],
                         target_config_idx=target_id
