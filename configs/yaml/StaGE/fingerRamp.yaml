@@ -1,5 +1,5 @@
 RRT:
-  verbose: 3
+  verbose: 1
   output_dir: ${hydra:runtime.output_dir}
   
   start_idx: -1
@@ -34,7 +34,7 @@ RRT:
   q_weight: 0.5
 
   sim_interface:
-    parallel_sims: 20 
+    parallel_sims: 20
     xml_path: "configs/mujoco_/fingerRamp.xml"
     tau_sim: 0.005
     verbose: 1

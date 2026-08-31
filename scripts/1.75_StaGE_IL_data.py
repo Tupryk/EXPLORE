@@ -41,7 +41,7 @@ def main(cfg: DictConfig):
         connection_ratio = len(reached_targets) / len(S.all_G_star) * 100.
 
         states, actions, next_states, rewards, dones = tree_to_buffer(
-            tree, end_nodes, reached_targets, S, 0.0
+            tree, end_nodes, reached_targets, S, 0.0, min_traj_len=1.0
         )
 
         if len(states) != 0:
