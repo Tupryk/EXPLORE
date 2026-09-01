@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 from explore.env.mujoco_sim import MjSim
 
-h5_file = "configs/stable/double_sphere_csrl.h5"
-mujoco_xml = "configs/mujoco_/doubleSphere.xml"
+# h5_file = "configs/stable/double_sphere_csrl.h5"
+# mujoco_xml = "configs/mujoco_/doubleSphere.xml"
 
 # h5_file = "configs/stable/finger_ramp_big.h5"
 # mujoco_xml = "configs/mujoco_/fingerRamp.xml"
@@ -24,8 +24,8 @@ mujoco_xml = "configs/mujoco_/doubleSphere.xml"
 # h5_file = "configs/stable/pandasTableConfigs.h5"
 # mujoco_xml = "configs/mujoco_/franka_emika_panda/pandas_table.xml"
 
-# h5_file = "configs/stable/pandaHook_balanced.h5"
-# mujoco_xml = "configs/mujoco_/franka_emika_panda/panda_single.xml"
+h5_file = "configs/stable/pandaHook.h5"
+mujoco_xml = "configs/mujoco_/franka_emika_panda/panda_single.xml"
 
 # h5_file = "experiments/stable_configs_copy.h5"
 # mujoco_xml = "configs/mujoco_/unitree_g1/table_box_scene.xml"

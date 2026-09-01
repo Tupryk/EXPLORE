@@ -2,29 +2,28 @@ RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [5]
+  start_idx: [29]
   max_expansions_per_tree: 10000
   max_configs: -1
   
   # StaGE params
-  remove_expanded: true
+  remove_expanded: false
 
   # Distance threshholds
   min_cost: 0.2
 
   # MPC actions
-  tau_action: 0.1
+  tau_action: 0.25
   stepsize: [
-    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 125.0,
-    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 125.0,
+    0.15, 0.15, 0.2, 0.25, 0.35, 0.3, 0.5, 125.0,
   ]
 
   # Distance measurements
-  q: [0, 16]
-  q_dot: [0, 16]
-  q_obj_dot: [16]
-  P: ["obj"]
-  G: ["obj"]
+  q: [0, 8]
+  q_dot: [0, 8]
+  q_obj_dot: [15]
+  P: ["hook", "hook_hook", "obj"]
+  G: ["hook", "hook_hook", "obj"]
 
   obs_pos_scale: 1.0
   obs_vel_scale: 0.1
@@ -33,15 +32,15 @@ RRT:
   q_weight: 0.1
 
   sim_interface:
-    parallel_sims: 100
-    xml_path: "configs/mujoco_/franka_emika_panda/pandas_table.xml"
+    parallel_sims: 500
+    xml_path: "configs/mujoco_/franka_emika_panda/panda_single.xml"
     tau_sim: 0.005
     verbose: 1
 
-    joint_vel_ids: [0,16]
+    joint_vel_ids: [0,8]
 
     camera: "fixed_cam"
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/pandasTableConfigs.h5"
+configs_path: "configs/stable/pandaHook.h5"

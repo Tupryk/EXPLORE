@@ -3,7 +3,7 @@ RRT:
   output_dir: ${hydra:runtime.output_dir}
   
   start_idx: -1
-  max_expansions_per_tree: 2500
+  max_expansions_per_tree: 1000
   max_configs: -1
   
   # StaGE params
@@ -45,4 +45,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/finger_ramp_big.h5"
+configs_path: "configs/stable/fingerRamp_onRamp.h5"

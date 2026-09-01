@@ -31,14 +31,14 @@
     
     <body name="obj" pos="0.0 0.3 0.7">
       <freejoint />
-      <geom type="box" size="0.02 0.02 0.02" rgba="0.1 1 0.5 1" mass="0.08"/>
+      <geom name="obj" type="box" size="0.02 0.02 0.02" rgba="0.1 1 0.5 1" mass="0.08"/>
     </body>
 
     <body name="hook" pos="0.0 0.3 0.7">
       <freejoint />
-      <geom type="box" size="0.01 0.25 0.01" rgba="0.25 0.25 0.25 1" mass="0.5"/>
+      <geom name="hook" type="box" size="0.01 0.25 0.01" rgba="0.25 0.25 0.25 1" mass="0.5"/>
       <body name="hook_hook" pos="0.075 0.25 0.0">
-        <geom type="box" size="0.075 0.01 0.01" rgba="0.25 0.25 0.25 1" mass="0.2"/>
+        <geom name="hook_hook" type="box" size="0.075 0.01 0.01" rgba="0.25 0.25 0.25 1" mass="0.2"/>
       </body>
     </body>
   </worldbody>
