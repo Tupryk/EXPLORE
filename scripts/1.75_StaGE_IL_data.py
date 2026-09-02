@@ -40,18 +40,14 @@ def main(cfg: DictConfig):
         end_nodes, reached_targets = get_tree_successful_nodes(tree, S.all_G_star, S.min_cost)
         connection_ratio = len(reached_targets) / len(S.all_G_star) * 100.
 
-        states, actions, next_states, rewards, dones = tree_to_buffer(
-            tree, end_nodes, reached_targets, S, 0.0, min_traj_len=1.0
+        ep_states, ep_actions = tree_to_episodes(
+            tree, end_nodes, reached_targets, S, min_traj_len=1.0
         )
 
-        if len(states) != 0:
-            dataset.add_multiple(
-                states,
-                actions,
-                next_states,
-                rewards.reshape(-1, 1),
-                dones.reshape(-1, 1)
-            )
+        if len(ep_states) != 0:
+            for i in range(len(ep_states)):
+                dataset.add_episode(ep_states[i], ep_actions[i])
+            dataset.print_stats()
         else:
             tqdm.write(f"WARNING: No connections found in loop {total_trees + 1}!")
 

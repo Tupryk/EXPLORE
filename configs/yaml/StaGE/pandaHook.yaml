@@ -43,4 +43,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/pandaHook.h5"
+configs_path: "configs/stable/pandaHook_balanced2_.h5"

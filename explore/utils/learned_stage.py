@@ -150,6 +150,36 @@ def tree_to_buffer(
     return (np.array(states), np.array(actions), np.array(next_states),
             np.array(rewards), np.array(dones))
 
+def tree_to_episodes(
+    tree: list[StaGE_Node],
+    end_nodes: list[int],
+    reached_targets: list[int],
+    S: StaGE,
+    min_traj_len: float=0.0
+) -> tuple[list, list]:
+
+    states, actions = [], []
+
+    # Successes
+    for i, node_id in enumerate(end_nodes):
+        if tree[node_id].t >= min_traj_len:
+            path, _ = build_path(tree, node_id)
+
+            obs = [node_obs_state(node, S.all_G_star[reached_targets[i]], S) for node in path]
+
+            episode_states = []
+            episode_actions = []
+
+            n_edges = len(path) - 1
+            for j in range(n_edges):
+                episode_states.append(obs[j])
+                episode_actions.append(path[j + 1].action)
+
+            states.append(episode_states)
+            actions.append(episode_actions)
+
+    return states, actions
+
 def sample_agent_actions(
     RL_agent: TD7.Agent,
     action_count: int,

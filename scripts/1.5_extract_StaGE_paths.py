@@ -18,7 +18,7 @@ from explore.env.mujoco_threaded_sim import MjSim
 
 def main():
 
-    out_path = "outputs/2026-09-01/14-00-55"
+    out_path = "outputs/2026-09-01/15-57-08"
     min_traj_time = 0.0
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
