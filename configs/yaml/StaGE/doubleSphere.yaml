@@ -1,13 +1,13 @@
 RRT:
-  verbose: 3
+  verbose: 0
+  log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [0]
-  max_expansions_per_tree: 2500
+  max_expansions_per_tree: 250
   max_configs: -1
   
   # StaGE params
-  remove_expanded: true
+  remove_expanded: false
 
   # Distance threshholds
   min_cost: 0.01
@@ -17,24 +17,20 @@ RRT:
   stepsize: 0.1
 
   # Distance measurements
-  q: [0, 3]
-  q_dot: [0, 3]
+  q: [0,3]
+  q_dot: [0,3]
   q_obj_dot: [3]
-  P: [
-    "l_fing", "obj",
-  ]
-  G: [
-    "obj",
-  ]
+  P: ["obj"]
+  G: ["obj"]
 
   obs_pos_scale: 1.0
-  obs_vel_scale: 0.1
-  obs_ref_err_scale: 10.0
+  obs_vel_scale: 0.05
+  obs_ref_err_scale: 20.0
 
-  q_weight: 1.
+  q_weight: 0.5
 
   sim_interface:
-    parallel_sims: 100
+    parallel_sims: 10
     xml_path: "configs/mujoco_/doubleSphere.xml"
     tau_sim: 0.005
     verbose: 1
@@ -45,4 +41,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/double_sphere.h5"
+configs_path: "configs/stable/double_sphere_csrl.h5"

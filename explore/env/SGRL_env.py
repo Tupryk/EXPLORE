@@ -218,7 +218,7 @@ class StableConfigsEnv(gym.Env):
     def reset(self, done=None, *, seed: int=None, options: dict={}) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
 
-        if "alpha" in options:
+        if "alpha" in options:  # This might be wrong for evaluations
             self.schedule_alpha = options["alpha"]
             if self.verbose > 0:
                 print("Current alpha: ", self.schedule_alpha)

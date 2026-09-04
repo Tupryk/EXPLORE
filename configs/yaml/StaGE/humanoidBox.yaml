@@ -2,12 +2,12 @@ RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [1, 6]
-  max_expansions_per_tree: 10000
+  start_idx: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43]
+  max_expansions_per_tree: 25000
   max_configs: -1
   
   # StaGE params
-  remove_expanded: false
+  remove_expanded: true
 
   # Distance threshholds
   min_cost: 0.1

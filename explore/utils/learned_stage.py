@@ -119,33 +119,33 @@ def tree_to_buffer(
 
     non_success_ids.extend(end_nodes)  # Avoid bias towards a certain region
     
-    n_neg = min(len(non_success_ids), int(success_size * (failure_ratio + 1.0)))
+    # n_neg = min(len(non_success_ids), int(success_size * (failure_ratio + 1.0)))
 
-    if n_neg > 0:
-        chosen = np.random.choice(non_success_ids, size=n_neg, replace=False)
+    # if n_neg > 0:
+    #     chosen = np.random.choice(non_success_ids, size=n_neg, replace=False)
 
-        for i in chosen:
+    #     for i in chosen:
             
-            if tree[i].parent == -1: continue
+    #         if tree[i].parent == -1: continue
             
-            random_target_id = np.random.randint(0, S.manifold_size)
-            random_target = S.all_G_star[random_target_id]
+    #         random_target_id = np.random.randint(0, S.manifold_size)
+    #         random_target = S.all_G_star[random_target_id]
 
-            path, _ = build_path(tree, i)
+    #         path, _ = build_path(tree, i)
 
-            found_goal = False
+    #         found_goal = False
 
-            for path_node in path:
-                path_node_G = path_node.geom_xpos[S.G, :].reshape(-1)
-                dist = np.linalg.norm(random_target - path_node_G)
+    #         for path_node in path:
+    #             path_node_G = path_node.geom_xpos[S.G, :].reshape(-1)
+    #             dist = np.linalg.norm(random_target - path_node_G)
 
-                if dist <= S.min_cost:
-                    found_goal = True
-                    break
+    #             if dist <= S.min_cost:
+    #                 found_goal = True
+    #                 break
             
-            if found_goal: continue
+    #         if found_goal: continue
 
-            add_path(path, random_target, is_success=False)
+    #         add_path(path, random_target, is_success=False)
             
     return (np.array(states), np.array(actions), np.array(next_states),
             np.array(rewards), np.array(dones))
@@ -160,23 +160,26 @@ def tree_to_episodes(
 
     states, actions = [], []
 
+    def add_path(path, G_target):
+        obs = [node_obs_state(node, G_target, S) for node in path]
+
+        n_edges = len(path) - 1
+        ep_states =[]
+        ep_actions =[]
+        for j in range(n_edges):
+
+            ep_states.append(obs[j])
+            ep_actions.append(path[j + 1].action)
+
+        states.append(ep_states)
+        actions.append(ep_actions)
+
     # Successes
     for i, node_id in enumerate(end_nodes):
         if tree[node_id].t >= min_traj_len:
             path, _ = build_path(tree, node_id)
 
-            obs = [node_obs_state(node, S.all_G_star[reached_targets[i]], S) for node in path]
-
-            episode_states = []
-            episode_actions = []
-
-            n_edges = len(path) - 1
-            for j in range(n_edges):
-                episode_states.append(obs[j])
-                episode_actions.append(path[j + 1].action)
-
-            states.append(episode_states)
-            actions.append(episode_actions)
+            add_path(path, S.all_G_star[reached_targets[i]])
 
     return states, actions
 
@@ -216,7 +219,8 @@ def eval_policy(
     for ep in range(eval_count):
         state, info = eval_env.reset(options={"alpha": 1.0, "sample_uniform": False, "render": True})
         done = False
-        goal_frame = info["goal_frame"]
+        if "goal_frame" in info.keys():
+            goal_frame = info["goal_frame"]
         frames = []
         while not done:
             action = RL_agent.select_action(np.array(state), use_exploration=False)
@@ -229,7 +233,8 @@ def eval_policy(
             done = np.logical_or(terminated[0], truncated[0])
 
         if frames:
-            frames = [(frame.astype(float)*0.8 + goal_frame.astype(float)*0.2).astype(frame.dtype) for frame in frames]
+            if "goal_frame" in info.keys():
+                frames = [(frame.astype(float)*0.8 + goal_frame.astype(float)*0.2).astype(frame.dtype) for frame in frames]
             if gif_name:
                 imageio.mimsave(os.path.join(output_dir, f"{gif_name}_ep{ep+1}.gif"), frames, fps=24, loop=0)
             else:

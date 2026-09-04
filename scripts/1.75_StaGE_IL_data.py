@@ -7,14 +7,14 @@ from tqdm import tqdm
 from omegaconf import DictConfig
 
 from explore.datasets.StaGE import StaGE
-from explore.datasets.stage_dataset import StaGEDataset
 from explore.utils.learned_stage import *
+from explore.datasets.stage_dataset import StaGEDataset
 
 
 @hydra.main(
     version_base="1.3",
     config_path="../configs/yaml/StaGE",
-    config_name="fingerRamp")
+    config_name="doubleSphere")
 def main(cfg: DictConfig):
 
     # Generate initial tree
@@ -65,4 +65,3 @@ def main(cfg: DictConfig):
 
 if __name__ == "__main__":
     main()
-    
