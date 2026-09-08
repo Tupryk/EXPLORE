@@ -49,11 +49,14 @@ def main():
     
     for start_id in start_ids:
 
+        try:
+            tree_path = os.path.join(out_path, f"trees/tree{start_id}.pkl")
+            with open(tree_path, "rb") as f:
+                tree: list[dict] = pickle.load(f)
+        except:
+            continue
+
         print(f"Analizing tree {start_id}...")
-        tree_path = os.path.join(out_path, f"trees/tree{start_id}.pkl")
-        
-        with open(tree_path, "rb") as f:
-            tree: list[dict] = pickle.load(f)
         
         phis = [node["goal_phi"] for node in tree]
         # phis = [node["manifold_phi"] for node in tree]
