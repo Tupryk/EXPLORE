@@ -1,5 +1,6 @@
 import os
 import time
+import random
 import mujoco
 import psutil
 import pickle
@@ -127,6 +128,7 @@ class StaGE:
         if not isinstance(self.start_ids, ListConfig):
             if self.start_ids == -1:
                 self.start_ids = list(range(self.manifold_size))
+                random.shuffle(self.start_ids)
             else:
                 self.start_ids = [self.start_ids]
         

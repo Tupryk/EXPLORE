@@ -86,7 +86,7 @@ RRT:
     "pelvis",
     "left_ankle_roll_joint", "right_ankle_roll_joint",
     "left_rubber_hand_0", "right_rubber_hand_0",
-    "box_marker_0", "box_marker_1", "box_marker_2"
+    "obj_col", "box_marker_0", "box_marker_1", "box_marker_2"
   ]
   G: [
     "box_marker_0", "box_marker_1", "box_marker_2"

@@ -18,7 +18,7 @@ from explore.env.mujoco_threaded_sim import MjSim
 
 def main():
 
-    out_path = "outputs/2026-09-04/10-42-50"
+    out_path = "outputs/2026-09-08/10-46-57"
     min_traj_time = 1.0
     horizon_same = 15
     
@@ -90,6 +90,7 @@ def main():
         added_nodes = []
         # for end_id, manifold_point in tqdm(enumerate(phi_stable_configs), total=len(phi_stable_configs)):
         for end_id, manifold_point in tqdm(enumerate(all_G_star), total=len(all_G_star)):
+            if end_id == start_id: continue
 
             # Get all neighbors within min_cost, sorted nearest-first
             ind_arr, dist_arr = sds_tree.query_radius(

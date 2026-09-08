@@ -177,10 +177,12 @@ class SingleTrajEnv(gym.Env):
             rewards = d_t1 - self.d_t + goal_reached.astype(np.float32)
             self.d_t = d_t1
 
-            rewards -= 4e-4 * np.array([qvel @ qvel for qvel in state_dict["qvel"]]).flatten()
-        
+            rewards -= 1e-4 * np.array([qvel @ qvel for qvel in state_dict["qvel"]]).flatten()
+
         terminated = goal_reached
-        truncated = np.full((self.sim_count,), self.iter >= self.max_steps)
+        pelvis_z = state_dict["geom_xpos"][:, self.P[0], :].reshape(self.sim.nworld, -1)[:, 2].flatten()
+        box_z = state_dict["geom_xpos"][:, self.P[5], :].reshape(self.sim.nworld, -1)[:, 2].flatten()
+        truncated = np.full((self.sim_count,), np.logical_or(np.logical_or(self.iter >= self.max_steps, pelvis_z <= 0.5), box_z <= 0.5))
 
         info = {
             "frames": frames,

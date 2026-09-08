@@ -2,26 +2,26 @@ RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [29]
-  max_expansions_per_tree: 10000
+  start_idx: -1
+  max_expansions_per_tree: 5000
   max_configs: -1
   
   # StaGE params
-  remove_expanded: false
+  remove_expanded: True
 
   # Distance threshholds
-  min_cost: 0.2
+  min_cost: 0.1
 
   # MPC actions
   tau_action: 0.25
   stepsize: [
-    0.15, 0.15, 0.2, 0.25, 0.35, 0.3, 0.5, 125.0,
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 128.0,
   ]
 
   # Distance measurements
   q: [0, 8]
   q_dot: [0, 8]
-  q_obj_dot: [15]
+  q_obj_dot: [9, 16]  # Weird jump to 9 because of two joints for the gripper finger.
   P: ["hook", "hook_hook", "obj"]
   G: ["hook", "hook_hook", "obj"]
 
@@ -29,10 +29,10 @@ RRT:
   obs_vel_scale: 0.1
   obs_ref_err_scale: 10.0
 
-  q_weight: 0.1
+  q_weight: 0.5
 
   sim_interface:
-    parallel_sims: 500
+    parallel_sims: 50
     xml_path: "configs/mujoco_/franka_emika_panda/panda_single.xml"
     tau_sim: 0.005
     verbose: 1
@@ -43,4 +43,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/pandaHook_balanced2_.h5"
+configs_path: "configs/stable/pandaHook.h5"
