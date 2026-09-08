@@ -3,11 +3,12 @@ RRT:
   log_data: false
   output_dir: ${hydra:runtime.output_dir}
   
-  max_expansions_per_tree: 250
+  start_idx: -1
+  max_expansions_per_tree: 2500
   max_configs: -1
   
   # StaGE params
-  remove_expanded: false
+  remove_expanded: True
 
   # Distance threshholds
   min_cost: 0.01
@@ -17,8 +18,8 @@ RRT:
   stepsize: 0.1
 
   # Distance measurements
-  q: [0,3]
-  q_dot: [0,3]
+  q: [0, 3]
+  q_dot: [0, 3]
   q_obj_dot: [3]
   P: ["obj"]
   G: ["obj"]
@@ -30,12 +31,12 @@ RRT:
   q_weight: 0.5
 
   sim_interface:
-    parallel_sims: 10
+    parallel_sims: 100
     xml_path: "configs/mujoco_/doubleSphere.xml"
     tau_sim: 0.005
     verbose: 1
 
-    joint_vel_ids: [0,3]
+    joint_vel_ids: [0, 3]
 
     camera: "fixed_cam"
     render_w: 640

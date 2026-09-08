@@ -82,6 +82,8 @@ class StaGE:
         self.obs_ref_err_scale = cfg.get("obs_ref_err_scale", 10.0)
 
         self.q_weight = cfg.q_weight
+        if isinstance(self.q_weight, ListConfig):
+            self.q_weight = np.array(self.q_weight)
         
         # Manifold embedings
         self.all_G_star = []
@@ -146,15 +148,15 @@ class StaGE:
         tree: list[ StaGE_Node] = []
     
         root =  StaGE_Node(
-            -1,
-            0.0,
-            self.manifold_qpos[start_idx],
-            np.zeros((self.sim.mj_data.qvel.shape[0],)),
-            self.manifold_ctrl[start_idx],
-            self.geom_xposes[start_idx],
-            np.zeros((self.sim.mj_data.ctrl.shape[0],)),
-            self.phi_stable_configs[start_idx],
-            self.all_G_star[start_idx]
+            parent=-1,
+            t=0.0,
+            qpos=self.manifold_qpos[start_idx],
+            qvel=np.zeros((self.sim.mj_data.qvel.shape[0],)),
+            ctrl=self.manifold_ctrl[start_idx],
+            geom_xpos=self.geom_xposes[start_idx],
+            action=np.zeros((self.sim.mj_data.ctrl.shape[0],)),
+            manifold_phi=self.phi_stable_configs[start_idx],
+            goal_phi=self.all_G_star[start_idx]
         )
         tree.append(root)
             
@@ -204,7 +206,8 @@ class StaGE:
                 pbar = trange(self.max_expansions_per_tree, desc=f"Tree {i+1}/{len(self.start_ids)}", unit="nodes")
             else:
                 pbar = range(self.max_expansions_per_tree)
-            
+
+            tree_len = 0
             for expansion_step_id in pbar:
 
                 # Sample from manifold
@@ -248,15 +251,15 @@ class StaGE:
                 start_id = len(tree)
                 for sim_i in range(self.sample_count):
                     new_node = StaGE_Node(
-                        parent_id,
-                        self.sim.numpy_dict["time"][sim_i],
-                        self.sim.numpy_dict["qpos"][sim_i],
-                        self.sim.numpy_dict["qvel"][sim_i],
-                        self.sim.numpy_dict["ctrl"][sim_i],
-                        self.sim.numpy_dict["geom_xpos"][sim_i],
-                        actions[sim_i],
-                        phi[sim_i],
-                        G[sim_i],
+                        parent=parent_id,
+                        t=self.sim.numpy_dict["time"][sim_i],
+                        qpos=self.sim.numpy_dict["qpos"][sim_i],
+                        qvel=self.sim.numpy_dict["qvel"][sim_i],
+                        ctrl=self.sim.numpy_dict["ctrl"][sim_i],
+                        geom_xpos=self.sim.numpy_dict["geom_xpos"][sim_i],
+                        action=actions[sim_i],
+                        manifold_phi=phi[sim_i],
+                        goal_phi=G[sim_i],
                         target_config_idx=target_id
                     )
                     tree.append(new_node)

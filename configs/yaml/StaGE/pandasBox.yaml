@@ -2,7 +2,7 @@ RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [5]
+  start_idx: -1
   max_expansions_per_tree: 10000
   max_configs: -1
   
@@ -13,16 +13,16 @@ RRT:
   min_cost: 0.2
 
   # MPC actions
-  tau_action: 0.1
+  tau_action: 0.25
   stepsize: [
-    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 125.0,
-    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 125.0,
+    0.15, 0.15, 0.2, 0.25, 0.35, 0.3, 0.5, 128.0,
+    0.15, 0.15, 0.2, 0.25, 0.35, 0.3, 0.5, 128.0
   ]
 
   # Distance measurements
-  q: [0, 16]
-  q_dot: [0, 16]
-  q_obj_dot: [16]
+  q: [0, 18]
+  q_dot: [0, 18]
+  q_obj_dot: [18]
   P: ["obj"]
   G: ["obj"]
 
@@ -30,7 +30,10 @@ RRT:
   obs_vel_scale: 0.1
   obs_ref_err_scale: 10.0
 
-  q_weight: 0.1
+  q_weight: [
+    1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.1, 0.0,
+    1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.1, 0.0
+  ]
 
   sim_interface:
     parallel_sims: 100
@@ -38,7 +41,8 @@ RRT:
     tau_sim: 0.005
     verbose: 1
 
-    joint_vel_ids: [0,16]
+    # joint_vel_ids: [0,18]
+    joint_vel_ids: []
 
     camera: "fixed_cam"
     render_w: 640

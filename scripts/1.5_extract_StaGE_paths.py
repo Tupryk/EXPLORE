@@ -1,7 +1,7 @@
 import os
 import h5py
 import pickle
-os.environ["MUJOCO_GL"] = "egl"
+# os.environ["MUJOCO_GL"] = "egl"
 import mujoco
 import imageio
 import numpy as np
@@ -18,9 +18,10 @@ from explore.env.mujoco_threaded_sim import MjSim
 
 def main():
 
-    out_path = "outputs/2026-09-08/10-46-57"
+    out_path = "outputs/2026-09-08/14-16-09"
     min_traj_time = 1.0
     horizon_same = 15
+    max_conns = 4
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
     gif_path = os.path.join(out_path, "path_gifs")
@@ -67,6 +68,12 @@ def main():
         #         phis = phis[:i]
         #         break
 
+        phis = np.asarray(phis)
+        finite_mask = np.all(np.isfinite(phis), axis=1)
+        if not finite_mask.all():
+            print(f"Dropping {(~finite_mask).sum()} non-finite tree nodes")
+        tree = [node for node, ok in zip(tree, finite_mask) if ok]
+
         sds_tree = KDTree(phis)
 
         cfg.sim_interface.parallel_sims = 1
@@ -93,14 +100,13 @@ def main():
         added_nodes = []
         # for end_id, manifold_point in tqdm(enumerate(phi_stable_configs), total=len(phi_stable_configs)):
         for end_id, manifold_point in tqdm(enumerate(all_G_star), total=len(all_G_star)):
-            if end_id == start_id: continue
+            if end_id == start_id or np.linalg.norm(all_G_star[start_id] - all_G_star[end_id]) < cfg.min_cost: continue
 
-            # Get all neighbors within min_cost, sorted nearest-first
+            # Get all neighbors within min_cost
             ind_arr, dist_arr = sds_tree.query_radius(
                 [manifold_point],
                 r=cfg.min_cost,
                 return_distance=True,
-                sort_results=True,
             )
             candidates = ind_arr[0]
             dists = dist_arr[0]
@@ -110,7 +116,9 @@ def main():
 
             reached_count += 1
 
+            conn_idx = 0
             for ind, dist in zip(candidates, dists):
+                if conn_idx >= max_conns: break
                 ind = int(ind)
 
                 if tree[ind]["t"] <= min_traj_time or ind in added_nodes:
@@ -124,57 +132,55 @@ def main():
                 if set(added_nodes) & set(new_ids):
                     continue
 
-                break  # stop at first valid candidate
-            else:
-                # no candidate within radius passed the checks
-                continue
+                # Valid candidate: accept it and keep going
+                added_nodes.extend(new_ids)
 
-            added_nodes.extend(new_ids)
+                # Render gif
+                goal_frame = sim.render_state(manifold_qpos[end_id])
 
-            # Render gif
-            goal_frame = sim.render_state(manifold_qpos[end_id])
-            
-            node = path[0]
-            sim.setState(
-                np.array([node["t"]]),
-                node["qpos"],
-                node["qvel"],
-                node["ctrl"]
-            )
-            
-            frames = []
-            prev_ctrl = node["ctrl"]
-            for node in path[1:]:
-                fs = sim.step(
-                    cfg.tau_action,
-                    prev_ctrl + node["action"] * cfg.stepsize,
-                    render=True
-                )
+                node = path[0]
                 sim.setState(
                     np.array([node["t"]]),
                     node["qpos"],
                     node["qvel"],
-                    node["ctrl"],
-                    reset_frame_time=False
+                    node["ctrl"]
                 )
-                frames.extend(fs)
+
+                frames = []
                 prev_ctrl = node["ctrl"]
+                for node in path[1:]:
+                    fs = sim.step(
+                        cfg.tau_action,
+                        prev_ctrl + node["action"] * cfg.stepsize,
+                        render=True
+                    )
+                    sim.setState(
+                        np.array([node["t"]]),
+                        node["qpos"],
+                        node["qvel"],
+                        node["ctrl"],
+                        reset_frame_time=False
+                    )
+                    frames.extend(fs)
+                    prev_ctrl = node["ctrl"]
 
-            # Save gif
-            ratio = 0.4
-            frames = [(frame.astype(float)*(1.-ratio) + goal_frame.astype(float)*ratio).astype(frame.dtype) for frame in frames]
-            name = f"{start_id}_to_{end_id}_len_{path[-1]["t"]:.2f}s({len(path)})"
-            imageio.mimsave(os.path.join(gif_path, f"{name}.gif"), frames, fps=24, loop=0)
+                # Save gif
+                ratio = 0.4
+                frames = [(frame.astype(float)*(1.-ratio) + goal_frame.astype(float)*ratio).astype(frame.dtype) for frame in frames]
+                name = f"{start_id}_to_{end_id}_{conn_idx}_len_{path[-1]["t"]:.2f}s({len(path)})"
+                imageio.mimsave(os.path.join(gif_path, f"{name}.gif"), frames, fps=24, loop=0)
 
-            # Save traj and goal
-            data_path = os.path.join(traj_path, f"{name}.pkl")
-            with open(data_path, "wb") as f:
-                pickle.dump(path, f)
+                # Save traj and goal
+                data_path = os.path.join(traj_path, f"{name}.pkl")
+                with open(data_path, "wb") as f:
+                    pickle.dump(path, f)
 
-            data_path = os.path.join(goals_path, f"{name}.pkl")
-            with open(data_path, "wb") as f:
-                pickle.dump(manifold_point, f)
-                
+                data_path = os.path.join(goals_path, f"{name}.pkl")
+                with open(data_path, "wb") as f:
+                    pickle.dump(manifold_point, f)
+
+                conn_idx += 1
+
         print(f"{((reached_count/manifold_size)*100):.2f}% Coverage. ({reached_count} states reached)")
 
 

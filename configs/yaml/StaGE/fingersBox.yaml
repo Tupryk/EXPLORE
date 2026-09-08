@@ -3,17 +3,17 @@ RRT:
   output_dir: ${hydra:runtime.output_dir}
   
   start_idx: -1
-  max_expansions_per_tree: 10000
+  max_expansions_per_tree: 2500
   max_configs: -1
   
   # StaGE params
   remove_expanded: True
 
   # Distance threshholds
-  min_cost: 0.02
+  min_cost: 0.05
 
   # MPC actions
-  tau_action: 0.05
+  tau_action: 0.1
   stepsize: 0.05
 
   # Distance measurements
