@@ -1,6 +1,6 @@
 RRT:
   verbose: 0
-  log_data: false
+  # log_data: False
   output_dir: ${hydra:runtime.output_dir}
   
   start_idx: -1

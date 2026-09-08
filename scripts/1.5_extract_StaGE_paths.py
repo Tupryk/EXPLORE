@@ -1,7 +1,7 @@
 import os
 import h5py
 import pickle
-# os.environ["MUJOCO_GL"] = "egl"
+os.environ["MUJOCO_GL"] = "egl"
 import mujoco
 import imageio
 import numpy as np
@@ -18,7 +18,7 @@ from explore.env.mujoco_threaded_sim import MjSim
 
 def main():
 
-    out_path = "outputs/2026-09-08/14-16-09"
+    out_path = "outputs/2026-09-08/16-09-08"
     min_traj_time = 1.0
     horizon_same = 15
     max_conns = 4

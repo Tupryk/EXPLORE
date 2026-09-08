@@ -69,6 +69,8 @@ class StaGE:
         self.state_dim = self.sim.mj_data.qpos.shape[0]
         
         self.sample_count = cfg.sim_interface.parallel_sims
+        self.knnK = cfg.get("knnK", 1)
+        print("Using StaGE knnK: ", self.knnK)
         
         # State info
         self.q = cfg.q
@@ -207,14 +209,13 @@ class StaGE:
             else:
                 pbar = range(self.max_expansions_per_tree)
 
-            tree_len = 0
             for expansion_step_id in pbar:
 
                 # Sample from manifold
                 target_id = np.random.randint(self.manifold_size)
                 
                 # Pick closest node from the k nearest nodes
-                ids, dists = self.sds_tree.knn_query(self.phi_stable_configs[target_id], k=1)
+                ids, dists = self.sds_tree.knn_query(self.phi_stable_configs[target_id], k=min(len(tree), self.knnK))
                 parent_id = np.random.choice(ids[0])
                 parent = tree[parent_id]
                 if self.remove_expanded:

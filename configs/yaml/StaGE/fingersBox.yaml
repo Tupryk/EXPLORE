@@ -8,6 +8,7 @@ RRT:
   
   # StaGE params
   remove_expanded: True
+  knnK: 16
 
   # Distance threshholds
   min_cost: 0.05
