@@ -148,6 +148,9 @@ class RL_Trainer:
                         print(f"Avg. fail T: {avg_fail_t:.1f}")
                         print(f"Episodes: {rewards_count}")
                         print(f"Alpha: {env.schedule_alpha:.3f}")
+                        if env.gravity_as_curriculum: print(f"Gravity: {env.sim.mj_model.opt.gravity}")
+                        if t < self.timesteps_before_training:
+                            print("Not training yet!!!")
 
                         writer.add_scalar("rollout/avg_success_rate", avg_success_rate, t)
                         writer.add_scalar("rollout/avg_reward", avg_reward, t)

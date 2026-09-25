@@ -52,6 +52,8 @@ class StableConfigsEnv(gym.Env):
         self.gravity_as_curriculum = cfg.get("gravity_as_curriculum", False)
         if self.gravity_as_curriculum:
             print("Using gravity as a curriculum!")
+            self.init_gravity = -1.0
+            self.sim.set_gravity_z(self.init_gravity)
 
         # SGRL
         self.use_csrl = cfg.get("use_csrl", False)
@@ -271,6 +273,7 @@ class StableConfigsEnv(gym.Env):
                 noised_qpos = self.manifold_qpos[s_cfg_idx[i]].copy()
                 noised_qpos[-7:] = cube_pos
                 self.sim.mj_data.qpos[:] = noised_qpos
+
                 mujoco.mj_forward(self.sim.mj_model, self.sim.mj_data)
 
                 G = self.sim.mj_data.geom_xpos[self.G, :].reshape(-1)
@@ -336,7 +339,13 @@ class StableConfigsEnv(gym.Env):
                 self.md_t = md_t1
         
         terminated = goal_reached
-        truncated = np.full((self.sim_count,), self.iter >= self.max_steps)
+
+        ########################################### JUST FOR HUMANOID BOX!!!!! ###########################################
+        pelvis_z = state_dict["geom_xpos"][:, self.P[0], :].reshape(self.sim.nworld, -1)[:, 2].flatten()
+        box_z = state_dict["geom_xpos"][:, self.P[5], :].reshape(self.sim.nworld, -1)[:, 2].flatten()
+        truncated = np.full((self.sim_count,), np.logical_or(np.logical_or(self.iter >= self.max_steps, pelvis_z <= 0.5), box_z <= 0.5))
+        ########################################### JUST FOR HUMANOID BOX!!!!! ###########################################
+        # truncated = np.full((self.sim_count,), self.iter >= self.max_steps)
         
         if self.expand_manifold:
             # TODO: Maybe this should be delayed to when the model has learned something?
@@ -370,10 +379,10 @@ class StableConfigsEnv(gym.Env):
                 self.update_sg_batch = True
                 if self.schedule_alpha > 1.0:
                     self.schedule_alpha = 1.0
-            
-            if self.gravity_as_curriculum:
-                t = self.schedule_alpha
-                gravity = -9.81 * t
-                self.sim.set_gravity_z(gravity)
+                
+                if self.gravity_as_curriculum:
+                    t = self.schedule_alpha
+                    gravity = (self.init_gravity * (1.0 - t)) + (-9.81 * t)
+                    self.sim.set_gravity_z(gravity)
     
         return state, rewards, terminated, truncated, info

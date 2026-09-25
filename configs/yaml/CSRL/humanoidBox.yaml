@@ -12,7 +12,7 @@ eval_eps: 10
 TD7:
   batch_size: 16000
   buffer_size: 4e6
-  discount: 0.95
+  discount: 0.98
   target_update_rate: 250
   exploration_noise: 0.05
   value_clip: [0., 2.]
@@ -54,10 +54,10 @@ TD7:
 
 env:
   min_cost: 0.1
-  max_steps: 64
+  max_steps: 128
   sparse_reward: false
   schedule_alpha_end_step: 100000
-  schedule_alpha_block: 5000
+  schedule_alpha_block: 1000
   gravity_as_curriculum: true
   use_csrl: true
   verbose: 1
