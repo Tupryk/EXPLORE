@@ -48,6 +48,11 @@ class StableConfigsEnv(gym.Env):
 
         self.q_weight = cfg.q_weight
 
+        # Gravity as a Curriculum
+        self.gravity_as_curriculum = cfg.get("gravity_as_curriculum", False)
+        if self.gravity_as_curriculum:
+            print("Using gravity as a curriculum!")
+
         # SGRL
         self.use_csrl = cfg.get("use_csrl", False)
         if self.use_csrl:
@@ -365,5 +370,10 @@ class StableConfigsEnv(gym.Env):
                 self.update_sg_batch = True
                 if self.schedule_alpha > 1.0:
                     self.schedule_alpha = 1.0
+            
+            if self.gravity_as_curriculum:
+                t = self.schedule_alpha
+                gravity = -9.81 * t
+                self.sim.set_gravity_z(gravity)
     
         return state, rewards, terminated, truncated, info

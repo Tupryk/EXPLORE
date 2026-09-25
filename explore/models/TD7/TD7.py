@@ -181,8 +181,12 @@ class Agent(object):
         self.checkpoint_actor = copy.deepcopy(self.actor)
         self.checkpoint_encoder = copy.deepcopy(self.encoder)
 
-        self.replay_buffer = buffer.LAP(state_dim, action_dim, self.device, hp.buffer_size, hp.batch_size, 
-            max_action, normalize_actions=True, prioritized=True, offline_max_size=hp.offline_buffer_size, offline_ratio=hp.buffer_offline_ratio)
+        try:
+            self.replay_buffer = buffer.LAP(state_dim, action_dim, self.device, hp.buffer_size, hp.batch_size, 
+                max_action, normalize_actions=True, prioritized=True, offline_max_size=hp.offline_buffer_size, offline_ratio=hp.buffer_offline_ratio)
+        except:
+            self.replay_buffer = buffer.LAP(state_dim, action_dim, self.device, hp.buffer_size, hp.batch_size, 
+                max_action, normalize_actions=True, prioritized=True)
 
         self.max_action = max_action
         self.offline = offline

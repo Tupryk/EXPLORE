@@ -5,8 +5,8 @@ timesteps_before_training: 25000
 output_dir: ${hydra:runtime.output_dir}
 device: "cpu"
 
-checkpoint_freq: 100000
-eval_freq: 100000
+checkpoint_freq: 50000
+eval_freq: 50000
 eval_eps: 10
 
 TD7:
@@ -25,6 +25,10 @@ TD7:
   # LAP
   alpha: 0.4
   min_priority: 1
+  
+  # # Offline to Online
+  # offline_buffer_size: 10
+  # buffer_offline_ratio: 0.0
   
   # TD3+BC
   offline_loss: False
@@ -54,6 +58,7 @@ env:
   sparse_reward: false
   schedule_alpha_end_step: 100000
   schedule_alpha_block: 5000
+  gravity_as_curriculum: true
   use_csrl: true
   verbose: 1
 

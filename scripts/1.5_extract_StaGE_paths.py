@@ -18,7 +18,7 @@ from explore.env.mujoco_threaded_sim import MjSim
 
 def main():
 
-    out_path = "outputs/2026-09-08/16-09-08"
+    out_path = "outputs/2026-09-08/19-17-11"
     min_traj_time = 1.0
     horizon_same = 15
     max_conns = 4
@@ -38,6 +38,7 @@ def main():
     manifold_size = manifold_qpos.shape[0]
     
     cfg = cfg.RRT
+    stepsize = np.array(cfg.stepsize)
     
     # Start states / tree roots
     start_ids = cfg.get("start_idx", -1)
@@ -151,7 +152,7 @@ def main():
                 for node in path[1:]:
                     fs = sim.step(
                         cfg.tau_action,
-                        prev_ctrl + node["action"] * cfg.stepsize,
+                        prev_ctrl + node["action"] * stepsize,
                         render=True
                     )
                     sim.setState(
@@ -167,7 +168,7 @@ def main():
                 # Save gif
                 ratio = 0.4
                 frames = [(frame.astype(float)*(1.-ratio) + goal_frame.astype(float)*ratio).astype(frame.dtype) for frame in frames]
-                name = f"{start_id}_to_{end_id}_{conn_idx}_len_{path[-1]["t"]:.2f}s({len(path)})"
+                name = f"{start_id}_to_{end_id}_{conn_idx}_len_{path[-1]["t"]:.2f}s({len(path)})_node_{ind}_of_{len(tree)}"
                 imageio.mimsave(os.path.join(gif_path, f"{name}.gif"), frames, fps=24, loop=0)
 
                 # Save traj and goal

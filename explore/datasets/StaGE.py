@@ -97,8 +97,9 @@ class StaGE:
             mujoco.mj_forward(self.sim.mj_model, self.sim.mj_data)
 
             q = self.sim.mj_data.qpos[self.q[0]:self.q[1]]
+            q_obj_dot = self.sim.mj_data.qvel[self.q_obj_dot[0]:self.q_obj_dot[1]]
             G = self.sim.mj_data.geom_xpos[self.G, :].reshape(-1)
-            phi = np.concatenate([q * self.q_weight, G])
+            phi = np.concatenate([q * self.q_weight, q_obj_dot, G])
             
             self.all_G_star.append(G)
             self.phi_stable_configs.append(phi)
@@ -205,7 +206,7 @@ class StaGE:
             self.sds_tree.add_items(self.phi_stable_configs[start_idx].reshape(1, -1), ids=[0])
 
             if self.verbose > 1:
-                pbar = trange(self.max_expansions_per_tree, desc=f"Tree {i+1}/{len(self.start_ids)}", unit="nodes")
+                pbar = trange(self.max_expansions_per_tree, desc=f"Tree {i+1}/{len(self.start_ids)} (idx: {start_idx})", unit="nodes")
             else:
                 pbar = range(self.max_expansions_per_tree)
 
@@ -243,30 +244,45 @@ class StaGE:
                 self.sim.gen_numpy_dict()
                 
                 # Add resulting nodes to tree
-                new_phis = []
-                
-                q = self.sim.numpy_dict["qpos"][:, self.q[0]:self.q[1]]
-                G = self.sim.numpy_dict["geom_xpos"][:, self.G, :].reshape(self.sample_count, -1)
-                phi = np.concatenate([q * self.q_weight, G], axis=1)
-                
-                start_id = len(tree)
-                for sim_i in range(self.sample_count):
-                    new_node = StaGE_Node(
-                        parent=parent_id,
-                        t=self.sim.numpy_dict["time"][sim_i],
-                        qpos=self.sim.numpy_dict["qpos"][sim_i],
-                        qvel=self.sim.numpy_dict["qvel"][sim_i],
-                        ctrl=self.sim.numpy_dict["ctrl"][sim_i],
-                        geom_xpos=self.sim.numpy_dict["geom_xpos"][sim_i],
-                        action=actions[sim_i],
-                        manifold_phi=phi[sim_i],
-                        goal_phi=G[sim_i],
-                        target_config_idx=target_id
-                    )
-                    tree.append(new_node)
-                    new_phis.append(phi[sim_i])
+                numpy_dict = self.sim.numpy_dict
 
-                self.sds_tree.add_items(new_phis, ids=list(range(start_id, len(tree))))
+                pelvis_z = numpy_dict["geom_xpos"][:, self.P[0], 2]
+                box_z = numpy_dict["geom_xpos"][:, self.P[5], 2]
+                mask = (pelvis_z > 0.5) | (box_z > 0.5)  # This is kind of like a collision in standard RRT
+
+                prev_tree_size = len(tree)
+
+                if mask.any():
+                    idx = np.nonzero(mask)[0]
+
+                    qpos_sel = numpy_dict["qpos"][mask]
+                    qvel_sel = numpy_dict["qvel"][mask]
+                    ctrl_sel = numpy_dict["ctrl"][mask]
+                    geom_xpos_sel = numpy_dict["geom_xpos"][mask]
+                    time_sel = numpy_dict["time"][mask]
+                    actions_sel = actions[mask]
+
+                    q = qpos_sel[:, self.q[0]:self.q[1]]
+                    q_obj_dot = qvel_sel[:, self.q_obj_dot[0]:self.q_obj_dot[1]]
+                    G = geom_xpos_sel[:, self.G, :].reshape(len(idx), -1)
+                    phi = np.concatenate([q * self.q_weight, q_obj_dot * 0.1, G], axis=1)
+
+                    for i in range(len(idx)):
+                        node = StaGE_Node(
+                            parent=parent_id,
+                            t=time_sel[i],
+                            qpos=qpos_sel[i],
+                            qvel=qvel_sel[i],
+                            ctrl=ctrl_sel[i],
+                            geom_xpos=geom_xpos_sel[i],
+                            action=actions_sel[i],
+                            manifold_phi=phi[i],
+                            goal_phi=G[i],
+                            target_config_idx=target_id
+                        )
+                        tree.append(node)
+
+                    self.sds_tree.add_items(phi, ids=list(range(prev_tree_size, len(tree))))
                 
             if self.verbose > 2:
                 process = psutil.Process(os.getpid())

@@ -3,11 +3,11 @@ RRT:
   output_dir: ${hydra:runtime.output_dir}
   
   start_idx: -1
-  max_expansions_per_tree: 2500
+  max_expansions_per_tree: 5000
   max_configs: -1
   
   # StaGE params
-  remove_expanded: True
+  remove_expanded: False
   knnK: 16
 
   # Distance threshholds
@@ -45,7 +45,7 @@ RRT:
     nconmax: 100
     ccd_iterations: 100
 
-    joint_vel_ids: [0,6]
+    joint_vel_ids: [0, 6]
 
     camera: "fixed_cam"
     render_w: 640

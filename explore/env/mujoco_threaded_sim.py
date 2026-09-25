@@ -166,6 +166,9 @@ class MjSim:
         self.renderer.update_scene(self.mj_data, self.camera)
         return self.renderer.render().copy()
 
+    def set_gravity_z(self, gravity_z: float):
+        self.mj_model.opt.gravity[2] = gravity_z
+
     def step_seq(self, tau_action: float, ctrl_targets: np.ndarray, sim_idx: int, render: bool = False) -> list[np.ndarray]:
         """
         Args:

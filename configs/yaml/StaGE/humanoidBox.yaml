@@ -2,32 +2,34 @@ RRT:
   verbose: 3
   output_dir: ${hydra:runtime.output_dir}
   
-  start_idx: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43]
+  start_idx: -1
   max_expansions_per_tree: 25000
   max_configs: -1
   
   # StaGE params
-  remove_expanded: true
+  remove_expanded: False
+  knnK: 16
 
   # Distance threshholds
-  min_cost: 0.1
+  min_cost: 0.25
 
   # MPC actions
   tau_action: 0.05
   stepsize: 0.25
 
   # Distance measurements
-  q: [7,36]
-  q_dot: [6,35]
-  q_obj_dot: [0,35]
+  q: [7, 36]
+  q_dot: [6, 35]
+  q_obj_dot: [0, 35]
   P: [
     "pelvis",
     "left_ankle_roll_joint", "right_ankle_roll_joint",
     "left_rubber_hand_0", "right_rubber_hand_0",
-    "box_marker_0", "box_marker_1", "box_marker_2"
+    "obj_col", "box_marker_0", "box_marker_1", "box_marker_2"
   ]
   G: [
-    "box_marker_0", "box_marker_1", "box_marker_2"
+    "left_ankle_roll_joint", "right_ankle_roll_joint",
+    "obj_col", "box_marker_0", "box_marker_1", "box_marker_2"
   ]
   obs_pos_scale: 1.0
   obs_vel_scale: 0.1
@@ -41,7 +43,7 @@ RRT:
     tau_sim: 0.005
     verbose: 1
 
-    joint_vel_ids: [6,35]
+    joint_vel_ids: [6, 35]
 
     camera: "fixed_cam"
     render_w: 640
