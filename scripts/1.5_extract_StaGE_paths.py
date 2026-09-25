@@ -1,7 +1,7 @@
 import os
 import h5py
 import pickle
-os.environ["MUJOCO_GL"] = "egl"
+# os.environ["MUJOCO_GL"] = "egl"
 import mujoco
 import imageio
 import numpy as np
@@ -18,9 +18,9 @@ from explore.env.mujoco_threaded_sim import MjSim
 
 def main():
 
-    out_path = "outputs/2026-09-08/19-17-11"
+    out_path = "outputs/2026-09-26/00-08-33"
     min_traj_time = 1.0
-    horizon_same = 15
+    horizon_same = 1
     max_conns = 4
     
     config_path = os.path.join(out_path, ".hydra/config.yaml")
@@ -61,15 +61,8 @@ def main():
         print(f"Analizing tree {start_id}...")
         
         phis = [node["goal_phi"] for node in tree]
-        # phis = [node["manifold_phi"] for node in tree]
-        # sds_tree = KDTree([p for p in phis if not np.any(np.isnan(p))])  # MuJoCo-Warp makes things NaN?
-        # for i, p in enumerate(phis):
-        #     if np.any(np.isnan(p)):
-        #         print(f"Tree contains nan! Truncating to length {i} of {len(phis)}...")
-        #         phis = phis[:i]
-        #         break
-
         phis = np.asarray(phis)
+        
         finite_mask = np.all(np.isfinite(phis), axis=1)
         if not finite_mask.all():
             print(f"Dropping {(~finite_mask).sum()} non-finite tree nodes")
@@ -85,21 +78,15 @@ def main():
         q_weight = cfg.q_weight
 
         all_G_star = []
-        phi_stable_configs = []
         for i in range(manifold_size):
             sim.mj_data.qpos[:] = manifold_qpos[i]
             mujoco.mj_forward(sim.mj_model, sim.mj_data)
 
-            q = sim.mj_data.qpos[q_ids[0]:q_ids[1]]
             G = sim.mj_data.geom_xpos[G_ids, :].reshape(-1)
-            phi = np.concatenate([q * q_weight, G])
-            
             all_G_star.append(G)
-            phi_stable_configs.append(phi)
         
         reached_count = 0
         added_nodes = []
-        # for end_id, manifold_point in tqdm(enumerate(phi_stable_configs), total=len(phi_stable_configs)):
         for end_id, manifold_point in tqdm(enumerate(all_G_star), total=len(all_G_star)):
             if end_id == start_id or np.linalg.norm(all_G_star[start_id] - all_G_star[end_id]) < cfg.min_cost: continue
 
@@ -168,7 +155,7 @@ def main():
                 # Save gif
                 ratio = 0.4
                 frames = [(frame.astype(float)*(1.-ratio) + goal_frame.astype(float)*ratio).astype(frame.dtype) for frame in frames]
-                name = f"{start_id}_to_{end_id}_{conn_idx}_len_{path[-1]["t"]:.2f}s({len(path)})_node_{ind}_of_{len(tree)}"
+                name = f"{start_id}_to_{end_id}_{conn_idx}_len_{path[-1]['t']:.2f}s({len(path)})_node_{ind}_of_{len(tree)}"
                 imageio.mimsave(os.path.join(gif_path, f"{name}.gif"), frames, fps=24, loop=0)
 
                 # Save traj and goal

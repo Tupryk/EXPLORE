@@ -109,4 +109,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/humanoid_box_grasps.h5"
+configs_path: "configs/stable/humanoid_box_grasps_big.h5"

@@ -99,7 +99,9 @@ class StaGE:
             q = self.sim.mj_data.qpos[self.q[0]:self.q[1]]
             q_obj_dot = self.sim.mj_data.qvel[self.q_obj_dot[0]:self.q_obj_dot[1]]
             G = self.sim.mj_data.geom_xpos[self.G, :].reshape(-1)
-            phi = np.concatenate([q * self.q_weight, q_obj_dot, G])
+            P = self.sim.mj_data.geom_xpos[self.P, :].reshape(-1)
+            # phi = np.concatenate([q * self.q_weight, q_obj_dot, G])
+            phi = np.concatenate([G, q_obj_dot * self.q_weight])
             
             self.all_G_star.append(G)
             self.phi_stable_configs.append(phi)
@@ -108,7 +110,6 @@ class StaGE:
         self.all_G_star = np.array(self.all_G_star)
         self.phi_stable_configs = np.array(self.phi_stable_configs)
         self.geom_xposes = np.array(self.geom_xposes)
-        self.sds_manifold = KDTree(self.phi_stable_configs)
 
         # Environment specific variables
         self.min_cost = cfg.min_cost
@@ -118,11 +119,7 @@ class StaGE:
         if isinstance(self.stepsize, ListConfig):
             self.stepsize = np.array(self.stepsize)
             
-        self.target_min_dist = cfg.get("target_min_dist", 1000.0)
         self.max_expansions_per_tree = int(cfg.get("max_expansions_per_tree", 2500))
-        
-        # MPC
-        self.action_sampler = lambda o, t: self.random_sample_ctrls(o, t)
         
         # StaGE params
         self.remove_expanded = cfg.get("remove_expanded", True)
@@ -246,9 +243,13 @@ class StaGE:
                 # Add resulting nodes to tree
                 numpy_dict = self.sim.numpy_dict
 
+                ########################################### JUST FOR HUMANOID BOX!!!!! ###########################################
+                assert len(self.P) == 9
                 pelvis_z = numpy_dict["geom_xpos"][:, self.P[0], 2]
-                box_z = numpy_dict["geom_xpos"][:, self.P[5], 2]
-                mask = (pelvis_z > 0.5) | (box_z > 0.5)  # This is kind of like a collision in standard RRT
+                # box_z = numpy_dict["geom_xpos"][:, self.P[5], 2]
+                # mask = (pelvis_z > 0.5) | (box_z > 0.5)  # This is kind of like a collision in standard RRT
+                mask = (pelvis_z > 0.5)
+                ########################################### JUST FOR HUMANOID BOX!!!!! ###########################################
 
                 prev_tree_size = len(tree)
 
@@ -265,19 +266,21 @@ class StaGE:
                     q = qpos_sel[:, self.q[0]:self.q[1]]
                     q_obj_dot = qvel_sel[:, self.q_obj_dot[0]:self.q_obj_dot[1]]
                     G = geom_xpos_sel[:, self.G, :].reshape(len(idx), -1)
-                    phi = np.concatenate([q * self.q_weight, q_obj_dot * 0.1, G], axis=1)
+                    P = geom_xpos_sel[:, self.P, :].reshape(len(idx), -1)
+                    # phi = np.concatenate([q * self.q_weight, q_obj_dot * 0.1, G], axis=1)
+                    phi = np.concatenate([G, q_obj_dot * self.q_weight], axis=1)
 
-                    for i in range(len(idx)):
+                    for j in range(len(idx)):
                         node = StaGE_Node(
                             parent=parent_id,
-                            t=time_sel[i],
-                            qpos=qpos_sel[i],
-                            qvel=qvel_sel[i],
-                            ctrl=ctrl_sel[i],
-                            geom_xpos=geom_xpos_sel[i],
-                            action=actions_sel[i],
-                            manifold_phi=phi[i],
-                            goal_phi=G[i],
+                            t=time_sel[j],
+                            qpos=qpos_sel[j],
+                            qvel=qvel_sel[j],
+                            ctrl=ctrl_sel[j],
+                            geom_xpos=geom_xpos_sel[j],
+                            action=actions_sel[j],
+                            manifold_phi=phi[j],
+                            goal_phi=G[j],
                             target_config_idx=target_id
                         )
                         tree.append(node)

@@ -65,7 +65,7 @@ env:
   tau_action: 0.1
   stepsize: 0.5
   
-  stable_configs_path: "configs/stable/humanoid_box_grasps.h5"
+  stable_configs_path: "configs/stable/humanoid_box_grasps_big.h5"
 
   q: [7,36]
   q_dot: [6,35]

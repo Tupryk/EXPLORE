@@ -341,9 +341,10 @@ class StableConfigsEnv(gym.Env):
         terminated = goal_reached
 
         ########################################### JUST FOR HUMANOID BOX!!!!! ###########################################
+        assert len(self.P) == 9
         pelvis_z = state_dict["geom_xpos"][:, self.P[0], :].reshape(self.sim.nworld, -1)[:, 2].flatten()
         box_z = state_dict["geom_xpos"][:, self.P[5], :].reshape(self.sim.nworld, -1)[:, 2].flatten()
-        truncated = np.full((self.sim_count,), np.logical_or(np.logical_or(self.iter >= self.max_steps, pelvis_z <= 0.5), box_z <= 0.5))
+        truncated = np.full((self.sim_count,), np.logical_or(np.logical_or(self.iter >= self.max_steps, pelvis_z <= 0.5), box_z <= 0.25))
         ########################################### JUST FOR HUMANOID BOX!!!!! ###########################################
         # truncated = np.full((self.sim_count,), self.iter >= self.max_steps)
         

@@ -3,7 +3,7 @@ RRT:
   output_dir: ${hydra:runtime.output_dir}
   
   start_idx: -1
-  max_expansions_per_tree: 25000
+  max_expansions_per_tree: 2500
   max_configs: -1
   
   # StaGE params
@@ -11,11 +11,11 @@ RRT:
   knnK: 16
 
   # Distance threshholds
-  min_cost: 0.25
+  min_cost: 0.1
 
   # MPC actions
-  tau_action: 0.05
-  stepsize: 0.25
+  tau_action: 0.2
+  stepsize: 1.0
 
   # Distance measurements
   q: [7, 36]
@@ -28,8 +28,7 @@ RRT:
     "obj_col", "box_marker_0", "box_marker_1", "box_marker_2"
   ]
   G: [
-    "left_ankle_roll_joint", "right_ankle_roll_joint",
-    "obj_col", "box_marker_0", "box_marker_1", "box_marker_2"
+    "box_marker_0", "box_marker_1", "box_marker_2"
   ]
   obs_pos_scale: 1.0
   obs_vel_scale: 0.1
@@ -49,4 +48,4 @@ RRT:
     render_w: 640
     render_h: 480
 
-configs_path: "configs/stable/humanoid_box_grasps.h5"
+configs_path: "configs/stable/humanoid_box_grasps_big.h5"
